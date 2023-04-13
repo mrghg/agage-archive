@@ -30,14 +30,17 @@ class Paths():
         else:
             if not list((self.input_path / self.data_suffix).glob("*.nc")):
                 raise FileNotFoundError(
-                    f"{self.data_suffix} directory doesn't contain any NetCDF files"
+                    f"""{self.data_suffix} directory doesn't
+                    contain any NetCDF files"""
                 )
 
         if not (self.input_path / self.data_gcms_suffix).exists():
             raise FileNotFoundError(
                 f"Data folder must contain {self.data_gcms_suffix} folder")
         else:
-            if not list((self.input_path / self.data_gcms_suffix).glob("*.nc")):
+            if not list(
+                (self.input_path / self.data_gcms_suffix).glob("*.nc")
+            ):
                 raise FileNotFoundError(
                     f"""{self.data_gcms_suffix} directory doesn't
                     contain any NetCDF files"""
@@ -59,4 +62,3 @@ def read_nc(species, site, instrument):
         ds = f.load()
 
     return ds
-

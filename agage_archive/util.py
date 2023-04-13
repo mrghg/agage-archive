@@ -1,5 +1,4 @@
 import configparser
-from pathlib import Path
 
 from agage_archive import get_path
 
