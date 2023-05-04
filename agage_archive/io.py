@@ -87,8 +87,11 @@ def read_c(site):
         site_info = json.load(f)
 
     # Find, open and concatenate files for site
-    search_string = f"{site_info[site]['gcwerks_name']}_ale.*.C"
-    c_files = (paths.input_path / paths.data_ale_suffix).glob(search_string)
+    c_files = []
+    for network in ["ale", "gage"]:
+        search_string = f"{site_info[site]['gcwerks_name']}_{network}.*.C"
+        suffix = getattr(paths, f"data_{network}_suffix")
+        c_files += (paths.input_path / suffix).glob(search_string)
 
     dfs = []
     for c_file in c_files:

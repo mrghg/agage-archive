@@ -9,6 +9,21 @@
         "longitude": 144.6883392334,
         "latitude": -40.682220459
     },
+    "CMO": {
+        "gcwerks_name": "oregon",
+        "longitude": -123.9575,
+        "latitude": 45.49
+    },
+    "MHD": {
+        "gcwerks_name": "macehead",
+        "longitude": -9.904419,
+        "latitude": 53.326614
+    },
+    "RPB": {
+        "gcwerks_name": "barbados",
+        "longitude": -59.4300003052,
+        "latitude": 13.1700000763
+    },
     "SMO": {
         "gcwerks_name": "samoa",
         "longitude": 170.5645141602,
