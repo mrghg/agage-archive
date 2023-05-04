@@ -1,0 +1,17 @@
+{
+    "ADR": {
+        "gcwerks_name": "adrigole",
+        "longitude": -9.7299995422,
+        "latitude": 51.6800003052
+    },
+    "CGO": {
+        "gcwerks_name": "capegrim",
+        "longitude": 144.6883392334,
+        "latitude": -40.682220459
+    },
+    "SMO": {
+        "gcwerks_name": "samoa",
+        "longitude": 170.5645141602,
+        "latitude": -14.2474746704
+    }
+}

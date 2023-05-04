@@ -20,8 +20,9 @@ def get_path(sub_path=""):
 
     """
 
-    if sub_path[0] == "/":
-        raise Exception("sub-path can't begin with '/'")
+    if sub_path:
+        if sub_path[0] == "/":
+            raise Exception("sub-path can't begin with '/'")
 
     path = _ROOT / sub_path
 
