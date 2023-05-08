@@ -72,7 +72,7 @@ def read_nc(species, site, instrument):
     return ds
 
 
-def read_c(site):
+def read_c(site, network):
     """Read .C files containing ALE/GAGE data
 
     Args:
@@ -88,10 +88,9 @@ def read_c(site):
 
     # Find, open and concatenate files for site
     c_files = []
-    for network in ["ale", "gage"]:
-        search_string = f"{site_info[site]['gcwerks_name']}_{network}.*.C"
-        suffix = getattr(paths, f"data_{network}_suffix")
-        c_files += (paths.input_path / suffix).glob(search_string)
+    search_string = f"{site_info[site]['gcwerks_name']}_{network}.*.C"
+    suffix = getattr(paths, f"data_{network}_suffix")
+    c_files += (paths.input_path / suffix).glob(search_string)
 
     dfs = []
     for c_file in c_files:
