@@ -59,6 +59,19 @@ paths = Paths()
 
 
 def read_nc(species, site, instrument):
+    """Read GCWerks netCDF files
+
+    Args:
+        species (str): Species
+        site (str): Site code
+        instrument (str): Instrument
+
+    Raises:
+        FileNotFoundError: Can't find netCDF file
+
+    Returns:
+        xarray.Dataset: Contents of netCDF file
+    """
 
     nc_file = paths.input_path / paths.data_suffix
     nc_file = nc_file / f"AGAGE-{instrument}_{site}_{species}.nc"
@@ -72,11 +85,12 @@ def read_nc(species, site, instrument):
     return ds
 
 
-def read_c(site, network):
+def read_c(species, site, network):
     """Read .C files containing ALE/GAGE data
 
     Args:
         site (str): site code
+        network (str): network, either ALE or GAGE
 
     Returns:
         pd.Dataframe: Pandas Dataframe containing concatenated contents of .C files
@@ -88,8 +102,8 @@ def read_c(site, network):
 
     # Find, open and concatenate files for site
     c_files = []
-    search_string = f"{site_info[site]['gcwerks_name']}_{network}.*.C"
-    suffix = getattr(paths, f"data_{network}_suffix")
+    search_string = f"{site_info[site]['gcwerks_name']}_{network.lower()}.*.C"
+    suffix = getattr(paths, f"data_{network.lower()}_suffix")
     c_files += (paths.input_path / suffix).glob(search_string)
 
     dfs = []
@@ -115,4 +129,42 @@ def read_c(site, network):
 
     df.drop(columns=["Year", "Inlet", "Standard", "datetime"], inplace=True)
 
-    return df.sort_index()
+    df = df.rename(columns={species: "mf"})
+    #TODO: This needs to be done properly!
+    df[f"mf_uncertainty"] = df["mf"]*0.02
+
+    return df[["mf", "mf_uncertainty"]].sort_index()
+#    return df[[species, f"{species}_uncertainty"]].sort_index()
+
+
+def combine_datasets(species, site):
+
+    # Get instructions on how to combine datasets
+    with open(get_path().parent / "data/data_selector.json") as f:
+        data_selector = json.load(f)
+
+    instruments = [["1970-01-01", "Medusa"]]
+
+    if site in data_selector:
+        if species in data_selector[site]:
+            instruments = data_selector[site][species]
+    
+    dfs = []
+    for i, (date, instrument) in enumerate(instruments):
+        if instrument in ["ALE", "GAGE"]:
+            df = read_c(species, site, instrument)
+        else:
+            df = read_nc(species, site, instrument)
+
+        # Apply start date
+        df = df.loc[date:, :]
+
+        # Cut off previous instrument timeseries
+        if i > 0:
+            dfs[i-1] = dfs[i-1].loc[:date, :]
+
+        dfs.append(df)
+
+    return dfs
+
+
