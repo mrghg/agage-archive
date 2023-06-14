@@ -3,12 +3,17 @@ from pathlib import Path
 import xarray as xr
 import json
 import pandas as pd
+import tarfile
+from tzwhere import tzwhere
 
 from agage_archive import get_path
 
 
 class Paths():
     def __init__(self):
+
+        # Get repository root
+        self.root = get_path().parent
 
         # Check if config file exists
         config_file = get_path("config.ini")
@@ -85,6 +90,82 @@ def read_nc(species, site, instrument):
     return ds
 
 
+def read_ale_gage(site, network):
+    """Read GA Tech ALE/GAGE files
+
+    Args:
+        site (str): Three-letter site code
+        network (str): "ALE" or "GAGE"
+
+    Returns:
+        pd.DataFrame: Pandas dataframe containing file contents
+    """
+
+    # Get data on ALE/GAGE sites
+    with open(paths.root / "data/ale_gage_sites.json") as f:
+        site_info = json.load(f)
+
+    # For now, hardwire path
+    folder = {"ALE": Path("/Users/chxmr/data/ale_gage_sio1993/ale"),
+              "GAGE":  Path("/Users/chxmr/data/ale_gage_sio1993/gage")}
+
+    pth = folder[network] / f"{site_info[site]['gcwerks_name']}_sio1993.gtar.gz"
+
+    tar = tarfile.open(pth, "r:gz")
+
+    dfs = []
+
+    for member in tar.getmembers():
+
+        f = tar.extractfile(member)
+        
+        meta = f.readline().decode("ascii").strip()
+        header = f.readline().decode("ascii").split()
+
+        site_in_file = meta[:2]
+        year = meta[2:4]
+        month = meta[4:7]
+
+        nspecies = len(header) - 3
+        columns = header[:3]
+
+        colspec = [3, 5, 7]
+        for species in header[3:]:
+            colspec += [7, 1]
+            columns += [str(species).replace("'", ""),
+                        f"{species}_pollution"]
+
+        df = pd.read_fwf(f, skiprows=0,
+                        widths=colspec,
+                        names=columns,
+                        na_values = -99.9)
+
+        # Some HHMM labeled as 2400, increment to following day
+        midnight = df["TIME"] == 2400
+        df.loc[midnight, "DA"] += 1
+        df.loc[midnight, "TIME"] = 0
+
+        # Create datetime string
+        datetime = df["DA"].astype(str) + \
+            f"/{month}/{year}:" + \
+            df["TIME"].astype(str).str.zfill(4)
+
+        # Convert datetime string
+        # There are some strange entries in here. If we can't understand the format, reject that point.
+        df.index = pd.to_datetime(datetime, format="%d/%b/%y:%H%M", errors="coerce")
+        df.index = df.index.tz_localize(site_info[site]["tz"])
+
+        dfs.append(df)
+
+    # Concatenate
+    df_combined = pd.concat(dfs)
+
+    # Convert to UTC
+    df_combined.index = df_combined.index.tz_convert(None)
+
+    return df_combined
+
+
 def read_c(species, site, network):
     """Read .C files containing ALE/GAGE data
 
@@ -133,13 +214,16 @@ def read_c(species, site, network):
     #TODO: This needs to be done properly!
     df[f"mf_uncertainty"] = df["mf"]*0.02
 
-    return df[["mf", "mf_uncertainty"]].sort_index()
-#    return df[[species, f"{species}_uncertainty"]].sort_index()
+    df = df[["mf", "mf_uncertainty"]].sort_index()
+    df.index.name = "time"
+
+    return df#.to_xarray()
 
 
 def combine_datasets(species, site):
 
     # Get instructions on how to combine datasets
+    # TODO: Use paths.root
     with open(get_path().parent / "data/data_selector.json") as f:
         data_selector = json.load(f)
 

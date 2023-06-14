@@ -2,31 +2,37 @@
     "ADR": {
         "gcwerks_name": "adrigole",
         "longitude": -9.7299995422,
-        "latitude": 51.6800003052
+        "latitude": 51.6800003052,
+        "tz": "Europe/Dublin"
     },
     "CGO": {
         "gcwerks_name": "capegrim",
         "longitude": 144.6883392334,
-        "latitude": -40.682220459
+        "latitude": -40.682220459,
+        "tz": "Australia/Melbourne"
     },
     "CMO": {
         "gcwerks_name": "oregon",
         "longitude": -123.9575,
-        "latitude": 45.49
+        "latitude": 45.49,
+        "tz": "America/Los_Angeles"
     },
     "MHD": {
         "gcwerks_name": "macehead",
         "longitude": -9.904419,
-        "latitude": 53.326614
+        "latitude": 53.326614,
+        "tz": "Europe/Dublin"
     },
     "RPB": {
         "gcwerks_name": "barbados",
         "longitude": -59.4300003052,
-        "latitude": 13.1700000763
+        "latitude": 13.1700000763,
+        "tz": "America/Barbados"
     },
     "SMO": {
         "gcwerks_name": "samoa",
         "longitude": 170.5645141602,
-        "latitude": -14.2474746704
+        "latitude": -14.2474746704,
+        "tz": "US/Samoa"
     }
 }
