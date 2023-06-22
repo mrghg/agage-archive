@@ -90,7 +90,7 @@ def read_nc(species, site, instrument):
     return ds
 
 
-def read_ale_gage(site, network):
+def read_ale_gage(species, site, network):
     """Read GA Tech ALE/GAGE files
 
     Args:
@@ -105,7 +105,12 @@ def read_ale_gage(site, network):
     with open(paths.root / "data/ale_gage_sites.json") as f:
         site_info = json.load(f)
 
+    # Get species info
+    with open(paths.root / "data/ale_gage_species.json") as f:
+        species_info = json.load(f)[species]
+
     # For now, hardwire path
+    #TODO: Sort out these paths
     folder = {"ALE": Path("/Users/chxmr/data/ale_gage_sio1993/ale"),
               "GAGE":  Path("/Users/chxmr/data/ale_gage_sio1993/gage")}
 
@@ -117,6 +122,7 @@ def read_ale_gage(site, network):
 
     for member in tar.getmembers():
 
+        # Extract tar file
         f = tar.extractfile(member)
         
         meta = f.readline().decode("ascii").strip()
@@ -129,12 +135,14 @@ def read_ale_gage(site, network):
         nspecies = len(header) - 3
         columns = header[:3]
 
+        # Define column widths
         colspec = [3, 5, 7]
         for species in header[3:]:
             colspec += [7, 1]
             columns += [str(species).replace("'", ""),
                         f"{species}_pollution"]
 
+        # Read data
         df = pd.read_fwf(f, skiprows=0,
                         widths=colspec,
                         names=columns,
@@ -163,7 +171,7 @@ def read_ale_gage(site, network):
     # Convert to UTC
     df_combined.index = df_combined.index.tz_convert(None)
 
-    return df_combined
+    return df_combined[species_info["species_name_gatech"]]
 
 
 def read_c(species, site, network):
@@ -217,7 +225,36 @@ def read_c(species, site, network):
     df = df[["mf", "mf_uncertainty"]].sort_index()
     df.index.name = "time"
 
-    return df#.to_xarray()
+    return df
+
+
+def attributes(species, site, network):
+
+    '''
+    Need the following attributes:
+        "comment"
+        "data_owner_email"
+        "station_long_name"
+        "inlet_base_elevation"
+        "inlet_latitude"
+        "inlet_longitude"
+        "inlet_comment"
+        "data_dir"
+        "species"
+        "calibration_scale"
+        "units"
+        "file_created"
+
+    and the following variables:
+        "inlet_height"
+        "mf"
+        "mf_repeatability"
+        "data_flag"
+        "integration_flag"
+        "git_pollution_flag"
+        "met_office_baseline_flag"
+    '''
+
 
 
 def combine_datasets(species, site):

@@ -1,0 +1,30 @@
+{
+    "CFC-11": {
+        "species_name_gatech": "F-11S",
+        "scale": "SIO-1993"
+    },
+    "CFC-12": {
+        "species_name_gatech": "F-12",
+        "scale": "SIO-1993"
+    },
+    "CFC-113": {
+        "species_name_gatech": "F-113",
+        "scale": "SIO-1993"
+    },
+    "CH3CCl3": {
+        "species_name_gatech": "CH3CCL3",
+        "scale": "SIO-1993"
+    },
+    "CCl4": {
+        "species_name_gatech": "CCL4",
+        "scale": "SIO-1993"
+    },
+    "N2O": {
+        "species_name_gatech": "N2O",
+        "scale": "SIO-1993"
+    },
+    "CH4": {
+        "species_name_gatech": "CH4",
+        "scale": "CSIRO-1994"
+    }
+}

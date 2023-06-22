@@ -1,38 +1,68 @@
 {
     "ADR": {
         "gcwerks_name": "adrigole",
+        "station_long_name": "Adrigole, Ireland",
+        "data_owner": "Simon O'Doherty",
+        "data_owner_email": "s.odoherty@bristol.ac.uk",
         "longitude": -9.7299995422,
         "latitude": 51.6800003052,
-        "tz": "Europe/Dublin"
+        "tz": "Europe/Dublin",
+        "inlet_height": 10,
+        "inlet_base_elevation_masl": 10
     },
     "CGO": {
         "gcwerks_name": "capegrim",
-        "longitude": 144.6883392334,
-        "latitude": -40.682220459,
-        "tz": "Australia/Melbourne"
+        "station_long_name": "Kennaook/Cape Grim, Tasmania, Australia",
+        "data_owner": "Paul Krummel",
+        "data_owner_email": "paul.krummel@csiro.au",
+        "longitude": 144.689,
+        "latitude": -40.683,
+        "tz": "Australia/Melbourne",
+        "inlet_height": 70,
+        "inlet_base_elevation_masl": 94.0
     },
     "CMO": {
         "gcwerks_name": "oregon",
+        "station_long_name": "Cape Mears, Oregon, USA",
+        "data_owner": "Ray F. Weiss, Jens Muhle",
+        "data_owner_email": "rfweiss@ucsd.edu, jmuhle@ucsd.edu",
         "longitude": -123.9575,
         "latitude": 45.49,
-        "tz": "America/Los_Angeles"
+        "tz": "America/Los_Angeles",
+        "inlet_height": 10,
+        "inlet_base_elevation_masl": 10.0
     },
     "MHD": {
         "gcwerks_name": "macehead",
-        "longitude": -9.904419,
-        "latitude": 53.326614,
-        "tz": "Europe/Dublin"
+        "station_long_name": "Mace Head, Ireland",
+        "data_owner": "Simon O'Doherty",
+        "data_owner_email": "s.odoherty@bristol.ac.uk",
+        "longitude": -9.90456,
+        "latitude": 53.32663,
+        "tz": "Europe/Dublin",
+        "inlet_height": 10,
+        "inlet_base_elevation_masl": 8.4
     },
     "RPB": {
         "gcwerks_name": "barbados",
-        "longitude": -59.4300003052,
-        "latitude": 13.1700000763,
-        "tz": "America/Barbados"
+        "station_long_name": "Ragged Point, Barbados",
+        "data_owner": "Dickon Young",
+        "data_owner_email": "dickon.young@bristol.ac.uk",
+        "longitude": -59.43208,
+        "latitude": 13.16512,
+        "tz": "America/Barbados",
+        "inlet_height": 10,
+        "inlet_base_elevation_masl": 45
     },
     "SMO": {
         "gcwerks_name": "samoa",
-        "longitude": 170.5645141602,
-        "latitude": -14.2474746704,
-        "tz": "US/Samoa"
+        "station_long_name": "Cape Matatula, American Samoa",
+        "data_owner": "Ray F. Weiss, Jens Muhle",
+        "data_owner_email": "rfweiss@ucsd.edu, jmuhle@ucsd.edu",
+        "longitude": -170.5644,
+        "latitude": -14.2474,
+        "tz": "US/Samoa",
+        "inlet_height": 10,
+        "inlet_base_elevation_masl": 42
     }
 }

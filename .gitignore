@@ -131,3 +131,4 @@ dmypy.json
 # User defined
 config.ini
 .vscode
+.DS_store
