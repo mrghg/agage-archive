@@ -8,7 +8,7 @@
         "latitude": 51.6800003052,
         "tz": "Europe/Dublin",
         "inlet_height": 10,
-        "inlet_base_elevation_masl": 10
+        "inlet_base_elevation_masl": 42
     },
     "CGO": {
         "gcwerks_name": "capegrim",
@@ -30,7 +30,7 @@
         "latitude": 45.49,
         "tz": "America/Los_Angeles",
         "inlet_height": 10,
-        "inlet_base_elevation_masl": 10.0
+        "inlet_base_elevation_masl": 22
     },
     "MHD": {
         "gcwerks_name": "macehead",
