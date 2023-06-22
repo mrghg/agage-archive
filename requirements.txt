@@ -1,3 +1,5 @@
 pandas
 xarray
 tzwhere
+netcdf4
+matplotlib

@@ -1,7 +1,63 @@
 # Methodology notes
 *Matt Rigby, University of Bristol*
 
-Some features of the ALE/GAGE data have to be reconstructed from literature. Here are some bits of information I've dug out of key papers at the time.
+with contributions from:
+
+*Ray Wang, GA Tech*
+
+*Paul Krummel, CSIRO*
+
+---
+
+Some features of the ALE/GAGE data have to be reconstructed from literature or personal communication. Here are some bits of information that have been provided to me, or dug out of key papers at the time.
+
+## File format
+The ALE/GAGE files were created by Derek Cunnold and his team at Georgia Tech (GA Tech.) in the early 1990s. These data were all converted from earlier scales to the Scripps Institution of Oceanography (SIO) 1993 scale (SIO-93; see Cunnold et al., 1994 and Prinn et al., 2000).
+
+Data are in *local time* at each site. One file per site, per month.
+
+Columns refer to:
+
+- 1st column, day of month
+- 2nd column, time in hhmm (hour, minute)
+- 3rd column, "ABSDA", days elapsed since the start of ALE program
+- 4th through last column is the dry air mole fraction of measured compounds. -99.0 indicates missing values. The "P" after mole fraction indicates pollution event according to the GA Tech statistcal pollution algorithm.
+
+F-11S and F-11P refer to silicone or Porasil chromatographic columns. The "S" column is preferred.
+
+## Scale conversions
+
+|Species|SIO-98/SIO-93|SIO-05/SIO-98|TU-87/CSIRO-94|
+|--|--|--|--|
+|CFC-11|1.0082|0.9945||
+|CFC-12|1.0053|1.0000||
+|CFC-113|1.0038|1.0042||
+|CH3CCl3|1.0184|0.9957||
+|CCl4|1.0090|1.0000||
+|CH4*|||1.0119|
+|N2O**|1.0058|1.0000||
+
+
+*CH4 note: the factor of 1.01069 was originally used to adjust CH4 to Japanese (TU-1987) scale (when we converted other compounds to SIO-98 scale), it was changed to 1.0119 after Paul Steel (CSIRO) updated the factor (when we updated other species to SIO-2005 scale).
+ 
+**N2O, in addition to applying the factor from SIO-93 to SIO-98, the value also needs to be divided by a time-dependent polynomial function f(t). For ABSDA day # betwen 2252 (May 1, 1984) and 4412 (Mar. 31, 1990):
+
+```
+N2O(t)(SIO-98)= N2O(t)(SIO-93)*1.0058/f(t)
+```
+
+where:
+```
+f(t) = a0 + a1*t + a2*t^(2) + a3*t^(3) + a4*t^(4)
+t = (ABSDA-3227)/365.25
+a0:  1.00664
+a1: -0.56994e-3
+a2: -0.65398e-3
+a3:  0.13083e-3
+a4: -0.20742e-4
+```
+
+ABSDA is the 3rd column in the original data file, 3227 corresponds to Jan. 1, 1987. Please be aware the f(t) function is based on day (e.g. ABSDA), all data within the same date is adjusted by the same f(t) (not varying with different hours, minutes).
 
 ## Repeatability
 I haven't found a good single source of information on repeatabilties, so here are some notes from the early papers.

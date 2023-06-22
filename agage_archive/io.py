@@ -34,15 +34,15 @@ class Paths():
         self.data_ale_suffix = "data-ale"
         self.data_gage_suffix = "data-gage"
 
-        # Check that data folders are there
-        for suffix in [self.data_suffix,
-                       self.data_gcms_suffix,
-                       self.data_ale_suffix,
-                       self.data_gage_suffix]:
+        # # Check that data folders are there
+        # for suffix in [self.data_suffix,
+        #                self.data_gcms_suffix,
+        #                self.data_ale_suffix,
+        #                self.data_gage_suffix]:
 
-            if not (self.input_path / suffix).exists():
-                raise FileNotFoundError(
-                    f"Data folder must contain {suffix} folder")
+        #     if not (self.input_path / suffix).exists():
+        #         raise FileNotFoundError(
+        #             f"Data folder must contain {suffix} folder")
         
         # Check that NetCDF folders contain .nc files
         for suffix in [self.data_suffix, self.data_gcms_suffix]:
@@ -52,15 +52,23 @@ class Paths():
                     contain any NetCDF files"""
                 )
 
-        # Check that ALE and GAGE folder contain .C files
-        for suffix in [self.data_ale_suffix, self.data_gage_suffix]:
-            if not list((self.input_path / suffix).glob("*.C")):
-                raise FileNotFoundError(
-                    f"""{suffix} directory doesn't
-                    contain any GCWerks .C files"""
-                )
+        # # Check that ALE and GAGE folder contain .C files
+        # for suffix in [self.data_ale_suffix, self.data_gage_suffix]:
+        #     if not list((self.input_path / suffix).glob("*.C")):
+        #         raise FileNotFoundError(
+        #             f"""{suffix} directory doesn't
+        #             contain any GCWerks .C files"""
+        #         )
+
 
 paths = Paths()
+
+
+def scale_convert(species, scale_original, scale_new):
+
+    scale_converter = pd.read_csv(paths.root / "data/scale_convert.csv")
+
+
 
 
 def read_nc(species, site, instrument):
@@ -260,8 +268,7 @@ def attributes(species, site, network):
 def combine_datasets(species, site):
 
     # Get instructions on how to combine datasets
-    # TODO: Use paths.root
-    with open(get_path().parent / "data/data_selector.json") as f:
+    with open(paths.root / "data/data_selector.json") as f:
         data_selector = json.load(f)
 
     instruments = [["1970-01-01", "Medusa"]]
