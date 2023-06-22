@@ -2,32 +2,42 @@
     "CFC-11": {
         "species_name_gatech": "F-11S",
         "scale": "SIO-93",
-        "ale_repeatability_percent": 0.5
+        "ale_repeatability_percent": 1,
+        "gage_repeatability_percent": 0.4
     },
     "CFC-12": {
         "species_name_gatech": "F-12",
-        "scale": "SIO-93"
+        "scale": "SIO-93",
+        "ale_repeatability_percent": 1,
+        "gage_repeatability_percent": 0.2
     },
     "CFC-113": {
         "species_name_gatech": "F-113",
-        "scale": "SIO-93"
+        "scale": "SIO-93",
+        "ale_repeatability_percent": 1,
+        "gage_repeatability_percent": 1
     },
     "CH3CCl3": {
         "species_name_gatech": "CH3CCL3",
-        "scale": "SIO-93"
+        "scale": "SIO-93",
+        "ale_repeatability_percent": 2,
+        "gage_repeatability_percent": 2
     },
     "CCl4": {
         "species_name_gatech": "CCL4",
-        "scale": "SIO-93"
+        "scale": "SIO-93",
+        "ale_repeatability_percent": 1,
+        "gage_repeatability_percent": 1
     },
     "N2O": {
         "species_name_gatech": "N2O",
         "scale": "SIO-93",
-        "ale_repeatability_percent": 0.34,
+        "ale_repeatability_percent": 0.35,
         "gage_repeatability_percent": 0.13
     },
     "CH4": {
         "species_name_gatech": "CH4",
-        "scale": "CSIRO-94"
+        "scale": "CSIRO-94",
+        "gage_repeatability_percent": 0.6
     }
 }

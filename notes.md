@@ -1,10 +1,16 @@
+# Methodology notes
+*Matt Rigby, University of Bristol*
+
+Some features of the ALE/GAGE data have to be reconstructed from literature. Here are some bits of information I've dug out of key papers at the time.
 
 ## Repeatability
+I haven't found a good single source of information on repeatabilties, so here are some notes from the early papers.
+
 Prinn et al. (1983) estimates monthly variances (so repeatability + variability) of ~5% for CH3CCl3, ~2% for CFC-11, CFC-12, and CCl4, and 0.5% for N2O.
 
 Cunnold et al. (1983) notes repeat measurement of standards with a repeatability of 0.5% for CFC-11, although 1% discontinuities for CFC-11 and CFC-12 found in Cunnold et al. (1986) due to tank changes.
 
-Prinn et al. (2000) states AGAGE repeatabilities of 0.07% for CFC-11, 0.04% for CFC-12, 0.15% for CFC-113, 0.32% for CH3CCl3, 0.16% for CCl4 and 0.03% for N2O. States that this is improved over GAGE by 1 - 3 times at stations with good environmental control (e.g., CGO), and 2 - 6 times for other stations (e.g. RPB and SMO). A factor of 3 or 6 increase over AGAGE would give (for GAGE):
+Prinn et al. (2000) states *AGAGE* repeatabilities of 0.07% for CFC-11, 0.04% for CFC-12, 0.15% for CFC-113, 0.32% for CH3CCl3, 0.16% for CCl4 and 0.03% for N2O. States that this is improved over GAGE by 1 - 3 times at stations with good environmental control (e.g., CGO), and 2 - 6 times for other stations (e.g. RPB and SMO). A factor of 3 or 6 increase over AGAGE would give (for GAGE):
 - CFC-11: 0.21% - 0.42%
 - CFC-12: 0.12% - 0.24%
 - CFC-113: 0.45% - 0.9%
@@ -15,13 +21,27 @@ N2O repeatability is 0.35% for ALE and 0.13% for GAGE (Prinn et al., 1990).
 
 CH4 GAGE repeatability is 0.3% at CGO to 0.6% at MHD (Cunnold et al., 2002).
 
+Based on these bits of information, I've estimated repeatabilties as follows:
+
+|Species |ALE repeatability (%)|GAGE repeatability (%)|Notes|
+|--------|----|----|---|
+|CFC-11  |1   |0.4 |GAGE value is at the upper end of the Prinn (2000) range inferred above. ALE is conservatively the 1% tank discontinuities mentioned in Cunnold (1986), and half the monthly variability in Prinn (1983).|
+|CFC-12  |1   |0.2 |As for CFC-11.|
+|CFC-113 |1   |1   |Used the Prinn (2000) inferred value for both.|
+|CH3CCl3 |2   |2   |As for CFC-113.|
+|CCl4    |1   |1   |As for CFC-113.|
+|N2O     |0.35|0.13|Prinn (1990).|
+|CH4     |-   |0.6 |Cunnold (2002) upper range applied to all.|
+
+If you propose a change to these values, make sure they are consistent with ```ale_gage_species.json```.
+
 ## Scale uncertainty
 
 SIO-93 scale uncertainty estimated as 0.8% for CFC-11 and 0.5% for CFC-12 (Cunnold et al., 1994)
 
 ## Site locations
 
-Prinn et al. (2000) has Adrigole inlet 52m above sea level and Cape Mears, Oregon inlet 32m above sea level. Have assumed towers were 10m high, and adjusted inlet_base_height accordingly.
+Prinn et al. (2000) has Adrigole inlet 52m above sea level and Cape Mears, Oregon inlet 32m above sea level. Have assumed inlets were 10m high and adjusted ```inlet_base_height``` attribute accordingly.
 
 ## References
 Cunnold, D. M., Prinn, R. G., Rasmussen, R. A., Simmonds, P. G., Alyea, F. N., Cardelino, C. A., Crawford, A. J., Fraser, P. J., and Rosen, R. D.: The Atmospheric Lifetime Experiment 3. Lifetime Methodology and Application to Three Years of CFCl3 Data, Journal of Geophysical Research, 88, 8379–8400, https://doi.org/10.1029/JC088iC13p08379, 1983.
