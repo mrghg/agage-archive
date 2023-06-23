@@ -173,13 +173,23 @@ def read_ale_gage(species, site, network):
 
         dfs.append(df)
 
-    # Concatenate
+    # Concatenate monthly dataframes into single dataframe
     df_combined = pd.concat(dfs)
 
     # Convert to UTC
     df_combined.index = df_combined.index.tz_convert(None)
 
-    return df_combined[species_info["species_name_gatech"]]
+    # Output one species
+    df_combined = df_combined[species_info["species_name_gatech"]]
+
+
+    repeatability = species_info[f"{network.lower()}_repeatability_percent"]/100.
+
+    df_out = pd.DataFrame(index=df_combined.index,
+                          data={"mf": df_combined.values,
+                                "mf_repeatability": df_combined.values*repeatability})
+
+    return df_out
 
 
 def read_c(species, site, network):
