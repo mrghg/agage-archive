@@ -106,10 +106,12 @@ def scale_convert(species, scale_original, scale_new, t, mf):
         f = 1./(a0 + a1*t + a2*t**2 + a3*t**3 + a4*t**4)
 
         # Apply f to mf only between 1st May 1984 and 31st March 1990
+        f_out = np.ones_like(f).astype(float)
         idx = (days_since_ale_start>=2252) & (days_since_ale_start<=4412)
-        mf[idx] = mf[idx] * f[idx]
+        f_out[idx] = f[idx]
+        #mf[idx] = mf[idx] * f[idx]
 
-        return mf
+        return f_out
     
     # Check if scales are the same
     if scale_original == scale_new:
