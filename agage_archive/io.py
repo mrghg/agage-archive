@@ -64,12 +64,33 @@ class Paths():
 paths = Paths()
 
 
-def scale_convert(species, scale_original, scale_new):
+def scale_convert(species, scale_original, scale_new, mf):
 
-    scale_converter = pd.read_csv(paths.root / "data/scale_convert.csv")
+    scale_converter = pd.read_csv(paths.root / "data/scale_convert.csv",
+                                  index_col="Species")
 
+    scale_numerator = [ratio.split("/")[0] for ratio in scale_converter.columns]
+    scale_denominator = [ratio.split("/")[1] for ratio in scale_converter.columns]
 
+    # Check for duplicates in numerator or denominator (can't handle this yet)
+    if len(set(scale_denominator)) != len(scale_denominator):
+        print("Can't deal with multiple factors for same scale at the moment")
+    if len(set(scale_numerator)) != len(scale_numerator):
+        print("Can't deal with multiple factors for same scale at the moment")
 
+    # Find chain of ratios to apply (start from end and work backwards)
+    columns = [scale_numerator.index(scale_new)]
+    while scale_denominator[columns[-1]] != scale_original:
+        columns.append(scale_numerator.index(scale_denominator[columns[-1]]))
+
+    # Now reverse to propagate forwards
+    columns = columns[::-1]    
+
+    # Apply scale conversion factors
+    for column in columns:
+        mf *= scale_converter.loc[species, scale_converter.columns[column]]
+
+    return mf
 
 def read_nc(species, site, instrument):
     """Read GCWerks netCDF files
