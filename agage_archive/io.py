@@ -5,6 +5,7 @@ import json
 import pandas as pd
 import tarfile
 from tzwhere import tzwhere
+import numpy as np
 
 from agage_archive import get_path
 
@@ -64,8 +65,57 @@ class Paths():
 paths = Paths()
 
 
-def scale_convert(species, scale_original, scale_new, mf):
+def scale_convert(species, scale_original, scale_new, t, mf):
+    """Convert mole fraction from one scale to another
 
+    Args:
+        species (str): Species
+        scale_original (str): Original scale
+        scale_new (str): Output scale
+        t (pd.Timestamp): Timestamp
+        mf (float): Mole fraction
+    
+    Returns:
+        ndarray,float: Mole fraction in new scale
+    """
+
+    def n2o_scale_function(time, mf):
+        """Function to apply to N2O mole fractions to convert from SIO-93 to SIO-98
+
+        Args:
+            time (pd.Timestamp): Timestamp
+            mf (ndarray): Mole fractions
+
+        Returns:
+            ndarray: Mole fractions adjusted for time-variation between scales (excluding factor)
+        """
+
+        # ensure mf is array
+        mf = np.atleast_1d(mf)
+
+        # calculate days elapsed since 19th August 1977
+        days_since_ale_start = np.atleast_1d((time - pd.Timestamp("1978-03-02")).days)
+
+        a0=1.00664
+        a1=-0.56994e-3
+        a2=-0.65398e-3
+        a3=0.13083e-3
+        a4=-0.20742e-4
+
+        t = (days_since_ale_start-3227.)/365.25
+        f = 1./(a0 + a1*t + a2*t**2 + a3*t**3 + a4*t**4)
+
+        # Apply f to mf only between 1st May 1984 and 31st March 1990
+        idx = (days_since_ale_start>=2252) & (days_since_ale_start<=4412)
+        mf[idx] = mf[idx] * f[idx]
+
+        return mf
+    
+    # Check if scales are the same
+    if scale_original == scale_new:
+        return mf
+
+    # Read scale conversion factors
     scale_converter = pd.read_csv(paths.root / "data/scale_convert.csv",
                                   index_col="Species")
 
@@ -73,10 +123,9 @@ def scale_convert(species, scale_original, scale_new, mf):
     scale_denominator = [ratio.split("/")[1] for ratio in scale_converter.columns]
 
     # Check for duplicates in numerator or denominator (can't handle this yet)
-    if len(set(scale_denominator)) != len(scale_denominator):
-        print("Can't deal with multiple factors for same scale at the moment")
-    if len(set(scale_numerator)) != len(scale_numerator):
-        print("Can't deal with multiple factors for same scale at the moment")
+    if (len(set(scale_denominator)) != len(scale_denominator)) or \
+        (len(set(scale_numerator)) != len(scale_numerator)):
+        raise NotImplementedError("Can't deal with multiple factors for same scale at the moment")
 
     # Find chain of ratios to apply (start from end and work backwards)
     columns = [scale_numerator.index(scale_new)]
@@ -88,9 +137,16 @@ def scale_convert(species, scale_original, scale_new, mf):
 
     # Apply scale conversion factors
     for column in columns:
-        mf *= scale_converter.loc[species, scale_converter.columns[column]]
+        column_name = scale_converter.columns[column]
+
+        if species.lower() == "n2o" and column_name == "SIO-98/SIO-93":
+            # Apply time-varying factor to N2O (scale factor is not included)
+            mf *= n2o_scale_function(t, mf)
+
+        mf *= scale_converter.loc[species, column_name]
 
     return mf
+
 
 def read_nc(species, site, instrument):
     """Read GCWerks netCDF files
@@ -200,9 +256,11 @@ def read_ale_gage(species, site, network):
     # Convert to UTC
     df_combined.index = df_combined.index.tz_convert(None)
 
+    # Sort
+    df_combined.sort_index(inplace=True)
+
     # Output one species
     df_combined = df_combined[species_info["species_name_gatech"]]
-
 
     repeatability = species_info[f"{network.lower()}_repeatability_percent"]/100.
 

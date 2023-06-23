@@ -20,7 +20,7 @@ Columns refer to:
 
 - 1st column, day of month
 - 2nd column, time in hhmm (hour, minute)
-- 3rd column, "ABSDA", days elapsed since the start of ALE program
+- 3rd column, "ABSDA", days elapsed since the start of ALE program (2nd March, 1978?)
 - 4th through last column is the dry air mole fraction of measured compounds. -99.0 indicates missing values. The "P" after mole fraction indicates pollution event according to the GA Tech statistcal pollution algorithm.
 
 F-11S and F-11P refer to silicone or Porasil chromatographic columns. The "S" column is preferred.
