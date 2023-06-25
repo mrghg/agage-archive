@@ -6,6 +6,8 @@ import pandas as pd
 import tarfile
 from tzwhere import tzwhere
 import numpy as np
+from datetime import datetime
+
 
 from agage_archive import get_path
 
@@ -78,6 +80,8 @@ def scale_convert(species, scale_original, scale_new, t, mf):
     Returns:
         ndarray,float: Mole fraction in new scale
     """
+
+    #TODO: CHANGE THIS TO USE PANDAS DATAFRAME
 
     def n2o_scale_function(time, mf):
         """Function to apply to N2O mole fractions to convert from SIO-93 to SIO-98
@@ -181,6 +185,7 @@ def read_ale_gage(species, site, network):
     """Read GA Tech ALE/GAGE files
 
     Args:
+        species (str): Species
         site (str): Three-letter site code
         network (str): "ALE" or "GAGE"
 
@@ -270,64 +275,13 @@ def read_ale_gage(species, site, network):
                           data={"mf": df_combined.values,
                                 "mf_repeatability": df_combined.values*repeatability})
 
+    df_out.attrs["scale"] = species_info["scale"]
+    df_out.attrs["units"] = species_info["units"]
+
     return df_out
 
 
-def read_c(species, site, network):
-    """Read .C files containing ALE/GAGE data
-
-    Args:
-        site (str): site code
-        network (str): network, either ALE or GAGE
-
-    Returns:
-        pd.Dataframe: Pandas Dataframe containing concatenated contents of .C files
-    """
-
-    # Get data on ALE/GAGE sites
-    with open(get_path().parent / "data/ale_gage_sites.json") as f:
-        site_info = json.load(f)
-
-    # Find, open and concatenate files for site
-    c_files = []
-    search_string = f"{site_info[site]['gcwerks_name']}_{network.lower()}.*.C"
-    suffix = getattr(paths, f"data_{network.lower()}_suffix")
-    c_files += (paths.input_path / suffix).glob(search_string)
-
-    dfs = []
-    for c_file in c_files:
-        dfs.append(pd.read_fwf(c_file,
-            skiprows=4,
-            colspecs="infer",
-            parse_dates={"datetime": ["yyyy", "mm", "dd", "hh", "mi"]}))
-    df = pd.concat(dfs)
-
-    # Create time index
-    df.index = pd.to_datetime(df["datetime"], format="%Y %m %d %H %M")
-    df.index.name = None
-
-    # Rename and drop columns
-    columns = []
-    for ci, col in enumerate(df.columns):
-        if "Flag" in col:
-            columns.append(f"{df.columns[ci-1]}_flag")
-        else:
-            columns.append(col)
-    df.columns = columns
-
-    df.drop(columns=["Year", "Inlet", "Standard", "datetime"], inplace=True)
-
-    df = df.rename(columns={species: "mf"})
-    #TODO: This needs to be done properly!
-    df[f"mf_uncertainty"] = df["mf"]*0.02
-
-    df = df[["mf", "mf_uncertainty"]].sort_index()
-    df.index.name = "time"
-
-    return df
-
-
-def attributes(species, site, network):
+def create_dataset(species, site, network, df):
 
     '''
     Need the following attributes:
@@ -354,6 +308,85 @@ def attributes(species, site, network):
         "met_office_baseline_flag"
     '''
 
+    units = df.attrs["units"]
+    scale = df.attrs["scale"]
+    github_url = "https://github.com/mrghg/agage-archive"
+
+    # Get data on ALE/GAGE sites
+    with open(paths.root / "data/ale_gage_sites.json") as f:
+        site_info = json.load(f)
+
+    # Get species info
+    with open(paths.root / "data/ale_gage_species.json") as f:
+        species_info = json.load(f)[species]
+
+    nt = len(df.index)
+    inlet_height = np.repeat(site_info[site]["inlet_height"], nt)
+    data_flag = np.repeat("U", nt)
+    integration_flag = np.repeat("H", nt)
+
+    # Create xarray dataset
+    ds = xr.Dataset(data_vars={"mf": ("time", df["mf_repeatability"].values.copy()),
+                            "mf_repeatability": ("time", df["mf_repeatability"].values.copy()),
+                            "inlet_height": ("time", inlet_height),
+                            "data_flag": ("time", data_flag),
+                            "integration_flag": ("time", integration_flag),
+                            }, 
+                    coords={"time": df.index})
+    
+    # Variable encoding
+    ds.mf.encoding = {"dtype": "float32"}
+    ds.mf_repeatability.encoding = {"dtype": "float32"}
+    ds.inlet_height.encoding = {"dtype": "int32"}
+    ds.time.encoding = {"units": f"seconds since 1970-01-01 00:00:00"}
+
+    # Variable attributes
+    attributes = {"time": {"label": "centre",
+                            "standard_name": "time",
+                            "comment": "Time stamp corresponds to middle of sampling period. " + \
+                            "Time since midnight UTC of reference date."},
+                    "mf": {"units": units,
+                        "scale": scale,
+                        "long_name": f"mole_fraction_of_{species.lower()}_in_air",
+                        "comment": f"Mole fraction of {species.lower()} in dry air"},
+                    "mf_repeatability": {"units": units,
+                        "long_name": f"mole_fraction_of_{species.lower()}_in_air_repeatability",
+                        "comment": f"Repeatability of {species.lower()} measurements in dry air"},
+                    "inlet_height": {"units": "m",
+                        "long_name": f"inlet_height",
+                        "comment": f"Height of inlet above inlet_base_elevation_masl"},
+                    "integration_flag":{"long_name": f"{species.lower()}_integration_flag",
+                        "comment": f"Integration flag, H=by height, A=by area"},
+                    "data_flag": {"long_name": f"{species.lower()}_data_flag",
+                        "comment": f"Data flag, F=flyer (rejected)"}
+                    }
+
+    for var in attributes:
+        ds[var].attrs.update(attributes[var])
+
+    # Global attributes
+    comment = f"{network} {species} data from {site_info[site]['station_long_name']}. " + \
+        "This data was processed by Derek Cunnold, Georgia Institute of Technology, " + \
+        "from the original files and has now been reprocessed into netCDF format " + \
+        "using code at {github_url}."
+
+    global_attributes = {"comment": comment,
+                        "data_owner_email": "",
+                        "data_owner": "",
+                        "station_long_name": site_info[site]["station_long_name"],
+                        "inlet_base_elevation_masl": site_info[site]["inlet_base_elevation_masl"],
+                        "inlet_latitude": site_info[site]["latitude"],
+                        "inlet_longitude": site_info[site]["longitude"],
+                        "inlet_comment": "",
+                        "data_dir": "",
+                        "species": species.lower(),
+                        "calibration_scale": scale,
+                        "units": units,
+                        "file_created": datetime.now().strftime("%Y-%m-%d %H:%M:%S")}
+
+    ds.attrs.update(global_attributes)    
+
+    return ds
 
 
 def combine_datasets(species, site):
