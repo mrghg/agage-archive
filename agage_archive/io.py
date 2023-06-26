@@ -28,40 +28,39 @@ class Paths():
         config = configparser.ConfigParser()
         config.read(get_path("config.ini"))
 
-        self.input_path = Path(config["Paths"]["input_path"])
+        self.agage = Path(config["Paths"]["agage_path"])
+        self.agage_gcmd = self.agage / "data-nc"
+        self.agage_gcms = self.agage / "data-gcms-nc"
+        self.ale = Path(config["Paths"]["ale_path"])
+        self.gage = Path(config["Paths"]["gage_path"])
+
         self.output_path = Path(config["Paths"]["output_path"])
 
-        # Data folders expected within input path
-        self.data_suffix = "data-nc"
-        self.data_gcms_suffix = "data-gcms-nc"
-        self.data_ale_suffix = "data-ale"
-        self.data_gage_suffix = "data-gage"
+        # Check that data folders are there
+        for pth in [self.agage_gcmd,
+                    self.agage_gcms,
+                    self.ale,
+                    self.gage]:
 
-        # # Check that data folders are there
-        # for suffix in [self.data_suffix,
-        #                self.data_gcms_suffix,
-        #                self.data_ale_suffix,
-        #                self.data_gage_suffix]:
-
-        #     if not (self.input_path / suffix).exists():
-        #         raise FileNotFoundError(
-        #             f"Data folder must contain {suffix} folder")
+            if not pth.exists():
+                raise FileNotFoundError(
+                    f"Folder {pth} doesn't exist")
         
         # Check that NetCDF folders contain .nc files
-        for suffix in [self.data_suffix, self.data_gcms_suffix]:
-            if not list((self.input_path / suffix).glob("*.nc")):
+        for pth in [self.agage_gcmd, self.agage_gcms]:
+            if not list(pth.glob("*.nc")):
                 raise FileNotFoundError(
-                    f"""{suffix} directory doesn't
+                    f"""{pth} directory doesn't
                     contain any NetCDF files"""
                 )
 
-        # # Check that ALE and GAGE folder contain .C files
-        # for suffix in [self.data_ale_suffix, self.data_gage_suffix]:
-        #     if not list((self.input_path / suffix).glob("*.C")):
-        #         raise FileNotFoundError(
-        #             f"""{suffix} directory doesn't
-        #             contain any GCWerks .C files"""
-        #         )
+        # Check that ALE and GAGE folder contain .C files
+        for pth in [self.ale, self.gage]:
+            if not list(pth.glob("*.gtar.gz")):
+                raise FileNotFoundError(
+                    f"""{pth} directory doesn't
+                    contain any GCWerks .gtar.gz files"""
+                )
 
 
 paths = Paths()
@@ -160,7 +159,7 @@ def scale_convert(ds, scale_new):
     return ds_out
 
 
-def read_nc(species, site, instrument):
+def read_agage(species, site, instrument):
     """Read GCWerks netCDF files
 
     Args:
@@ -175,8 +174,14 @@ def read_nc(species, site, instrument):
         xarray.Dataset: Contents of netCDF file
     """
 
-    nc_file = paths.input_path / paths.data_suffix
-    nc_file = nc_file / f"AGAGE-{instrument}_{site}_{species}.nc"
+    species_search = species.lower()
+
+    if instrument == "GCMD":
+        pth = paths.agage_gcmd
+    elif "GCMS" in instrument:
+        pth = paths.agage_gcms
+
+    nc_file = pth / f"AGAGE-{instrument}_{site}_{species_search}.nc"
 
     if not nc_file.exists():
         raise FileNotFoundError(f"Can't find file {nc_file}")
@@ -274,6 +279,12 @@ def read_ale_gage(species, site, network):
 
     # Sort
     df_combined.sort_index(inplace=True)
+
+    # Drop duplicated indices
+    df_combined = df_combined.loc[df_combined.index.drop_duplicates(),:]
+
+    # Drop na indices
+    df_combined = df_combined.loc[~df_combined.index.isna(),:]
 
     # Output one species
     df_combined = df_combined[species_info["species_name_gatech"]]
@@ -377,7 +388,7 @@ def create_dataset(species, site, network, df):
     comment = f"{network} {species} data from {site_info[site]['station_long_name']}. " + \
         "This data was processed by Derek Cunnold, Georgia Institute of Technology, " + \
         "from the original files and has now been reprocessed into netCDF format " + \
-        "using code at {github_url}."
+        f"using code at {github_url}."
 
     global_attributes = {"comment": comment,
                         "data_owner_email": "",
@@ -410,22 +421,48 @@ def combine_datasets(species, site):
         if species in data_selector[site]:
             instruments = data_selector[site][species]
     
-    dfs = []
+    dss = []
+    comments = []
+
     for i, (date, instrument) in enumerate(instruments):
         if instrument in ["ALE", "GAGE"]:
-            df = read_c(species, site, instrument)
+            ds = read_ale_gage(species, site, instrument)
         else:
-            df = read_nc(species, site, instrument)
+            ds = read_agage(species, site, instrument)
 
-        # Apply start date
-        df = df.loc[date:, :]
+        comments.append(ds.attrs["comment"])
+
+        # Remove data before date
+        ds = ds.sel(time=slice(date, None))
+
+        # Convert scale
+        #TODO: Make this more general (scales)
+        ds = scale_convert(ds, "SIO-05")
+
+        # Add instrument to dataset as variable
+        ds["instrument"] = xr.DataArray(np.repeat(instrument, len(ds.time)),
+                                        dims="time", coords={"time": ds.time})
+        ds.instrument.encoding = {"dtype": "str"}
+        ds.instrument.attrs["long_name"] = "ALE/GAGE/AGAGE instrument"
+        ds.instrument.attrs["comment"] = "ALE = GC multi-detector (GCMD) from the ALE project; " + \
+                                        "GAGE = GCMD from the GAGE project; " + \
+                                        "GCMD, GCMS-ADS or GCMS-Medusa are instruments from AGAGE"
+        ds.instrument.attrs["units"] = ""
 
         # Cut off previous instrument timeseries
+        #TODO: Allow for overlapping time periods
         if i > 0:
-            dfs[i-1] = dfs[i-1].loc[:date, :]
+            dss[i-1] = dss[i-1].sel(time=slice(None, date))
 
-        dfs.append(df)
+        dss.append(ds)
 
-    return dfs
+    ds_combined = xr.concat(dss, dim="time")
 
+    # Sort by time
+    ds_combined = ds_combined.sortby("time")
 
+    # Extend comment attribute describing all datasets
+    ds_combined.attrs["comment"] = "Combined AGAGE/GAGE/ALE dataset combined from the following individual sources: ---- " + \
+        "|---| ".join(comments)
+
+    return ds_combined
