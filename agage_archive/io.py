@@ -67,7 +67,7 @@ class Paths():
 paths = Paths()
 
 
-def scale_convert(species, scale_original, scale_new, t, mf):
+def scale_convert(ds, scale_new):
     """Convert mole fraction from one scale to another
 
     Args:
@@ -81,9 +81,7 @@ def scale_convert(species, scale_original, scale_new, t, mf):
         ndarray,float: Mole fraction in new scale
     """
 
-    #TODO: CHANGE THIS TO USE PANDAS DATAFRAME
-
-    def n2o_scale_function(time, mf):
+    def n2o_scale_function(time):
         """Function to apply to N2O mole fractions to convert from SIO-93 to SIO-98
 
         Args:
@@ -94,11 +92,9 @@ def scale_convert(species, scale_original, scale_new, t, mf):
             ndarray: Mole fractions adjusted for time-variation between scales (excluding factor)
         """
 
-        # ensure mf is array
-        mf = np.atleast_1d(mf)
-
         # calculate days elapsed since 19th August 1977
-        days_since_ale_start = np.atleast_1d((time - pd.Timestamp("1978-03-02")).days)
+        days_since_ale_start = (time - \
+                                pd.Timestamp("1978-03-02")).dt.days.values
 
         a0=1.00664
         a1=-0.56994e-3
@@ -118,8 +114,15 @@ def scale_convert(species, scale_original, scale_new, t, mf):
         return f_out
     
     # Check if scales are the same
-    if scale_original == scale_new:
-        return mf
+    if ds.attrs["calibration_scale"] == scale_new:
+        return ds
+    else:
+        scale_original = ds.attrs["calibration_scale"]
+    
+    species = ds.attrs["species"]
+
+    # Make a deep copy of the dataset
+    ds_out = ds.copy(deep=True)
 
     # Read scale conversion factors
     scale_converter = pd.read_csv(paths.root / "data/scale_convert.csv",
@@ -147,11 +150,14 @@ def scale_convert(species, scale_original, scale_new, t, mf):
 
         if species.lower() == "n2o" and column_name == "SIO-98/SIO-93":
             # Apply time-varying factor to N2O (scale factor is not included)
-            mf *= n2o_scale_function(t, mf)
+            ds_out.mf.values *= n2o_scale_function(ds.time.to_series())
 
-        mf *= scale_converter.loc[species, column_name]
+        ds_out.mf.values *= scale_converter.loc[species, column_name]
 
-    return mf
+    # Update attributes
+    ds_out.attrs["calibration_scale"] = scale_new
+
+    return ds_out
 
 
 def read_nc(species, site, instrument):
@@ -229,10 +235,10 @@ def read_ale_gage(species, site, network):
 
         # Define column widths
         colspec = [3, 5, 7]
-        for species in header[3:]:
+        for sp in header[3:]:
             colspec += [7, 1]
-            columns += [str(species).replace("'", ""),
-                        f"{species}_pollution"]
+            columns += [str(sp).replace("'", ""),
+                        f"{sp}_pollution"]
 
         # Read data
         df = pd.read_fwf(f, skiprows=0,
@@ -252,8 +258,11 @@ def read_ale_gage(species, site, network):
 
         # Convert datetime string
         # There are some strange entries in here. If we can't understand the format, reject that point.
-        df.index = pd.to_datetime(datetime, format="%d/%b/%y:%H%M", errors="coerce")
-        df.index = df.index.tz_localize(site_info[site]["tz"])
+        df.index = pd.to_datetime(datetime, format="%d/%b/%y:%H%M",
+                                  errors="coerce")
+        df.index = df.index.tz_localize(site_info[site]["tz"],
+                                        ambiguous="NaT",
+                                        nonexistent="NaT")
 
         dfs.append(df)
 
@@ -272,13 +281,13 @@ def read_ale_gage(species, site, network):
     repeatability = species_info[f"{network.lower()}_repeatability_percent"]/100.
 
     df_out = pd.DataFrame(index=df_combined.index,
-                          data={"mf": df_combined.values,
-                                "mf_repeatability": df_combined.values*repeatability})
+                          data={"mf": df_combined.values.copy(),
+                                "mf_repeatability": df_combined.values.copy()*repeatability})
 
     df_out.attrs["scale"] = species_info["scale"]
     df_out.attrs["units"] = species_info["units"]
 
-    return df_out
+    return create_dataset(species, site, network, df_out)
 
 
 def create_dataset(species, site, network, df):
@@ -326,7 +335,7 @@ def create_dataset(species, site, network, df):
     integration_flag = np.repeat("H", nt)
 
     # Create xarray dataset
-    ds = xr.Dataset(data_vars={"mf": ("time", df["mf_repeatability"].values.copy()),
+    ds = xr.Dataset(data_vars={"mf": ("time", df["mf"].values.copy()),
                             "mf_repeatability": ("time", df["mf_repeatability"].values.copy()),
                             "inlet_height": ("time", inlet_height),
                             "data_flag": ("time", data_flag),
