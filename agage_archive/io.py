@@ -409,14 +409,16 @@ def create_dataset(species, site, network, df):
     return ds
 
 
-def combine_datasets(species, site):
+def combine_datasets(species, site, scale = "SIO-05"):
 
     # Get instructions on how to combine datasets
     with open(paths.root / "data/data_selector.json") as f:
         data_selector = json.load(f)
 
+    # Set default to Medusa
     instruments = [["1970-01-01", "Medusa"]]
 
+    # Read instruments from JSON file
     if site in data_selector:
         if species in data_selector[site]:
             instruments = data_selector[site][species]
@@ -424,7 +426,8 @@ def combine_datasets(species, site):
     dss = []
     comments = []
 
-    for i, (date, instrument) in enumerate(instruments):
+    for instrument, date in instruments.items():
+
         if instrument in ["ALE", "GAGE"]:
             ds = read_ale_gage(species, site, instrument)
         else:
@@ -432,12 +435,12 @@ def combine_datasets(species, site):
 
         comments.append(ds.attrs["comment"])
 
-        # Remove data before date
-        ds = ds.sel(time=slice(date, None))
+        # Subset date
+        date = [None if d == "" else d for d in date]
+        ds = ds.sel(time=slice(*date))
 
         # Convert scale
-        #TODO: Make this more general (scales)
-        ds = scale_convert(ds, "SIO-05")
+        ds = scale_convert(ds, scale)
 
         # Add instrument to dataset as variable
         ds["instrument"] = xr.DataArray(np.repeat(instrument, len(ds.time)),
@@ -448,11 +451,6 @@ def combine_datasets(species, site):
                                         "GAGE = GCMD from the GAGE project; " + \
                                         "GCMD, GCMS-ADS or GCMS-Medusa are instruments from AGAGE"
         ds.instrument.attrs["units"] = ""
-
-        # Cut off previous instrument timeseries
-        #TODO: Allow for overlapping time periods
-        if i > 0:
-            dss[i-1] = dss[i-1].sel(time=slice(None, date))
 
         dss.append(ds)
 
