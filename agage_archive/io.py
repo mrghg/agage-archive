@@ -34,7 +34,7 @@ class Paths():
         self.ale = Path(config["Paths"]["ale_path"])
         self.gage = Path(config["Paths"]["gage_path"])
 
-        self.output_path = Path(config["Paths"]["output_path"])
+        self.output = Path(config["Paths"]["output_path"])
 
         # Check that data folders are there
         for pth in [self.agage_gcmd,
@@ -189,6 +189,11 @@ def read_agage(species, site, instrument):
     with xr.open_dataset(nc_file) as f:
         ds = f.load()
 
+    #TODO: This is a temporary fix while the flag type is sorted out
+    nt = ds.time.size
+    ds["data_flag"] = xr.DataArray(np.repeat(0, nt), coords=[ds.time], dims=["time"])
+    ds["integration_flag"] = xr.DataArray(np.repeat(0, nt), coords=[ds.time], dims=["time"])
+
     return ds
 
 
@@ -342,8 +347,8 @@ def create_dataset(species, site, network, df):
 
     nt = len(df.index)
     inlet_height = np.repeat(site_info[site]["inlet_height"], nt)
-    data_flag = np.repeat("U", nt)
-    integration_flag = np.repeat("H", nt)
+    data_flag = np.repeat(0, nt)
+    integration_flag = np.repeat(0, nt)
 
     # Create xarray dataset
     ds = xr.Dataset(data_vars={"mf": ("time", df["mf"].values.copy()),
@@ -357,7 +362,9 @@ def create_dataset(species, site, network, df):
     # Variable encoding
     ds.mf.encoding = {"dtype": "float32"}
     ds.mf_repeatability.encoding = {"dtype": "float32"}
-    ds.inlet_height.encoding = {"dtype": "int32"}
+    ds.inlet_height.encoding = {"dtype": "int8"}
+    ds.data_flag.encoding = {"dtype": "int8"}
+    ds.integration_flag.encoding = {"dtype": "int8"}
     ds.time.encoding = {"units": f"seconds since 1970-01-01 00:00:00"}
 
     # Variable attributes
@@ -376,9 +383,9 @@ def create_dataset(species, site, network, df):
                         "long_name": f"inlet_height",
                         "comment": f"Height of inlet above inlet_base_elevation_masl"},
                     "integration_flag":{"long_name": f"{species.lower()}_integration_flag",
-                        "comment": f"Integration flag, H=by height, A=by area"},
+                        "comment": f"Integration flag, 0=by height, 1=by area"},
                     "data_flag": {"long_name": f"{species.lower()}_data_flag",
-                        "comment": f"Data flag, F=flyer (rejected)"}
+                        "comment": f"Data flag, 1=flyer (rejected)"}
                     }
 
     for var in attributes:
@@ -415,8 +422,14 @@ def combine_datasets(species, site, scale = "SIO-05"):
     with open(paths.root / "data/data_selector.json") as f:
         data_selector = json.load(f)
 
+    instrument_number = {"ALE": 0,
+                         "GAGE": 1,
+                         "GCMD": 2,
+                         "GCMS-ADS": 3,
+                         "GCMS-Medusa": 4}
+    
     # Set default to Medusa
-    instruments = [["1970-01-01", "Medusa"]]
+    instruments = [["1970-01-01", "GCMS-Medusa"]]
 
     # Read instruments from JSON file
     if site in data_selector:
@@ -432,6 +445,8 @@ def combine_datasets(species, site, scale = "SIO-05"):
             ds = read_ale_gage(species, site, instrument)
         else:
             ds = read_agage(species, site, instrument)
+            ds = ds.drop_vars(["git_pollution_flag",
+                               "met_office_baseline_flag"])
 
         comments.append(ds.attrs["comment"])
 
@@ -443,13 +458,13 @@ def combine_datasets(species, site, scale = "SIO-05"):
         ds = scale_convert(ds, scale)
 
         # Add instrument to dataset as variable
-        ds["instrument"] = xr.DataArray(np.repeat(instrument, len(ds.time)),
+        ds["instrument"] = xr.DataArray(np.repeat(instrument_number[instrument], len(ds.time)),
                                         dims="time", coords={"time": ds.time})
-        ds.instrument.encoding = {"dtype": "str"}
+        ds.instrument.encoding = {"dtype": "int8"}
         ds.instrument.attrs["long_name"] = "ALE/GAGE/AGAGE instrument"
-        ds.instrument.attrs["comment"] = "ALE = GC multi-detector (GCMD) from the ALE project; " + \
-                                        "GAGE = GCMD from the GAGE project; " + \
-                                        "GCMD, GCMS-ADS or GCMS-Medusa are instruments from AGAGE"
+        ds.instrument.attrs["comment"] = "0 = GC multi-detector (GCMD) from the ALE project; " + \
+                                        "1 = GCMD from the GAGE project; " + \
+                                        "2, 3, 4 are GCMD, GCMS-ADS or GCMS-Medusa instruments from AGAGE"
         ds.instrument.attrs["units"] = ""
 
         dss.append(ds)
@@ -462,5 +477,21 @@ def combine_datasets(species, site, scale = "SIO-05"):
     # Extend comment attribute describing all datasets
     ds_combined.attrs["comment"] = "Combined AGAGE/GAGE/ALE dataset combined from the following individual sources: ---- " + \
         "|---| ".join(comments)
+    
+    # Add site code
+    ds_combined.attrs["site_code"] = site.upper()
 
     return ds_combined
+
+
+def output_dataset(ds, end_date = None):
+
+    #TODO: may need to translate species
+    filename = f"AGAGE-combined_{ds.attrs['site_code']}_{ds.attrs['species'].lower()}.nc"
+
+    # Remove run_time variable since we don't have this for the ALE/GAGE data yet
+    #TODO: Check this is still the case
+    ds = ds.drop_vars("run_time")
+
+    ds.to_netcdf(paths.output / filename, mode="w", format="NETCDF4")
+    #.sel(time=slice(None, end_date))
