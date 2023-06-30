@@ -429,6 +429,7 @@ def combine_datasets(species, site, scale = "SIO-05"):
         species (str): Species
         site (str): Site
         scale (str, optional): Calibration scale. Defaults to "SIO-05".
+            If None, no scale conversion is attempted
 
     Returns:
         xr.Dataset: Dataset containing data
@@ -445,7 +446,7 @@ def combine_datasets(species, site, scale = "SIO-05"):
                          "GCMS-Medusa": 4}
     
     # Set default to Medusa
-    instruments = [["1970-01-01", "GCMS-Medusa"]]
+    instruments = {"GCMS-Medusa": ["", ""]}
 
     # Read instruments from JSON file
     if site in data_selector:
@@ -469,7 +470,8 @@ def combine_datasets(species, site, scale = "SIO-05"):
         ds = ds.sel(time=slice(*date))
 
         # Convert scale
-        ds = scale_convert(ds, scale)
+        if scale != None:
+            ds = scale_convert(ds, scale)
 
         # Add instrument to dataset as variable
         ds["instrument"] = xr.DataArray(np.repeat(instrument_number[instrument], len(ds.time)),
@@ -509,5 +511,5 @@ def output_dataset(ds, end_date = None):
     #TODO: may need to translate species
     filename = f"AGAGE-combined_{ds.attrs['site_code']}_{ds.attrs['species'].lower()}.nc"
 
-    ds.to_netcdf(paths.output / filename, mode="w", format="NETCDF4")
-    #.sel(time=slice(None, end_date))
+    ds.sel(time=slice(None, end_date)).to_netcdf(paths.output / filename, mode="w", format="NETCDF4")
+
