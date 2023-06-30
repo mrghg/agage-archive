@@ -190,10 +190,18 @@ def read_agage(species, site, instrument):
     with xr.open_dataset(nc_file) as f:
         ds = f.load()
 
-    #TODO: This is a temporary fix while the flag type is sorted out
-    nt = ds.time.size
-    ds["data_flag"] = xr.DataArray(np.repeat(0, nt), coords=[ds.time], dims=["time"])
-    ds["integration_flag"] = xr.DataArray(np.repeat(0, nt), coords=[ds.time], dims=["time"])
+    # Everything should have been flagged already, but just in case...
+    flagged = ds.data_flag != 0
+    ds.mf[flagged] = np.nan
+    ds.mf_repeatability[flagged] = np.nan
+
+    # For public files, remove flagged data and some other variables
+    ds = ds.drop_vars(["data_flag",
+                       "integration_flag",
+                       "git_pollution_flag",
+                       "met_office_baseline_flag",
+                       "run_time"],
+                       errors="ignore")
 
     return ds
 
@@ -360,24 +368,20 @@ def create_dataset(species, site, network, df):
     ds = xr.Dataset(data_vars={"mf": ("time", df["mf"].values.copy()),
                             "mf_repeatability": ("time", df["mf_repeatability"].values.copy()),
                             "inlet_height": ("time", inlet_height),
-                            "data_flag": ("time", data_flag),
-                            "integration_flag": ("time", integration_flag),
-                            }, 
+                            },
                     coords={"time": df.index})
     
     # Variable encoding
     ds.mf.encoding = {"dtype": "float32"}
     ds.mf_repeatability.encoding = {"dtype": "float32"}
     ds.inlet_height.encoding = {"dtype": "int8"}
-    ds.data_flag.encoding = {"dtype": "int8"}
-    ds.integration_flag.encoding = {"dtype": "int8"}
     ds.time.encoding = {"units": f"seconds since 1970-01-01 00:00:00"}
 
     # Variable attributes
     attributes = {"time": {"label": "centre",
-                            "standard_name": "time",
-                            "comment": "Time stamp corresponds to middle of sampling period. " + \
-                            "Time since midnight UTC of reference date."},
+                        "standard_name": "time",
+                        "comment": "Time stamp corresponds to middle of sampling period. " + \
+                        "Time since midnight UTC of reference date."},
                     "mf": {"units": units,
                         "scale": scale,
                         "long_name": f"mole_fraction_of_{species.lower()}_in_air",
@@ -388,10 +392,6 @@ def create_dataset(species, site, network, df):
                     "inlet_height": {"units": "m",
                         "long_name": f"inlet_height",
                         "comment": f"Height of inlet above inlet_base_elevation_masl"},
-                    "integration_flag":{"long_name": f"{species.lower()}_integration_flag",
-                        "comment": f"Integration flag, 0=by height, 1=by area"},
-                    "data_flag": {"long_name": f"{species.lower()}_data_flag",
-                        "comment": f"Data flag, 1=flyer (rejected)"}
                     }
 
     for var in attributes:
@@ -404,8 +404,8 @@ def create_dataset(species, site, network, df):
         f"using code at {github_url}."
 
     global_attributes = {"comment": comment,
-                        "data_owner_email": "",
-                        "data_owner": "",
+                        "data_owner_email": site_info[site]["data_owner_email"],
+                        "data_owner": site_info[site]["data_owner"],
                         "station_long_name": site_info[site]["station_long_name"],
                         "inlet_base_elevation_masl": site_info[site]["inlet_base_elevation_masl"],
                         "inlet_latitude": site_info[site]["latitude"],
@@ -461,8 +461,6 @@ def combine_datasets(species, site, scale = "SIO-05"):
             ds = read_ale_gage(species, site, instrument)
         else:
             ds = read_agage(species, site, instrument)
-            ds = ds.drop_vars(["git_pollution_flag",
-                               "met_office_baseline_flag"])
 
         comments.append(ds.attrs["comment"])
 
@@ -480,7 +478,7 @@ def combine_datasets(species, site, scale = "SIO-05"):
         ds.instrument.attrs["long_name"] = "ALE/GAGE/AGAGE instrument"
         ds.instrument.attrs["comment"] = "0 = GC multi-detector (GCMD) from the ALE project; " + \
                                         "1 = GCMD from the GAGE project; " + \
-                                        "2, 3, 4 are GCMD, GCMS-ADS or GCMS-Medusa instruments from AGAGE"
+                                        "2, 3, 4 are GCMD, GCMS-ADS or GCMS-Medusa instruments from AGAGE, respectively"
         ds.instrument.attrs["units"] = ""
 
         dss.append(ds)
@@ -510,10 +508,6 @@ def output_dataset(ds, end_date = None):
     
     #TODO: may need to translate species
     filename = f"AGAGE-combined_{ds.attrs['site_code']}_{ds.attrs['species'].lower()}.nc"
-
-    # Remove run_time variable since we don't have this for the ALE/GAGE data yet
-    #TODO: Check this is still the case
-    ds = ds.drop_vars("run_time")
 
     ds.to_netcdf(paths.output / filename, mode="w", format="NETCDF4")
     #.sel(time=slice(None, end_date))
