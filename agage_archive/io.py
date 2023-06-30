@@ -4,7 +4,6 @@ import xarray as xr
 import json
 import pandas as pd
 import tarfile
-from tzwhere import tzwhere
 import numpy as np
 from datetime import datetime
 
@@ -14,6 +13,8 @@ from agage_archive import get_path
 
 class Paths():
     def __init__(self):
+        """Class to store paths to data folders
+        """
 
         # Get repository root
         self.root = get_path().parent
@@ -307,8 +308,7 @@ def read_ale_gage(species, site, network):
 
 
 def create_dataset(species, site, network, df):
-
-    '''
+    '''Create xarray dataset from pandas dataframe
     Need the following attributes:
         "comment"
         "data_owner_email"
@@ -322,15 +322,21 @@ def create_dataset(species, site, network, df):
         "calibration_scale"
         "units"
         "file_created"
-
     and the following variables:
         "inlet_height"
         "mf"
         "mf_repeatability"
         "data_flag"
         "integration_flag"
-        "git_pollution_flag"
-        "met_office_baseline_flag"
+
+    Args:
+        species (str): Species
+        site (str): Site
+        network (str): Network
+        df (pd.DataFrame): Dataframe containing data
+
+    Returns:
+        xr.Dataset: Dataset containing data
     '''
 
     units = df.attrs["units"]
@@ -417,6 +423,16 @@ def create_dataset(species, site, network, df):
 
 
 def combine_datasets(species, site, scale = "SIO-05"):
+    '''Combine ALE/GAGE/AGAGE datasets for a given species and site
+
+    Args:
+        species (str): Species
+        site (str): Site
+        scale (str, optional): Calibration scale. Defaults to "SIO-05".
+
+    Returns:
+        xr.Dataset: Dataset containing data
+    '''
 
     # Get instructions on how to combine datasets
     with open(paths.root / "data/data_selector.json") as f:
@@ -485,7 +501,13 @@ def combine_datasets(species, site, scale = "SIO-05"):
 
 
 def output_dataset(ds, end_date = None):
+    '''Output dataset to netCDF file
 
+    Args:
+        ds (xr.Dataset): Dataset to output
+        end_date (str, optional): End date to subset to. Defaults to None.
+    '''
+    
     #TODO: may need to translate species
     filename = f"AGAGE-combined_{ds.attrs['site_code']}_{ds.attrs['species'].lower()}.nc"
 
