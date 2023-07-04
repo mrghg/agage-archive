@@ -109,7 +109,11 @@ def scale_convert(ds, scale_new):
     return ds_out
 
 
-def create_dataset(species, site, network, df):
+def create_dataset(df,
+                   species,
+                   site,
+                   network, 
+                   instrument):
     '''Create xarray dataset from pandas dataframe
     Need the following attributes:
         "comment"
@@ -136,6 +140,7 @@ def create_dataset(species, site, network, df):
         site (str): Site
         network (str): Network
         df (pd.DataFrame): Dataframe containing data
+        instrument_name (str): Name of instrument, defaults to ""
 
     Returns:
         xr.Dataset: Dataset containing data
@@ -155,8 +160,6 @@ def create_dataset(species, site, network, df):
 
     nt = len(df.index)
     inlet_height = np.repeat(site_info[site]["inlet_height"], nt)
-    data_flag = np.repeat(0, nt)
-    integration_flag = np.repeat(0, nt)
 
     # Create xarray dataset
     ds = xr.Dataset(data_vars={"mf": ("time", df["mf"].values.copy()),
@@ -206,10 +209,15 @@ def create_dataset(species, site, network, df):
                         "inlet_longitude": site_info[site]["longitude"],
                         "inlet_comment": "",
                         "data_dir": "",
-                        "species": species.lower(),
+                        "species": species.lower(), #TODO: Add a species translator to, e.g., remove hyphens. Also needed when filenames are created
                         "calibration_scale": scale,
                         "units": units,
-                        "file_created": datetime.now().strftime("%Y-%m-%d %H:%M:%S")}
+                        "file_created": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                        "instrument": instrument,
+                        "instrument_date": f"{ds.time[0].dt.strftime('%Y-%m-%d').values}",
+                        "instrument_comment": "",
+                        "network": network,
+                        "site_code": site}
 
     ds.attrs.update(global_attributes)    
 
@@ -249,14 +257,14 @@ def combine_datasets(species, site, scale = "SIO-05"):
 
     for instrument, date in instruments.items():
 
-        instrument_rec.append(instrument)
-
         if instrument in ["ALE", "GAGE"]:
             ds = read_ale_gage(species, site, instrument)
         else:
             ds = read_agage(species, site, instrument)
 
         attrs.append(ds.attrs)
+
+        instrument_rec.append({key:value for key, value in ds.attrs.items() if "instrument" in key})
 
         #comments.append(ds.attrs["comment"])
 
@@ -287,11 +295,9 @@ def combine_datasets(species, site, scale = "SIO-05"):
     # Sort by time
     ds_combined = ds_combined.sortby("time")
 
-    # # Add details on instruments to global attributes
-    ds_combined = attributes_instruments(ds_combined,
-                                         instrument_rec,
-                                         attrs,
-                                         dates_rec)
+    # Add details on instruments to global attributes
+    ds_combined = global_attributes_combine_instruments(ds_combined,
+                                                        instrument_rec)
 
     # # Extend comment attribute describing all datasets
     # ds_combined.attrs["comment"] = "Combined AGAGE/GAGE/ALE dataset combined from the following individual sources: ---- " + \
@@ -303,35 +309,89 @@ def combine_datasets(species, site, scale = "SIO-05"):
     return ds_combined
 
 
-def attributes_instruments(ds,
-                           instrument_list,
-                           attribute_list,
-                           dates_list):
+def global_attributes_instrument(ds, instrument):
+    '''Add global attributes for instrument
 
-    ds.attrs = {}
+    Args:
+        ds (xr.Dataset): Dataset
+        instrument (str): Instrument
+    '''
+
+    if "instrument" not in ds.attrs.keys():
+        ds.attrs["instrument"] = instrument
+        ds.attrs["instrument_date"] = f"{ds.time[0].dt.strftime('%Y-%m-%d').values}"
+        ds.attrs["instrument_comment"] = ""
+
+    return ds
+
+
+def global_attributes_combine_instruments(ds,
+                                        instruments):
+
+
+    attrs = {}
+
+    # Remove instrument attributes so that we can repopulate them
+    for attr in ds.attrs:
+        if "instrument" not in attr:
+            attrs[attr] = ds.attrs[attr]
+
+    dates = []
+    for instrument in instruments:
+        for key, value in instrument.items():
+            # For now, just get the date of the first instrument, as it makes sorting easier
+            # There can be multiple, but it's probably not a big deal if they aren't in exactly the right order
+            if key == "instrument_date":
+                dates.append(value)
+
+    #Sort index by date
+    idx = np.argsort(dates)
+
+    instrument_count = 0
 
     # Loop through instruments in reverse
-    for instrument in list(instrument_number.keys())[::-1]:
-        if len(ds.attrs) == 0:
-            if instrument in instrument_list:
-                ds.attrs = attribute_list[instrument_list.index(instrument)]
-                if not "instrument" in ds.attrs:
-                    ds.attrs["instrument"] = instrument
-                    ds.attrs["instrument_date"] = dates_list[instrument_list.index(instrument)]
-                    ds.attrs["instrument_comment"] = ""
-        else:
-            if instrument in instrument_list:
-                # Find maximum existing instrument number
-                instrument_max = 0
-                for attr in ds.attrs:
-                    if "instrument" in attr:
-                        if is_number(attr.split("_")[-1]):
-                            if int(attr.split("_")[-1]) > instrument_max:
-                                instrument_max = int(attr.split("_")[-1])
+    for instrument in np.array(instruments)[idx][::-1]:
 
-                # Add new instrument
-                ds.attrs[f"instrument_{instrument_max + 1}"] = instrument
-                ds.attrs[f"instrument_{instrument_max + 1}_date"] = dates_list[instrument_list.index(instrument)]
-                ds.attrs[f"instrument_{instrument_max + 1}_comment"] = ""
+        max_num = 0
+        for key, value in instrument.items():
+            if is_number(key.split("_")[-1]):
+                if int(key.split("_")[-1]) > max_num:
+                    max_num = int(key.split("_")[-1])
+
+        instrument_count_per_dataset = 0
+        TODO: FIX THIS
+        for key, value in instrument.items():
+            if is_number(key.split("_")[-1]):
+                attrs[f"{key[:-2]}_{overall_instrument_count}"] = value
+            else:
+                attrs[f"{key}_{overall_instrument_count}"] = value
+
+        overall_instrument_count += 1
+
+    ds.attrs = attrs.copy()
+
+    # # Loop through instruments in reverse
+    # for instrument in list(instrument_number.keys())[::-1]:
+    #     if len(ds.attrs) == 0:
+    #         if instrument in instrument_list:
+    #             ds.attrs = attribute_list[instrument_list.index(instrument)]
+    #             if not "instrument" in ds.attrs:
+    #                 ds.attrs["instrument"] = instrument
+    #                 ds.attrs["instrument_date"] = dates_list[instrument_list.index(instrument)]
+    #                 ds.attrs["instrument_comment"] = ""
+    #     else:
+    #         if instrument in instrument_list:
+    #             # Find maximum existing instrument number
+    #             instrument_max = 0
+    #             for attr in ds.attrs:
+    #                 if "instrument" in attr:
+    #                     if is_number(attr.split("_")[-1]):
+    #                         if int(attr.split("_")[-1]) > instrument_max:
+    #                             instrument_max = int(attr.split("_")[-1])
+
+    #             # Add new instrument
+    #             ds.attrs[f"instrument_{instrument_max + 1}"] = instrument
+    #             ds.attrs[f"instrument_{instrument_max + 1}_date"] = dates_list[instrument_list.index(instrument)]
+    #             ds.attrs[f"instrument_{instrument_max + 1}_comment"] = ""
 
     return ds

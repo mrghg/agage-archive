@@ -5,11 +5,9 @@ import json
 import pandas as pd
 import tarfile
 import numpy as np
-from datetime import datetime
 
 from agage_archive import get_path
-from agage_archive.util import is_number
-from agage_archive.processing import create_dataset
+from agage_archive.processing import create_dataset, global_attributes_instrument
 
 
 class Paths():
@@ -110,6 +108,9 @@ def read_agage(species, site, instrument):
                        "met_office_baseline_flag",
                        "run_time"],
                        errors="ignore")
+
+    # Add instrument global attributes, if needed
+    ds = global_attributes_instrument(ds, instrument)
 
     return ds
 
@@ -220,10 +221,13 @@ def read_ale_gage(species, site, network):
     df_out.attrs["scale"] = species_info["scale"]
     df_out.attrs["units"] = species_info["units"]
 
-    return create_dataset(species, site, network, df_out)
+    return create_dataset(df_out, species, site, network, f"{network} GCMD")
 
 
-def output_dataset(ds, end_date = None):
+def output_dataset(ds,
+                   network = "AGAGE",
+                   instrument = "GCMD",
+                   end_date = None):
     '''Output dataset to netCDF file
 
     Args:
@@ -232,7 +236,9 @@ def output_dataset(ds, end_date = None):
     '''
     
     #TODO: may need to translate species
-    filename = f"AGAGE-combined_{ds.attrs['site_code']}_{ds.attrs['species'].lower()}.nc"
+    #TODO: maybe add network and instrument to attributes so it doesn't have to be an input?
+    # NOTE: having said that instrument may not be reliable, as it's used inconsistently in AGAGE files
+    filename = f"{network}-{instrument}_{ds.attrs['site_code']}_{ds.attrs['species'].lower()}.nc"
 
     ds.sel(time=slice(None, end_date)).to_netcdf(paths.output / filename, mode="w", format="NETCDF4")
 
