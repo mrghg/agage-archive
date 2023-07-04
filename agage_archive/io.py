@@ -7,8 +7,8 @@ import tarfile
 import numpy as np
 from datetime import datetime
 
-
 from agage_archive import get_path
+from agage_archive.util import is_number
 
 
 class Paths():
@@ -455,15 +455,21 @@ def combine_datasets(species, site, scale = "SIO-05"):
     
     dss = []
     comments = []
+    attrs = []
+    instrument_rec = []
 
     for instrument, date in instruments.items():
+
+        instrument_rec.append(instrument)
 
         if instrument in ["ALE", "GAGE"]:
             ds = read_ale_gage(species, site, instrument)
         else:
             ds = read_agage(species, site, instrument)
 
-        comments.append(ds.attrs["comment"])
+        attrs.append(ds.attrs)
+
+        #comments.append(ds.attrs["comment"])
 
         # Subset date
         date = [None if d == "" else d for d in date]
@@ -473,15 +479,15 @@ def combine_datasets(species, site, scale = "SIO-05"):
         if scale != None:
             ds = scale_convert(ds, scale)
 
-        # Add instrument to dataset as variable
-        ds["instrument"] = xr.DataArray(np.repeat(instrument_number[instrument], len(ds.time)),
+        # Add instrument_type to dataset as variable
+        ds["instrument_type"] = xr.DataArray(np.repeat(instrument_number[instrument], len(ds.time)),
                                         dims="time", coords={"time": ds.time})
-        ds.instrument.encoding = {"dtype": "int8"}
-        ds.instrument.attrs["long_name"] = "ALE/GAGE/AGAGE instrument"
-        ds.instrument.attrs["comment"] = "0 = GC multi-detector (GCMD) from the ALE project; " + \
+        ds.instrument_type.encoding = {"dtype": "int8"}
+        ds.instrument_type.attrs["long_name"] = "ALE/GAGE/AGAGE instrument type"
+        ds.instrument_type.attrs["comment"] = "0 = GC multi-detector (GCMD) from the ALE project; " + \
                                         "1 = GCMD from the GAGE project; " + \
                                         "2, 3, 4 are GCMD, GCMS-ADS or GCMS-Medusa instruments from AGAGE, respectively"
-        ds.instrument.attrs["units"] = ""
+        ds.instrument_type.attrs["units"] = ""
 
         dss.append(ds)
 
@@ -490,9 +496,40 @@ def combine_datasets(species, site, scale = "SIO-05"):
     # Sort by time
     ds_combined = ds_combined.sortby("time")
 
-    # Extend comment attribute describing all datasets
-    ds_combined.attrs["comment"] = "Combined AGAGE/GAGE/ALE dataset combined from the following individual sources: ---- " + \
-        "|---| ".join(comments)
+
+    # New attributes
+    instrument_type_newest = np.max(ds_combined.instrument)
+    instrument_newest = list(instrument_number.keys())[list(instrument_number.values()).index(instrument_type_newest)]
+
+    ds_combined.attrs = {}
+
+    # Loop through instruments in reverse
+    for instrument in list(instrument_number.keys())[::-1]:
+        if len(ds_combined.attrs) == 0:
+            if instrument in instrument_rec:
+                ds_combined.attrs = attrs[instrument_rec.index(instrument)]
+                if not "instrument" in ds_combined.attrs:
+                    ds_combined.attrs["instrument"] = instrument
+                    ds_combined.attrs["instrument_date"] = dss[instrument_rec.index(instrument)].time[0].dt.strftime("%Y-%m-%d").values
+                    ds_combined.attrs["instrument_comment"] = ""
+        else:
+            if instrument in instrument_rec:
+                # Find maximum existing instrument number
+                instrument_max = 0
+                for attr in ds_combined.attrs:
+                    if "instrument" in attr:
+                        if is_number(attr.split("_")[-1]):
+                            if int(attr.split("_")[-1]) > instrument_max:
+                                instrument_max = int(attr.split("_")[-1])
+
+                # Add new instrument
+                ds_combined.attrs[f"instrument_{instrument_max + 1}"] = instrument
+                ds_combined.attrs[f"instrument_{instrument_max + 1}_date"] = dss[instrument_rec.index(instrument)].time[0].dt.strftime("%Y-%m-%d").values
+                ds_combined.attrs[f"instrument_{instrument_max + 1}_comment"] = ""
+
+    # # Extend comment attribute describing all datasets
+    # ds_combined.attrs["comment"] = "Combined AGAGE/GAGE/ALE dataset combined from the following individual sources: ---- " + \
+    #     "|---| ".join(comments)
     
     # Add site code
     ds_combined.attrs["site_code"] = site.upper()

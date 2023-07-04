@@ -32,5 +32,14 @@ def setup():
         config.write(configfile)
 
 
+def is_number(s):
+    """ Check if a string is a number. """
+    try:
+        float(s)
+        return True
+    except ValueError:
+        return False
+
+
 if __name__ == "__main__":
     setup()
