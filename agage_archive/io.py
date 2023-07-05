@@ -6,62 +6,15 @@ import pandas as pd
 import tarfile
 import numpy as np
 
-from agage_archive import get_path
-from agage_archive.processing import create_dataset, global_attributes_instrument
+from agage_archive import Paths
+from agage_archive.processing import create_dataset, global_attributes_instrument, \
+    global_attributes_combine_instruments, scale_convert
 
-
-class Paths():
-    def __init__(self):
-        """Class to store paths to data folders
-        """
-
-        # Get repository root
-        self.root = get_path().parent
-
-        # Check if config file exists
-        config_file = get_path("config.ini")
-        if not config_file.exists():
-            raise FileNotFoundError(
-                "Config file not found. Try running util.setup first")
-
-        # Read config file
-        config = configparser.ConfigParser()
-        config.read(get_path("config.ini"))
-
-        self.agage = Path(config["Paths"]["agage_path"])
-        self.agage_gcmd = self.agage / "data-nc"
-        self.agage_gcms = self.agage / "data-gcms-nc"
-        self.ale = Path(config["Paths"]["ale_path"])
-        self.gage = Path(config["Paths"]["gage_path"])
-
-        self.output = Path(config["Paths"]["output_path"])
-
-        # Check that data folders are there
-        for pth in [self.agage_gcmd,
-                    self.agage_gcms,
-                    self.ale,
-                    self.gage]:
-
-            if not pth.exists():
-                raise FileNotFoundError(
-                    f"Folder {pth} doesn't exist")
-        
-        # Check that NetCDF folders contain .nc files
-        for pth in [self.agage_gcmd, self.agage_gcms]:
-            if not list(pth.glob("*.nc")):
-                raise FileNotFoundError(
-                    f"""{pth} directory doesn't
-                    contain any NetCDF files"""
-                )
-
-        # Check that ALE and GAGE folder contain .C files
-        for pth in [self.ale, self.gage]:
-            if not list(pth.glob("*.gtar.gz")):
-                raise FileNotFoundError(
-                    f"""{pth} directory doesn't
-                    contain any GCWerks .gtar.gz files"""
-                )
-
+instrument_number = {"ALE": 0,
+                    "GAGE": 1,
+                    "GCMD": 2,
+                    "GCMS-ADS": 3,
+                    "GCMS-Medusa": 4}
 
 paths = Paths()
 
@@ -222,6 +175,91 @@ def read_ale_gage(species, site, network):
     df_out.attrs["units"] = species_info["units"]
 
     return create_dataset(df_out, species, site, network, f"{network} GCMD")
+
+
+def combine_datasets(species, site, scale = "SIO-05"):
+    '''Combine ALE/GAGE/AGAGE datasets for a given species and site
+
+    Args:
+        species (str): Species
+        site (str): Site
+        scale (str, optional): Calibration scale. Defaults to "SIO-05".
+            If None, no scale conversion is attempted
+
+    Returns:
+        xr.Dataset: Dataset containing data
+    '''
+
+    # Get instructions on how to combine datasets
+    with open(paths.root / "data/data_selector.json") as f:
+        data_selector = json.load(f)
+    
+    # Set default to Medusa
+    instruments = {"GCMS-Medusa": ["", ""]}
+
+    # Read instruments from JSON file
+    if site in data_selector:
+        if species in data_selector[site]:
+            instruments = data_selector[site][species]
+    
+    dss = []
+    comments = []
+    attrs = []
+    instrument_rec = []
+    dates_rec = []
+
+    for instrument, date in instruments.items():
+
+        if instrument in ["ALE", "GAGE"]:
+            ds = read_ale_gage(species, site, instrument)
+        else:
+            ds = read_agage(species, site, instrument)
+
+        attrs.append(ds.attrs)
+
+        instrument_rec.append({key:value for key, value in ds.attrs.items() if "instrument" in key})
+
+        #comments.append(ds.attrs["comment"])
+
+        # Subset date
+        date = [None if d == "" else d for d in date]
+        ds = ds.sel(time=slice(*date))
+
+        dates_rec.append(ds.time[0].dt.strftime("%Y-%m-%d").values)
+
+        # Convert scale
+        if scale != None:
+            ds = scale_convert(ds, scale)
+
+        # Add instrument_type to dataset as variable
+        ds["instrument_type"] = xr.DataArray(np.repeat(instrument_number[instrument], len(ds.time)),
+                                        dims="time", coords={"time": ds.time})
+        ds.instrument_type.encoding = {"dtype": "int8"}
+        ds.instrument_type.attrs["long_name"] = "ALE/GAGE/AGAGE instrument type"
+        ds.instrument_type.attrs["comment"] = "0 = GC multi-detector (GCMD) from the ALE project; " + \
+                                        "1 = GCMD from the GAGE project; " + \
+                                        "2, 3, 4 are GCMD, GCMS-ADS or GCMS-Medusa instruments from AGAGE, respectively"
+        ds.instrument_type.attrs["units"] = ""
+
+        dss.append(ds)
+
+    ds_combined = xr.concat(dss, dim="time")
+
+    # Sort by time
+    ds_combined = ds_combined.sortby("time")
+
+    # Add details on instruments to global attributes
+    ds_combined = global_attributes_combine_instruments(ds_combined,
+                                                        instrument_rec)
+
+    # # Extend comment attribute describing all datasets
+    # ds_combined.attrs["comment"] = "Combined AGAGE/GAGE/ALE dataset combined from the following individual sources: ---- " + \
+    #     "|---| ".join(comments)
+    
+    # Add site code
+    ds_combined.attrs["site_code"] = site.upper()
+
+    return ds_combined
 
 
 def output_dataset(ds,

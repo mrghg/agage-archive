@@ -4,15 +4,10 @@ import xarray as xr
 import numpy as np
 from datetime import datetime
 
-from agage_archive.io import Paths, read_ale_gage, read_agage
+from agage_archive import Paths
+#from agage_archive.io import read_ale_gage, read_agage
 from agage_archive.util import is_number
 
-
-instrument_number = {"ALE": 0,
-                    "GAGE": 1,
-                    "GCMD": 2,
-                    "GCMS-ADS": 3,
-                    "GCMS-Medusa": 4}
 
 paths = Paths()
 
@@ -224,91 +219,6 @@ def create_dataset(df,
     return ds
 
 
-def combine_datasets(species, site, scale = "SIO-05"):
-    '''Combine ALE/GAGE/AGAGE datasets for a given species and site
-
-    Args:
-        species (str): Species
-        site (str): Site
-        scale (str, optional): Calibration scale. Defaults to "SIO-05".
-            If None, no scale conversion is attempted
-
-    Returns:
-        xr.Dataset: Dataset containing data
-    '''
-
-    # Get instructions on how to combine datasets
-    with open(paths.root / "data/data_selector.json") as f:
-        data_selector = json.load(f)
-    
-    # Set default to Medusa
-    instruments = {"GCMS-Medusa": ["", ""]}
-
-    # Read instruments from JSON file
-    if site in data_selector:
-        if species in data_selector[site]:
-            instruments = data_selector[site][species]
-    
-    dss = []
-    comments = []
-    attrs = []
-    instrument_rec = []
-    dates_rec = []
-
-    for instrument, date in instruments.items():
-
-        if instrument in ["ALE", "GAGE"]:
-            ds = read_ale_gage(species, site, instrument)
-        else:
-            ds = read_agage(species, site, instrument)
-
-        attrs.append(ds.attrs)
-
-        instrument_rec.append({key:value for key, value in ds.attrs.items() if "instrument" in key})
-
-        #comments.append(ds.attrs["comment"])
-
-        # Subset date
-        date = [None if d == "" else d for d in date]
-        ds = ds.sel(time=slice(*date))
-
-        dates_rec.append(ds.time[0].dt.strftime("%Y-%m-%d").values)
-
-        # Convert scale
-        if scale != None:
-            ds = scale_convert(ds, scale)
-
-        # Add instrument_type to dataset as variable
-        ds["instrument_type"] = xr.DataArray(np.repeat(instrument_number[instrument], len(ds.time)),
-                                        dims="time", coords={"time": ds.time})
-        ds.instrument_type.encoding = {"dtype": "int8"}
-        ds.instrument_type.attrs["long_name"] = "ALE/GAGE/AGAGE instrument type"
-        ds.instrument_type.attrs["comment"] = "0 = GC multi-detector (GCMD) from the ALE project; " + \
-                                        "1 = GCMD from the GAGE project; " + \
-                                        "2, 3, 4 are GCMD, GCMS-ADS or GCMS-Medusa instruments from AGAGE, respectively"
-        ds.instrument_type.attrs["units"] = ""
-
-        dss.append(ds)
-
-    ds_combined = xr.concat(dss, dim="time")
-
-    # Sort by time
-    ds_combined = ds_combined.sortby("time")
-
-    # Add details on instruments to global attributes
-    ds_combined = global_attributes_combine_instruments(ds_combined,
-                                                        instrument_rec)
-
-    # # Extend comment attribute describing all datasets
-    # ds_combined.attrs["comment"] = "Combined AGAGE/GAGE/ALE dataset combined from the following individual sources: ---- " + \
-    #     "|---| ".join(comments)
-    
-    # Add site code
-    ds_combined.attrs["site_code"] = site.upper()
-
-    return ds_combined
-
-
 def global_attributes_instrument(ds, instrument):
     '''Add global attributes for instrument
 
@@ -337,36 +247,58 @@ def global_attributes_combine_instruments(ds,
             attrs[attr] = ds.attrs[attr]
 
     dates = []
+    suffixes = []
+
     for instrument in instruments:
+        suffix = ["",]
+
+        has_instrument = False
+        has_instrument_date = False
+
         for key, value in instrument.items():
             # For now, just get the date of the first instrument, as it makes sorting easier
             # There can be multiple, but it's probably not a big deal if they aren't in exactly the right order
             if key == "instrument_date":
                 dates.append(value)
+                has_instrument_date = True
+            
+            if is_number(key.split("instrument_")[-1]):
+                # Store numerical suffix, prepending with underscore
+                suffix.append("_" + key.split("instrument_")[-1])
+                has_instrument = True
 
+            if key == "instrument":
+                has_instrument = True
+                
+        suffixes.append(suffix)
+
+    if not has_instrument:
+        raise ValueError("No instrument attribute found")
+    if not has_instrument_date:
+        raise ValueError("No instrument_date attribute found")
+    
     #Sort index by date
-    idx = np.argsort(dates)
+    idx = np.argsort(dates)[::-1]
+    # Apply this sort order to instruments dictionary
+    instruments_sorted = [instruments[i] for i in idx]
+    suffixes_sorted = [suffixes[i] for i in idx]
 
     instrument_count = 0
 
     # Loop through instruments in reverse
-    for instrument in np.array(instruments)[idx][::-1]:
+    for instrument, suffix in zip(instruments_sorted, suffixes_sorted):
 
-        max_num = 0
-        for key, value in instrument.items():
-            if is_number(key.split("_")[-1]):
-                if int(key.split("_")[-1]) > max_num:
-                    max_num = int(key.split("_")[-1])
-
-        instrument_count_per_dataset = 0
-        TODO: FIX THIS
-        for key, value in instrument.items():
-            if is_number(key.split("_")[-1]):
-                attrs[f"{key[:-2]}_{overall_instrument_count}"] = value
+        for n in suffix:
+            if instrument_count == 0:
+                attrs[f"instrument"] = instrument["instrument" + n]
+                attrs[f"instrument_date"] = instrument["instrument_date" + n]
+                attrs[f"instrument_comment"] = instrument["instrument_comment" + n]
             else:
-                attrs[f"{key}_{overall_instrument_count}"] = value
-
-        overall_instrument_count += 1
+                attrs[f"instrument_{instrument_count}"] = instrument["instrument" + n]
+                attrs[f"instrument_date_{instrument_count}"] = instrument["instrument_date" + n]
+                attrs[f"instrument_comment_{instrument_count}"] = instrument["instrument_comment" + n]
+            
+            instrument_count += 1
 
     ds.attrs = attrs.copy()
 
