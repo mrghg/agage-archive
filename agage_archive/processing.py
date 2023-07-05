@@ -237,7 +237,20 @@ def global_attributes_instrument(ds, instrument):
 
 def global_attributes_combine_instruments(ds,
                                         instruments):
+    '''Combine instrument details in global attributes
 
+    Args:
+        ds (xr.Dataset): Dataset
+        instruments (list): List of instruments
+    
+    
+    Returns:
+        xr.Dataset: Dataset with updated global attributes
+    '''
+
+    # If only one instrument, return
+    if len(instruments) == 1:
+        return ds
 
     attrs = {}
 
@@ -272,11 +285,11 @@ def global_attributes_combine_instruments(ds,
                 
         suffixes.append(suffix)
 
-    if not has_instrument:
-        raise ValueError("No instrument attribute found")
-    if not has_instrument_date:
-        raise ValueError("No instrument_date attribute found")
-    
+        if not has_instrument:
+            raise ValueError("No instrument attribute found")
+        if not has_instrument_date:
+            raise ValueError("No instrument_date attribute found")
+        
     #Sort index by date
     idx = np.argsort(dates)[::-1]
     # Apply this sort order to instruments dictionary
@@ -289,41 +302,22 @@ def global_attributes_combine_instruments(ds,
     for instrument, suffix in zip(instruments_sorted, suffixes_sorted):
 
         for n in suffix:
+
+            # Relabel instrument number
             if instrument_count == 0:
-                attrs[f"instrument"] = instrument["instrument" + n]
-                attrs[f"instrument_date"] = instrument["instrument_date" + n]
-                attrs[f"instrument_comment"] = instrument["instrument_comment" + n]
+                suffix_new = ""
             else:
-                attrs[f"instrument_{instrument_count}"] = instrument["instrument" + n]
-                attrs[f"instrument_date_{instrument_count}"] = instrument["instrument_date" + n]
-                attrs[f"instrument_comment_{instrument_count}"] = instrument["instrument_comment" + n]
-            
+                suffix_new = "_" + str(instrument_count)
+
+            for attr in ["instrument", "instrument_date", "instrument_comment"]:
+                if attr + n in instrument.keys():
+                    attrs[attr + suffix_new] = instrument[attr + n]
+                else:
+                    print("WARNING: No " + attr + " found for instrument " + n + ". Setting to empty string")
+                    attrs[attr + suffix_new] = ""
+        
             instrument_count += 1
 
     ds.attrs = attrs.copy()
-
-    # # Loop through instruments in reverse
-    # for instrument in list(instrument_number.keys())[::-1]:
-    #     if len(ds.attrs) == 0:
-    #         if instrument in instrument_list:
-    #             ds.attrs = attribute_list[instrument_list.index(instrument)]
-    #             if not "instrument" in ds.attrs:
-    #                 ds.attrs["instrument"] = instrument
-    #                 ds.attrs["instrument_date"] = dates_list[instrument_list.index(instrument)]
-    #                 ds.attrs["instrument_comment"] = ""
-    #     else:
-    #         if instrument in instrument_list:
-    #             # Find maximum existing instrument number
-    #             instrument_max = 0
-    #             for attr in ds.attrs:
-    #                 if "instrument" in attr:
-    #                     if is_number(attr.split("_")[-1]):
-    #                         if int(attr.split("_")[-1]) > instrument_max:
-    #                             instrument_max = int(attr.split("_")[-1])
-
-    #             # Add new instrument
-    #             ds.attrs[f"instrument_{instrument_max + 1}"] = instrument
-    #             ds.attrs[f"instrument_{instrument_max + 1}_date"] = dates_list[instrument_list.index(instrument)]
-    #             ds.attrs[f"instrument_{instrument_max + 1}_comment"] = ""
 
     return ds
