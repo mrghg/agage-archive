@@ -8,7 +8,8 @@ import numpy as np
 
 from agage_archive import Paths
 from agage_archive.processing import create_dataset, global_attributes_instrument, \
-    global_attributes_combine_instruments, scale_convert
+    global_attributes_combine_instruments, scale_convert, format_dataset,\
+    format_species
 
 instrument_number = {"ALE": 0,
                     "GAGE": 1,
@@ -219,7 +220,7 @@ def combine_datasets(species, site, scale = "SIO-05"):
 
         instrument_rec.append({key:value for key, value in ds.attrs.items() if "instrument" in key})
 
-        #comments.append(ds.attrs["comment"])
+        comments.append(ds.attrs["comment"])
 
         # Subset date
         date = [None if d == "" else d for d in date]
@@ -252,10 +253,13 @@ def combine_datasets(species, site, scale = "SIO-05"):
     ds_combined = global_attributes_combine_instruments(ds_combined,
                                                         instrument_rec)
 
-    # # Extend comment attribute describing all datasets
-    # ds_combined.attrs["comment"] = "Combined AGAGE/GAGE/ALE dataset combined from the following individual sources: ---- " + \
-    #     "|---| ".join(comments)
-    
+    # Extend comment attribute describing all datasets
+    if len(comments) > 1:
+        ds_combined.attrs["comment"] = "Combined AGAGE/GAGE/ALE dataset from the following individual sources: ---- " + \
+            "|---| ".join(comments)
+    else:
+        ds_combined.attrs["comment"] = comments[0]
+
     # Add site code
     ds_combined.attrs["site_code"] = site.upper()
 
@@ -272,11 +276,13 @@ def output_dataset(ds,
         ds (xr.Dataset): Dataset to output
         end_date (str, optional): End date to subset to. Defaults to None.
     '''
-    
-    #TODO: may need to translate species
+
+    #TODO: is this the best place to call this?    
+    ds = format_dataset(ds)
+
     #TODO: maybe add network and instrument to attributes so it doesn't have to be an input?
     # NOTE: having said that instrument may not be reliable, as it's used inconsistently in AGAGE files
-    filename = f"{network}-{instrument}_{ds.attrs['site_code']}_{ds.attrs['species'].lower()}.nc"
+    filename = f"{network}-{instrument}_{ds.attrs['site_code']}_{format_species(ds.attrs['species'])}.nc"
 
     ds.sel(time=slice(None, end_date)).to_netcdf(paths.output / filename, mode="w", format="NETCDF4")
 

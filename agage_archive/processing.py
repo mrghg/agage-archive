@@ -4,7 +4,7 @@ import xarray as xr
 import numpy as np
 from datetime import datetime
 import re
-import pprint
+import os
 
 from agage_archive import Paths
 #from agage_archive.io import read_ale_gage, read_agage
@@ -206,17 +206,17 @@ def create_dataset(df,
                         "inlet_longitude": site_info[site]["longitude"],
                         "inlet_comment": "",
                         "data_dir": "",
-                        "species": species.lower(), #TODO: Add a species translator to, e.g., remove hyphens. Also needed when filenames are created
+                        "species": format_species(species),
                         "calibration_scale": scale,
                         "units": units,
                         "file_created": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-                        "instrument": instrument,
-                        "instrument_date": f"{ds.time[0].dt.strftime('%Y-%m-%d').values}",
-                        "instrument_comment": "",
                         "network": network,
                         "site_code": site}
 
     ds.attrs.update(global_attributes)    
+
+    # Add instrument attributes
+    ds = global_attributes_instrument(ds, instrument)
 
     return ds
 
@@ -351,20 +351,62 @@ def format_dataset(ds):
                          "units",
                          "file_created",
                          "file_created_by",
-                         "instrument*",
+                         "instrument",
                          "doi"]
     
     attrs = {}
 
     for attr in attributes_public:
+
+        attr_exists = False
         for key in ds.attrs.keys():
-            if re.search(attr, key):
+            if re.match(attr, key):
                 attrs[key] = ds.attrs[key]
-            else:
-                attrs[key] = ""
+                attr_exists = True
+        
+        if not attr_exists:
+            attrs[attr] = ""
 
-    pprint.pprint(attrs)
+    attrs["species"] = format_species(ds.attrs["species"])
 
-    #TODO: Add variable encoding
-    #TODO: Format comment string
-    #TODO: Species formatter
+    attrs["file_created"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+    # Get username
+    try:
+        attrs["file_created_by"] = f"{os.environ['USER']}."
+    except:
+        try:
+            attrs["file_created_by"] = f"{os.environ['USERNAME']}."
+        except:
+            try:
+                attrs["file_created_by"] = f"{os.environ['LOGNAME']}."
+            except:
+                attrs["file_created_by"] = f"unknown user."
+
+        
+    ds.attrs = attrs.copy()
+
+    # Variable encoding
+    if "instrument_type" in ds.variables.keys():
+        ds.instrument_type.encoding = {"dtype": "int8"}
+    ds.mf.encoding = {"dtype": "float32"}
+    ds.mf_repeatability.encoding = {"dtype": "float32"}
+    ds.inlet_height.encoding = {"dtype": "int8"}
+    ds.time.encoding = {"units": f"seconds since 1970-01-01 00:00:00"}
+
+    #TODO: Format comment string?
+
+    return ds
+
+
+def format_species(species):
+    '''Format species name
+
+    Args:
+        species (str): Species name
+
+    Returns:
+        str: Formatted species name
+    '''
+
+    return species.lower().replace("-", "")
