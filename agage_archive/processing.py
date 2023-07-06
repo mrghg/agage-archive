@@ -3,6 +3,8 @@ import pandas as pd
 import xarray as xr
 import numpy as np
 from datetime import datetime
+import re
+import pprint
 
 from agage_archive import Paths
 #from agage_archive.io import read_ale_gage, read_agage
@@ -109,7 +111,7 @@ def create_dataset(df,
                    site,
                    network, 
                    instrument):
-    '''Create xarray dataset from pandas dataframe
+    '''Create xarray dataset from pandas dataframe to mirror the AGAGE nc output
     Need the following attributes:
         "comment"
         "data_owner_email"
@@ -321,3 +323,48 @@ def global_attributes_combine_instruments(ds,
     ds.attrs = attrs.copy()
 
     return ds
+
+
+def format_dataset(ds):
+    '''Format attributes, variables and encoding
+
+    Args:
+        ds (xr.Dataset): Dataset
+    
+    Returns:
+        xr.Dataset: Dataset with updated global attributes
+    '''
+
+    # Define set of attribute keys for public files
+    attributes_public = ["comment",
+                         "data_owner",
+                         "data_owner_email",
+                         "network",
+                         "species",
+                         "site_code",
+                         "station_long_name",
+                         "inlet_base_elevation_masl",
+                         "inlet_latitude",
+                         "inlet_longitude",
+                         "inlet_comment",
+                         "calibration_scale",
+                         "units",
+                         "file_created",
+                         "file_created_by",
+                         "instrument*",
+                         "doi"]
+    
+    attrs = {}
+
+    for attr in attributes_public:
+        for key in ds.attrs.keys():
+            if re.search(attr, key):
+                attrs[key] = ds.attrs[key]
+            else:
+                attrs[key] = ""
+
+    pprint.pprint(attrs)
+
+    #TODO: Add variable encoding
+    #TODO: Format comment string
+    #TODO: Species formatter
