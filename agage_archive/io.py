@@ -50,6 +50,22 @@ def read_agage(species, site, instrument):
     with xr.open_dataset(nc_file) as f:
         ds = f.load()
 
+    # Read sampling time
+    if "sampling_time_seconds" in ds.time.attrs:
+        sampling_time = int(ds.time.attrs["sampling_time_seconds"])
+    else:
+        # GCMD files don't have sampling time in the file
+        # assume it's 1s (essentially instantaneous)
+        sampling_time = 1
+
+    # Add sampling time to variables
+    ds["sampling_time"] = xr.DataArray(np.ones(len(ds.time))*sampling_time,
+                                        coords={"time": ds.time},
+                                        attrs={"units": "s",
+                                            "long_name": "sampling_time",
+                                            "comment": "Sampling period in seconds"})
+    ds["sampling_time"].encoding = {"dtype": "int32"}
+
     # Everything should have been flagged already, but just in case...
     flagged = ds.data_flag != 0
     ds.mf[flagged] = np.nan

@@ -131,6 +131,7 @@ def create_dataset(df,
         "mf_repeatability"
         "data_flag"
         "integration_flag"
+        "sampling_time"
 
     Args:
         species (str): Species
@@ -162,13 +163,15 @@ def create_dataset(df,
     ds = xr.Dataset(data_vars={"mf": ("time", df["mf"].values.copy()),
                             "mf_repeatability": ("time", df["mf_repeatability"].values.copy()),
                             "inlet_height": ("time", inlet_height),
+                            "sampling_time": ("time", np.repeat(1, nt))
                             },
                     coords={"time": df.index})
     
     # Variable encoding
     ds.mf.encoding = {"dtype": "float32"}
     ds.mf_repeatability.encoding = {"dtype": "float32"}
-    ds.inlet_height.encoding = {"dtype": "int8"}
+    ds.inlet_height.encoding = {"dtype": "int32"}
+    ds.sampling_time.encoding = {"dtype": "int32"}
     ds.time.encoding = {"units": f"seconds since 1970-01-01 00:00:00"}
 
     # Variable attributes
@@ -186,6 +189,9 @@ def create_dataset(df,
                     "inlet_height": {"units": "m",
                         "long_name": f"inlet_height",
                         "comment": f"Height of inlet above inlet_base_elevation_masl"},
+                    "sampling_time": {"units": "s",
+                        "long_name": "sampling_time",
+                        "comment": "Sampling time in seconds"}
                     }
 
     for var in attributes:
@@ -391,8 +397,10 @@ def format_dataset(ds):
         ds.instrument_type.encoding = {"dtype": "int8"}
     ds.mf.encoding = {"dtype": "float32"}
     ds.mf_repeatability.encoding = {"dtype": "float32"}
-    ds.inlet_height.encoding = {"dtype": "int8"}
+    ds.inlet_height.encoding = {"dtype": "int32"}
+    ds.sampling_time.encoding = {"dtype": "int32"}
     ds.time.encoding = {"units": f"seconds since 1970-01-01 00:00:00"}
+
 
     #TODO: Format comment string?
 
@@ -409,4 +417,4 @@ def format_species(species):
         str: Formatted species name
     '''
 
-    return species.lower().replace("-", "")
+    return species.lower() #.replace("-", "")
