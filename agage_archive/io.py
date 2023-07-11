@@ -55,8 +55,8 @@ def read_agage(species, site, instrument):
         sampling_time = int(ds.time.attrs["sampling_time_seconds"])
     else:
         # GCMD files don't have sampling time in the file
-        # assume it's 1s (essentially instantaneous)
-        sampling_time = 1
+        # assume it's 30s (Peter Salameh, pers. comm.)
+        sampling_time = 30
 
     # Add sampling time to variables
     ds["sampling_time"] = xr.DataArray(np.ones(len(ds.time))*sampling_time,
