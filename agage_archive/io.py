@@ -59,12 +59,12 @@ def read_agage(species, site, instrument):
         sampling_time = 30
 
     # Add sampling time to variables
-    ds["sampling_time"] = xr.DataArray(np.ones(len(ds.time))*sampling_time,
+    ds["sampling_time"] = xr.DataArray(np.ones(len(ds.time)).astype(np.int16)*sampling_time,
                                         coords={"time": ds.time},
                                         attrs={"units": "s",
                                             "long_name": "sampling_time",
                                             "comment": "Sampling period in seconds"})
-    ds["sampling_time"].encoding = {"dtype": "int32"}
+    ds["sampling_time"].encoding = {"dtype": "int16"}
 
     # Everything should have been flagged already, but just in case...
     flagged = ds.data_flag != 0

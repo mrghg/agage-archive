@@ -163,7 +163,7 @@ def create_dataset(df,
     ds = xr.Dataset(data_vars={"mf": ("time", df["mf"].values.copy()),
                             "mf_repeatability": ("time", df["mf_repeatability"].values.copy()),
                             "inlet_height": ("time", inlet_height),
-                            "sampling_time": ("time", np.repeat(30, nt))
+                            "sampling_time": ("time", np.repeat(30, nt).astype(int))
                             },
                     coords={"time": df.index})
     
