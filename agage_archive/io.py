@@ -55,7 +55,7 @@ def read_agage(species, site, instrument):
         sampling_time = int(ds.time.attrs["sampling_time_seconds"])
     else:
         # GCMD files don't have sampling time in the file
-        # assume it's 30s (Peter Salameh, pers. comm.)
+        # assume it's 30s (Peter Salameh, pers. comm., 2023-07-06)
         sampling_time = 30
 
     # Add sampling time to variables

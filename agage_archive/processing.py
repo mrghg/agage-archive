@@ -227,7 +227,7 @@ def create_dataset(df,
     return ds
 
 
-def global_attributes_instrument(ds, instrument):
+def global_attributes_instrument(ds, instrument, return_attributes=False):
     '''Add global attributes for instrument
 
     Args:
@@ -235,30 +235,40 @@ def global_attributes_instrument(ds, instrument):
         instrument (str): Instrument
     '''
 
+    attrs = ds.attrs.copy()
+
     if "instrument" not in ds.attrs.keys():
-        ds.attrs["instrument"] = instrument
-        ds.attrs["instrument_date"] = f"{ds.time[0].dt.strftime('%Y-%m-%d').values}"
-        ds.attrs["instrument_comment"] = ""
+        attrs["instrument"] = instrument
+    if "instrument_date" not in ds.attrs.keys():
+        attrs["instrument_date"] = f"{ds.time[0].dt.strftime('%Y-%m-%d').values}"
+    if "instrument_comment" not in ds.attrs.keys():
+        attrs["instrument_comment"] = ""
 
-    return ds
+    if return_attributes:
+        return {key: attrs[key] for key in attrs if "instrument" in key}
+    else:
+        ds_out = ds.copy(deep=True)
+        ds_out.attrs = attrs.copy()
+        return ds_out
 
 
-def global_attributes_combine_instruments(ds,
-                                        instruments):
+def format_attributes_global_instruments(ds,
+                                        instruments,
+                                        return_attributes=False):
     '''Combine instrument details in global attributes
 
     Args:
         ds (xr.Dataset): Dataset
-        instruments (list): List of instruments
-    
-    
+        instruments (list): List of instrument dictionaries containing the keys "instrument", "instrument_date" and "instrument_comment"
+        
     Returns:
         xr.Dataset: Dataset with updated global attributes
     '''
 
-    # If only one instrument, return
+    # If only one instrument, make sure formatted properly and return
     if len(instruments) == 1:
-        return ds
+        return global_attributes_instrument(ds, instruments[0]["instrument"],
+                                            return_attributes=return_attributes)
 
     attrs = {}
 
@@ -326,9 +336,12 @@ def global_attributes_combine_instruments(ds,
         
             instrument_count += 1
 
-    ds.attrs = attrs.copy()
-
-    return ds
+    if return_attributes:
+        return {key: attrs[key] for key in attrs if "instrument" in key}
+    else:
+        ds_out = ds.copy(deep=True)
+        ds_out.attrs = attrs.copy()
+        return ds_out
 
 
 def format_dataset(ds):
@@ -407,6 +420,152 @@ def format_dataset(ds):
     return ds
 
 
+def format_variables(ds,
+                    variable_translate={},
+                    species = None,
+                    units = None,
+                    calibration_scale = None):
+    '''Standardise variable names and units
+
+    Args:
+        ds (xr.Dataset): Dataset
+        variable_translate (dict, optional): Dictionary of variable translations. Defaults to {}.
+        species (str, optional): Species name. Defaults to None, in which case it is looked up in the dataset attributes.
+        units (str, optional): Units. Defaults to None, in which case it is looked up in the dataset attributes.
+        calibration_scale (str, optional): Calibration scale. Defaults to None, in which case it is looked up in the dataset attributes.
+
+    Returns:
+        xr.Dataset: Dataset with standardised variable names and units
+
+    Raises:
+        ValueError: If variable not found in dataset
+
+    '''
+
+    with open(paths.root / "data/variables.json") as f:
+        variables = json.load(f)
+
+    attrs = ds.attrs.copy()
+    
+    vars_out = {}
+
+    # Loop through standard variable names
+    for var in variables:
+
+        # Do we need to translate any variable names?
+        if var in variable_translate:
+            var_ds = variable_translate[var]
+        else:
+            var_ds = var
+        
+        # Copy and convert variable from dataset
+        if var_ds in ds.variables:
+            # Convert type to that contained in variables.json
+            typ = np.__getattribute__(variables[var]["encoding"]["dtype"])
+            
+            vars_out[var] = ("time", ds[var_ds].values.copy().astype(typ))
+
+        else:
+            raise ValueError(f"Variable {var_ds} not found in dataset. " + \
+                             "Use variable_translate to map to a different variable name.")
+    
+    # Time can't be in variable list
+    del vars_out["time"]
+
+    # Create new dataset
+    ds = xr.Dataset(vars_out,
+                    coords = {"time": ds.time.copy()}, 
+                    attrs=attrs)
+
+    # Add variable attributes and encoding
+    for var in variables:
+        ds[var].attrs = variables[var]["attrs"]
+        ds[var].encoding = variables[var]["encoding"]
+
+        # for mole fractions, replace % with species name, etc.
+        if "mf" in var:
+            ds[var].attrs["long_name"] = ds[var].attrs["long_name"].replace("%",
+                                                        lookup_locals_and_attrs("species", locals(), attrs))
+            ds[var].attrs["standard_name"] = ds[var].attrs["standard_name"].replace("%",
+                                                        lookup_locals_and_attrs("species", locals(), attrs))
+            ds[var].attrs["units"] = lookup_locals_and_attrs("units", locals(), attrs)
+            ds[var].attrs["calibration_scale"] = lookup_locals_and_attrs("calibration_scale", locals(), attrs)
+
+    return ds
+
+
+def lookup_locals_and_attrs(v, local, attrs):
+    '''Look up variable in locals and attrs, and format the output
+
+    Args:
+        v (str): Variable name
+        local (dict): Dictionary of local variables
+        attrs (dict): Dictionary of attributes
+
+    Returns:
+        str: Variable name
+    '''
+
+    #TODO: this assumes that the variable is in locals
+    if local[v] is None:
+        # If not set as keyword, check if it is in dataset attributes
+        if v not in attrs:
+            raise ValueError(f"{v} not set and not found in dataset attributes")
+        else:
+            # If in dataset attributes, format it
+            return eval(f"format_{v}('{attrs[v]}')")
+    else:
+        # If set, format it
+        return eval(f"format_{v}('{local[v]}')")
+
+
+def format_attributes(ds, instruments = [],
+                      species = None,
+                      units = None,
+                      calibration_scale = None):
+    '''Format attributes
+
+    Args:
+        ds (xr.Dataset): Dataset
+        instruments (list, optional): List of instrument dictionaries containing the keys "instrument", "instrument_date" and "instrument_comment"
+
+    Returns:
+        xr.Dataset: Dataset with formatted attributes
+    '''
+
+    with open(paths.root / "data/attributes.json") as f:
+        attributes = json.load(f)
+
+    attrs = {}
+
+    for attr in attributes:
+
+        if "instrument" not in attr:
+            attrs[attr] = attributes[attr]
+
+            # If attribute is in dataset, and not empty, overwrite
+            if attr in ds.attrs:
+                if ds.attrs[attr] != "":
+                    attrs[attr] = ds.attrs[attr]
+
+        else:
+
+            # Update instrument attributes
+            attrs.update(format_attributes_global_instruments(ds,
+                                                        instruments,
+                                                        return_attributes=True))
+
+
+    # Format certain key attributes, and determine if they have been set as keywords
+    for v in ["species", "units", "calibration_scale"]:
+        attrs[v] = lookup_locals_and_attrs(v, locals(), ds.attrs.copy())
+
+    ds_out = ds.copy(deep=True)
+    ds_out.attrs = attrs.copy()
+
+    return ds_out
+
+
 def format_species(species):
     '''Format species name
 
@@ -418,3 +577,42 @@ def format_species(species):
     '''
 
     return species.lower() #.replace("-", "")
+
+
+def format_units(units):
+    '''Format units
+
+    Args:
+        units (str): Units
+
+    Returns:
+        str: Formatted units
+    '''
+
+    unit_translator = {"ppm": "1e-6",
+                       "ppb": "1e-9",
+                       "ppt": "1e-12",
+                       "ppq": "1e-15",
+                       "nmol/mol": "1e-9",
+                       "nmol mol-1": "1e-9",
+                       "pmol/mol": "1e-12",
+                       "pmol mol-1": "1e-12",
+                       }
+
+    if units in unit_translator:
+        return unit_translator[units]
+    else:
+        return units
+
+
+def format_calibration_scale(scale):
+    '''Format scale
+
+    Args:
+        scale (str): Scale
+
+    Returns:
+        str: Formatted scale
+    '''
+
+    return scale

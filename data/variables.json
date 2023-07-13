@@ -10,27 +10,32 @@
         "encoding": {
             "units": "seconds since 1970-01-01 00:00:00",
             "dtype": "float64"
-        }
+        },
+        "optional": "False"
     },
     "mf": {
         "attrs": {
             "long_name": "Mole fraction of % in dry air",
             "units": "",
-            "standard_name": "mole_fraction_of_%_in_dry_air"
+            "standard_name": "mole_fraction_of_%_in_dry_air",
+            "calibration_scale": ""
         },
         "encoding": {
             "dtype": "float32"
-        }
+        },
+        "optional": "False"
     },
     "mf_repeatability": {
         "attrs": {
             "long_name": "Mole fraction repeatability of % in dry air",
             "units": "",
-            "standard_name": "mole_fraction_repeatability_of_%_in_dry_air"
+            "standard_name": "mole_fraction_repeatability_of_%_in_dry_air",
+            "calibration_scale": ""
         },
         "encoding": {
             "dtype": "float32"
-        }
+        },
+        "optional": "False"
     },
     "inlet_height": {
         "attrs": {
@@ -40,16 +45,28 @@
         },
         "encoding": {
             "dtype": "float16"
-        }
+        },
+        "optional": "False"
     },
     "sampling_period": {
         "attrs": {
             "long_name": "sampling_period",
             "units": "s",
-            "comment": "Time over which sample was collected"
+            "comment": "Time period over which sample was collected"
         },
         "encoding": {
             "dtype": "float16"
-        }
+        },
+        "optional": "True"
+    },
+    "instrument_type": {
+        "attrs": {
+            "long_name": "ALE/GAGE/AGAGE instrument type",
+            "comment": "0 = GC multi-detector (GCMD) from the ALE project; 1 = GCMD from the GAGE project; 2, 3, 4 are GCMD, GCMS-ADS or GCMS-Medusa instruments from AGAGE, respectively"
+        },
+        "encoding": {
+            "dtype": "int8"
+        },
+        "optional": "True"
     }
 }
