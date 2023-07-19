@@ -81,4 +81,3 @@ class Paths():
                     f"""{pth} directory doesn't
                     contain any GCWerks .gtar.gz files"""
                 )
-

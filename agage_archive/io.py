@@ -7,8 +7,7 @@ import tarfile
 import numpy as np
 
 from agage_archive import Paths
-from agage_archive.processing import create_dataset, \
-    format_attributes_global_instruments, scale_convert, format_dataset,\
+from agage_archive.processing import scale_convert, format_dataset,\
     format_species, format_variables, format_attributes
 
 instrument_number = {"ALE": 0,
@@ -16,6 +15,7 @@ instrument_number = {"ALE": 0,
                     "GCMD": 2,
                     "GCMS-ADS": 3,
                     "GCMS-Medusa": 4}
+
 
 paths = Paths()
 
@@ -89,6 +89,9 @@ def read_ale_gage(species, site, network):
         pd.DataFrame: Pandas dataframe containing file contents
     """
 
+    if network not in ["ALE", "GAGE"]:
+        raise ValueError("network must be ALE or GAGE")
+
     # Get data on ALE/GAGE sites
     with open(paths.root / "data/ale_gage_sites.json") as f:
         site_info = json.load(f)
@@ -98,63 +101,61 @@ def read_ale_gage(species, site, network):
         species_info = json.load(f)[species]
 
     # For now, hardwire path
-    #TODO: Sort out these paths
-    folder = {"ALE": Path("/Users/chxmr/data/ale_gage_sio1993/ale"),
-              "GAGE":  Path("/Users/chxmr/data/ale_gage_sio1993/gage")}
+    folder = paths.__getattribute__(network.lower())
 
-    pth = folder[network] / f"{site_info[site]['gcwerks_name']}_sio1993.gtar.gz"
+    pth = folder / f"{site_info[site]['gcwerks_name']}_sio1993.gtar.gz"
 
-    tar = tarfile.open(pth, "r:gz")
+    with tarfile.open(pth, "r:gz") as tar:
 
-    dfs = []
+        dfs = []
 
-    for member in tar.getmembers():
+        for member in tar.getmembers():
 
-        # Extract tar file
-        f = tar.extractfile(member)
-        
-        meta = f.readline().decode("ascii").strip()
-        header = f.readline().decode("ascii").split()
+            # Extract tar file
+            f = tar.extractfile(member)
+            
+            meta = f.readline().decode("ascii").strip()
+            header = f.readline().decode("ascii").split()
 
-        site_in_file = meta[:2]
-        year = meta[2:4]
-        month = meta[4:7]
+            site_in_file = meta[:2]
+            year = meta[2:4]
+            month = meta[4:7]
 
-        nspecies = len(header) - 3
-        columns = header[:3]
+            nspecies = len(header) - 3
+            columns = header[:3]
 
-        # Define column widths
-        colspec = [3, 5, 7]
-        for sp in header[3:]:
-            colspec += [7, 1]
-            columns += [str(sp).replace("'", ""),
-                        f"{sp}_pollution"]
+            # Define column widths
+            colspec = [3, 5, 7]
+            for sp in header[3:]:
+                colspec += [7, 1]
+                columns += [str(sp).replace("'", ""),
+                            f"{sp}_pollution"]
 
-        # Read data
-        df = pd.read_fwf(f, skiprows=0,
-                        widths=colspec,
-                        names=columns,
-                        na_values = -99.9)
+            # Read data
+            df = pd.read_fwf(f, skiprows=0,
+                            widths=colspec,
+                            names=columns,
+                            na_values = -99.9)
 
-        # Some HHMM labeled as 2400, increment to following day
-        midnight = df["TIME"] == 2400
-        df.loc[midnight, "DA"] += 1
-        df.loc[midnight, "TIME"] = 0
+            # Some HHMM labeled as 2400, increment to following day
+            midnight = df["TIME"] == 2400
+            df.loc[midnight, "DA"] += 1
+            df.loc[midnight, "TIME"] = 0
 
-        # Create datetime string
-        datetime = df["DA"].astype(str) + \
-            f"/{month}/{year}:" + \
-            df["TIME"].astype(str).str.zfill(4)
+            # Create datetime string
+            datetime = df["DA"].astype(str) + \
+                f"/{month}/{year}:" + \
+                df["TIME"].astype(str).str.zfill(4)
 
-        # Convert datetime string
-        # There are some strange entries in here. If we can't understand the format, reject that point.
-        df.index = pd.to_datetime(datetime, format="%d/%b/%y:%H%M",
-                                  errors="coerce")
-        df.index = df.index.tz_localize(site_info[site]["tz"],
-                                        ambiguous="NaT",
-                                        nonexistent="NaT")
+            # Convert datetime string
+            # There are some strange entries in here. If we can't understand the format, reject that point.
+            df.index = pd.to_datetime(datetime, format="%d/%b/%y:%H%M",
+                                    errors="coerce")
+            df.index = df.index.tz_localize(site_info[site]["tz"],
+                                            ambiguous="NaT",
+                                            nonexistent="NaT")
 
-        dfs.append(df)
+            dfs.append(df)
 
     # Concatenate monthly dataframes into single dataframe
     df_combined = pd.concat(dfs)
@@ -174,16 +175,44 @@ def read_ale_gage(species, site, network):
     # Output one species
     df_combined = df_combined[species_info["species_name_gatech"]]
 
+    # Estimate of repeatability
     repeatability = species_info[f"{network.lower()}_repeatability_percent"]/100.
 
-    df_out = pd.DataFrame(index=df_combined.index,
-                          data={"mf": df_combined.values.copy(),
-                                "mf_repeatability": df_combined.values.copy()*repeatability})
+    nt = len(df_combined.index)
 
-    df_out.attrs["scale"] = species_info["scale"]
-    df_out.attrs["units"] = species_info["units"]
+    # Create xarray dataset
+    ds = xr.Dataset(data_vars={"mf": ("time", df_combined.values.copy()),
+                            "mf_repeatability": ("time", df_combined.values.copy()*repeatability),
+                            "inlet_height": ("time", np.repeat(site_info[site]["inlet_height"], nt)),
+                            "sampling_period": ("time", np.repeat(30, nt)),
+                            },
+                    coords={"time": df_combined.index.copy()})
 
-    return create_dataset(df_out, species, site, network, f"{network} GCMD")
+    # Global attributes
+    comment = f"{network} {species} data from {site_info[site]['station_long_name']}. " + \
+        "This data was originally processed by Derek Cunnold, Georgia Institute of Technology, " + \
+        "from the original files and has now been reprocessed into netCDF format."
+
+    ds.attrs = {"comment": comment,
+                "data_owner_email": site_info[site]["data_owner_email"],
+                "data_owner": site_info[site]["data_owner"],
+                "station_long_name": site_info[site]["station_long_name"],
+                "inlet_base_elevation_masl": site_info[site]["inlet_base_elevation_masl"],
+                "inlet_latitude": site_info[site]["latitude"],
+                "inlet_longitude": site_info[site]["longitude"],
+                "inlet_comment": "",
+                "network": network,
+                "site_code": site}
+
+    ds = format_attributes(ds,
+                        instruments=[{"instrument": f"{network.upper()}_GCMD"}],
+                        species=species,
+                        calibration_scale=species_info["scale"],
+                        units=species_info["units"])
+
+    ds = format_variables(ds)
+
+    return ds
 
 
 def combine_datasets(species, site, scale = "SIO-05"):
