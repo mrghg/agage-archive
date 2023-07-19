@@ -7,8 +7,17 @@ import tarfile
 import numpy as np
 
 from agage_archive import Paths
-from agage_archive.processing import scale_convert, format_dataset,\
-    format_species, format_variables, format_attributes
+from agage_archive.processing import format_species, \
+    format_variables, format_attributes, scale_convert
+
+
+# Define instrument numbers
+# NOTE: If this changes, make sure you update the instrument_type comment in variables.json
+instrument_number = {"ALE": 0,
+                    "GAGE": 1,
+                    "GCMD": 2,
+                    "GCMS-ADS": 3,
+                    "GCMS-Medusa": 4}
 
 
 paths = Paths()
@@ -216,6 +225,91 @@ def read_ale_gage(species, site, network):
     return ds
 
 
+def combine_datasets(species, site, scale = "SIO-05"):
+    '''Combine ALE/GAGE/AGAGE datasets for a given species and site
+
+    Args:
+        species (str): Species
+        site (str): Site
+        scale (str, optional): Calibration scale. Defaults to "SIO-05".
+            If None, no scale conversion is attempted
+
+    Returns:
+        xr.Dataset: Dataset containing data
+    '''
+
+    # Get instructions on how to combine datasets
+    with open(paths.root / "data/data_selector.json") as f:
+        data_selector = json.load(f)
+    
+    # Set default to Medusa
+    instruments = {"GCMS-Medusa": ["", ""]}
+
+    # Read instruments from JSON file
+    if site in data_selector:
+        if species in data_selector[site]:
+            instruments = data_selector[site][species]
+    
+    dss = []
+    comments = []
+    attrs = []
+    instrument_rec = []
+    dates_rec = []
+
+    for instrument, date in instruments.items():
+
+        if instrument in ["ALE", "GAGE"]:
+            ds = read_ale_gage(species, site, instrument)
+        else:
+            ds = read_agage(species, site, instrument)
+
+        attrs.append(ds.attrs)
+
+        instrument_rec.append({key:value for key, value in ds.attrs.items() if "instrument" in key})
+
+        comments.append(ds.attrs["comment"])
+
+        # Subset date
+        date = [None if d == "" else d for d in date]
+        ds = ds.sel(time=slice(*date))
+
+        dates_rec.append(ds.time[0].dt.strftime("%Y-%m-%d").values)
+
+        # Convert scale
+        if scale != None:
+            ds = scale_convert(ds, scale)
+
+        # Add instrument_type to dataset as variable
+        ds["instrument_type"] = xr.DataArray(np.repeat(instrument_number[instrument], len(ds.time)),
+                                        dims="time", coords={"time": ds.time})
+
+        dss.append(ds)
+
+    ds_combined = xr.concat(dss, dim="time")
+
+    # Sort by time
+    ds_combined = ds_combined.sortby("time")
+
+    # Add details on instruments to global attributes
+    ds_combined = format_attributes(ds_combined,
+                                instrument_rec)
+
+    # Extend comment attribute describing all datasets
+    if len(comments) > 1:
+        comment_str = "Combined AGAGE/GAGE/ALE dataset from the following individual sources:\n"
+        for i, comment in enumerate(comments):
+            comment_str += f"{i}) {comment}\n"
+    else:
+        comment_str = comments[0]
+
+    ds_combined.attrs["comment"] = comment_str
+
+    # Format variables
+    ds_combined = format_variables(ds_combined)
+
+    return ds_combined
+
+
 def output_dataset(ds,
                    network = "AGAGE",
                    instrument = "GCMD",
@@ -234,5 +328,10 @@ def output_dataset(ds,
     if "units" in ds_out.time.attrs:
         del ds_out.time.attrs["units"]
         del ds_out.time.attrs["calendar"]
+
+
+    # Remove instrument_type variable if all the same    
+    if len(np.unique(ds_out.instrument_type.values)) == 1:
+        ds_out = ds_out.drop_vars("instrument_type")
 
     ds_out.sel(time=slice(None, end_date)).to_netcdf(paths.output / filename, mode="w", format="NETCDF4")

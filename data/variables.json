@@ -9,7 +9,7 @@
         },
         "encoding": {
             "units": "seconds since 1970-01-01 00:00:00",
-            "dtype": "float64"
+            "dtype": "f8"
         },
         "optional": "False"
     },
@@ -21,7 +21,7 @@
             "calibration_scale": ""
         },
         "encoding": {
-            "dtype": "float32"
+            "dtype": "f4"
         },
         "optional": "False"
     },
@@ -33,7 +33,7 @@
             "calibration_scale": ""
         },
         "encoding": {
-            "dtype": "float32"
+            "dtype": "f4"
         },
         "optional": "False"
     },
@@ -44,7 +44,7 @@
             "comment": "Height of inlet above inlet_base_elevation_masl"
         },
         "encoding": {
-            "dtype": "float16"
+            "dtype": "i2"
         },
         "optional": "False"
     },
@@ -55,7 +55,7 @@
             "comment": "Time period over which sample was collected"
         },
         "encoding": {
-            "dtype": "float16"
+            "dtype": "i2"
         },
         "optional": "True"
     },
@@ -65,7 +65,7 @@
             "comment": "0 = GC multi-detector (GCMD) from the ALE project; 1 = GCMD from the GAGE project; 2, 3, 4 are GCMD, GCMS-ADS or GCMS-Medusa instruments from AGAGE, respectively"
         },
         "encoding": {
-            "dtype": "int8"
+            "dtype": "i1"
         },
         "optional": "True"
     }
