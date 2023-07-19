@@ -7,9 +7,9 @@ import tarfile
 import numpy as np
 
 from agage_archive import Paths
-from agage_archive.processing import create_dataset, global_attributes_instrument, \
-    global_attributes_combine_instruments, scale_convert, format_dataset,\
-    format_species
+from agage_archive.processing import create_dataset, \
+    format_attributes_global_instruments, scale_convert, format_dataset,\
+    format_species, format_variables, format_attributes
 
 instrument_number = {"ALE": 0,
                     "GAGE": 1,
@@ -52,35 +52,27 @@ def read_agage(species, site, instrument):
 
     # Read sampling time
     if "sampling_time_seconds" in ds.time.attrs:
-        sampling_time = int(ds.time.attrs["sampling_time_seconds"])
+        sampling_period = int(ds.time.attrs["sampling_time_seconds"])
     else:
         # GCMD files don't have sampling time in the file
         # assume it's 30s (Peter Salameh, pers. comm., 2023-07-06)
-        sampling_time = 30
+        sampling_period = 30
 
     # Add sampling time to variables
-    ds["sampling_time"] = xr.DataArray(np.ones(len(ds.time)).astype(np.int16)*sampling_time,
-                                        coords={"time": ds.time},
-                                        attrs={"units": "s",
-                                            "long_name": "sampling_time",
-                                            "comment": "Sampling period in seconds"})
-    ds["sampling_time"].encoding = {"dtype": "int16"}
+    ds["sampling_period"] = xr.DataArray(np.ones(len(ds.time)).astype(np.int16)*sampling_period,
+                                        coords={"time": ds.time})
 
     # Everything should have been flagged already, but just in case...
     flagged = ds.data_flag != 0
     ds.mf[flagged] = np.nan
     ds.mf_repeatability[flagged] = np.nan
 
-    # For public files, remove flagged data and some other variables
-    ds = ds.drop_vars(["data_flag",
-                       "integration_flag",
-                       "git_pollution_flag",
-                       "met_office_baseline_flag",
-                       "run_time"],
-                       errors="ignore")
+    ds.attrs["site_code"] = site.upper()
 
-    # Add instrument global attributes, if needed
-    ds = global_attributes_instrument(ds, instrument)
+    ds = format_variables(ds)
+
+    ds = format_attributes(ds,
+                        species=species)
 
     return ds
 

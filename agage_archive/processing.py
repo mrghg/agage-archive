@@ -227,7 +227,9 @@ def create_dataset(df,
     return ds
 
 
-def global_attributes_instrument(ds, instrument, return_attributes=False):
+def format_attributes_global_instrument(ds,
+                                instrument,
+                                return_attributes=False):
     '''Add global attributes for instrument
 
     Args:
@@ -253,7 +255,7 @@ def global_attributes_instrument(ds, instrument, return_attributes=False):
 
 
 def format_attributes_global_instruments(ds,
-                                        instruments,
+                                        instruments = [],
                                         return_attributes=False):
     '''Combine instrument details in global attributes
 
@@ -265,10 +267,18 @@ def format_attributes_global_instruments(ds,
         xr.Dataset: Dataset with updated global attributes
     '''
 
+    # If no instruments specified, check if they are in the dataset attributes
+    if len(instruments) == 0:
+        if "instrument" in ds.attrs:
+            instruments = [{key: ds.attrs[key] for key in ds.attrs if "instrument" in key}]
+        else:
+            raise ValueError("No instrument* attributes specified and none found in dataset attributes. " + \
+                             "As a minimum, set keyword instrument = [{'instrument': 'INSTRUMENT_NAME'}]")
+
     # If only one instrument, make sure formatted properly and return
-    if len(instruments) == 1:
-        return global_attributes_instrument(ds, instruments[0]["instrument"],
-                                            return_attributes=return_attributes)
+    elif len(instruments) == 1:
+        return format_attributes_global_instrument(ds, instruments[0]["instrument"],
+                                                return_attributes=return_attributes)
 
     attrs = {}
 
@@ -344,7 +354,12 @@ def format_attributes_global_instruments(ds,
         return ds_out
 
 
-def format_dataset(ds):
+def format_dataset(ds,
+                variable_translate={},
+                instruments = [],
+                species = None,
+                units = None,
+                calibration_scale = None):
     '''Format attributes, variables and encoding
 
     Args:
@@ -354,66 +369,17 @@ def format_dataset(ds):
         xr.Dataset: Dataset with updated global attributes
     '''
 
-    # Define set of attribute keys for public files
-    attributes_public = ["comment",
-                         "data_owner",
-                         "data_owner_email",
-                         "network",
-                         "species",
-                         "site_code",
-                         "station_long_name",
-                         "inlet_base_elevation_masl",
-                         "inlet_latitude",
-                         "inlet_longitude",
-                         "inlet_comment",
-                         "calibration_scale",
-                         "units",
-                         "file_created",
-                         "file_created_by",
-                         "instrument",
-                         "doi"]
+    ds = format_attributes(ds,
+                        instruments = instruments,
+                        species = species,
+                        units = units,
+                        calibration_scale = calibration_scale)
     
-    attrs = {}
-
-    for attr in attributes_public:
-
-        attr_exists = False
-        for key in ds.attrs.keys():
-            if re.match(attr, key):
-                attrs[key] = ds.attrs[key]
-                attr_exists = True
-        
-        if not attr_exists:
-            attrs[attr] = ""
-
-    attrs["species"] = format_species(ds.attrs["species"])
-
-    attrs["file_created"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-
-    # Get username
-    try:
-        attrs["file_created_by"] = f"{os.environ['USER']}."
-    except:
-        try:
-            attrs["file_created_by"] = f"{os.environ['USERNAME']}."
-        except:
-            try:
-                attrs["file_created_by"] = f"{os.environ['LOGNAME']}."
-            except:
-                attrs["file_created_by"] = f"unknown user."
-
-        
-    ds.attrs = attrs.copy()
-
-    # Variable encoding
-    if "instrument_type" in ds.variables.keys():
-        ds.instrument_type.encoding = {"dtype": "int8"}
-    ds.mf.encoding = {"dtype": "float32"}
-    ds.mf_repeatability.encoding = {"dtype": "float32"}
-    ds.inlet_height.encoding = {"dtype": "int32"}
-    ds.sampling_time.encoding = {"dtype": "int32"}
-    ds.time.encoding = {"units": f"seconds since 1970-01-01 00:00:00"}
-
+    ds = format_variables(ds,
+                        variable_translate = variable_translate,
+                        species = species,
+                        units = units,
+                        calibration_scale = calibration_scale)
 
     #TODO: Format comment string?
 
@@ -466,8 +432,9 @@ def format_variables(ds,
             vars_out[var] = ("time", ds[var_ds].values.copy().astype(typ))
 
         else:
-            raise ValueError(f"Variable {var_ds} not found in dataset. " + \
-                             "Use variable_translate to map to a different variable name.")
+            if variables[var]["optional"] == "False":
+                raise ValueError(f"Variable {var_ds} not found in dataset. " + \
+                                "Use variable_translate to map to a different variable name.")
     
     # Time can't be in variable list
     del vars_out["time"]
@@ -478,7 +445,7 @@ def format_variables(ds,
                     attrs=attrs)
 
     # Add variable attributes and encoding
-    for var in variables:
+    for var in ds.variables:
         ds[var].attrs = variables[var]["attrs"]
         ds[var].encoding = variables[var]["encoding"]
 
@@ -534,27 +501,34 @@ def format_attributes(ds, instruments = [],
     '''
 
     with open(paths.root / "data/attributes.json") as f:
-        attributes = json.load(f)
+        attributes_default = json.load(f)
 
     attrs = {}
 
-    for attr in attributes:
+    for attr in attributes_default:
 
-        if "instrument" not in attr:
-            attrs[attr] = attributes[attr]
-
-            # If attribute is in dataset, and not empty, overwrite
-            if attr in ds.attrs:
-                if ds.attrs[attr] != "":
-                    attrs[attr] = ds.attrs[attr]
-
-        else:
-
+        if "instrument" in attr:
             # Update instrument attributes
             attrs.update(format_attributes_global_instruments(ds,
                                                         instruments,
                                                         return_attributes=True))
 
+        elif attr == "file_created_by":
+            # Get username
+            attrs[attr] = lookup_username()
+
+        elif attr == "file_created":
+            # Get current time
+            attrs[attr] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+        else:
+            # Set default
+            attrs[attr] = attributes_default[attr]
+
+            # If attribute is in dataset, and not empty, overwrite
+            if attr in ds.attrs:
+                if ds.attrs[attr] != "":
+                    attrs[attr] = ds.attrs[attr]
 
     # Format certain key attributes, and determine if they have been set as keywords
     for v in ["species", "units", "calibration_scale"]:
@@ -616,3 +590,22 @@ def format_calibration_scale(scale):
     '''
 
     return scale
+
+
+def lookup_username():
+    '''Look up username
+
+    Returns:
+        str: Username
+    '''
+
+    try:
+        return os.environ["USER"]
+    except:
+        try:
+            return os.environ["USERNAME"]
+        except:
+            try:
+                return os.environ["LOGNAME"]
+            except:
+                return "unknown user"
