@@ -4,8 +4,9 @@ import xarray as xr
 import numpy as np
 from datetime import datetime
 import os
+import configparser
 
-from agage_archive import Paths
+from agage_archive import Paths, get_path
 from agage_archive.util import is_number
 
 
@@ -489,13 +490,26 @@ def lookup_username():
         str: Username
     '''
 
-    try:
-        return os.environ["USER"]
-    except:
+    # Check if config file exists
+    config_file = get_path("config.ini")
+    if not config_file.exists():
+        raise FileNotFoundError(
+            "Config file not found. Try running util.setup first")
+    
+    # Take username from config file if it exists, otherwise try to get it from the system
+    config = configparser.ConfigParser()
+    config.read(config_file)
+
+    if "User" in config:
+        return config["User"]["name"]
+    else:
         try:
-            return os.environ["USERNAME"]
+            return os.environ["USER"]
         except:
             try:
-                return os.environ["LOGNAME"]
+                return os.environ["USERNAME"]
             except:
-                return "unknown user"
+                try:
+                    return os.environ["LOGNAME"]
+                except:
+                    return "unknown user"

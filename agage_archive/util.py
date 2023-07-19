@@ -27,6 +27,10 @@ def setup():
                        "ale_path": ale_path,
                        "gage_path": gage_path,
                        "output_path": output_path}
+    
+    # User name
+    usr = input("Name (press enter for system ID):") or None
+    config["User"] = {"name": usr}
 
     with open(get_path('config.ini'), 'w') as configfile:
         config.write(configfile)

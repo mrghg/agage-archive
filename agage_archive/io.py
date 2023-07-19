@@ -307,6 +307,10 @@ def combine_datasets(species, site, scale = "SIO-05"):
     # Format variables
     ds_combined = format_variables(ds_combined)
 
+    # Remove instrument_type variable if all the same    
+    if len(np.unique(ds_combined.instrument_type.values)) == 1:
+        ds_combined = ds_combined.drop_vars("instrument_type")
+
     return ds_combined
 
 
@@ -328,10 +332,5 @@ def output_dataset(ds,
     if "units" in ds_out.time.attrs:
         del ds_out.time.attrs["units"]
         del ds_out.time.attrs["calendar"]
-
-
-    # Remove instrument_type variable if all the same    
-    if len(np.unique(ds_out.instrument_type.values)) == 1:
-        ds_out = ds_out.drop_vars("instrument_type")
 
     ds_out.sel(time=slice(None, end_date)).to_netcdf(paths.output / filename, mode="w", format="NETCDF4")
