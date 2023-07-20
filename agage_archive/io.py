@@ -8,7 +8,8 @@ import numpy as np
 
 from agage_archive import Paths
 from agage_archive.processing import format_species, \
-    format_variables, format_attributes, scale_convert
+    format_variables, format_attributes, scale_convert, \
+    read_instrument_dates_csv
 
 
 # Define instrument numbers
@@ -242,20 +243,10 @@ def combine_datasets(species, site, scale = "SIO-05",
         xr.Dataset: Dataset containing data
     '''
 
-    paths = Paths(test=testing_path)
+    # Read instrument dates from CSV files
+    instruments = read_instrument_dates_csv(species, site)
 
-    # Get instructions on how to combine datasets
-    with open(paths.root / "data/data_selector.json") as f:
-        data_selector = json.load(f)
-    
-    # Set default to Medusa
-    instruments = {"GCMS-Medusa": ["", ""]}
-
-    # Read instruments from JSON file
-    if site in data_selector:
-        if species in data_selector[site]:
-            instruments = data_selector[site][species]
-    
+    # Combine datasets    
     dss = []
     comments = []
     attrs = []

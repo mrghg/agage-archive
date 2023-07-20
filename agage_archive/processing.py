@@ -50,7 +50,7 @@ def scale_convert(ds, scale_new):
             ndarray: Mole fractions adjusted for time-variation between scales (excluding factor)
         """
 
-        # calculate days elapsed since 19th August 1977
+        # calculate days elapsed since 2nd March 1978
         days_since_ale_start = (time - \
                                 pd.Timestamp("1978-03-02")).dt.days.values
 
@@ -67,7 +67,6 @@ def scale_convert(ds, scale_new):
         f_out = np.ones_like(f).astype(float)
         idx = (days_since_ale_start>=2252) & (days_since_ale_start<=4412)
         f_out[idx] = f[idx]
-        #mf[idx] = mf[idx] * f[idx]
 
         return f_out
     
@@ -513,3 +512,46 @@ def lookup_username():
                     return os.environ["LOGNAME"]
                 except:
                     return "unknown user"
+                
+
+def read_instrument_dates_csv(species, site):
+    '''Read instrument dates from csv file
+
+    Args:
+        species (str): Species
+        site (str): Site code
+
+    Returns:
+        dict: Dictionary of instrument dates
+    '''
+
+    path = paths.root / "data" / "data_selection" / f"{site.upper()}.csv"
+
+    warning_message = f"WARNING: No instrument dates found for {species} at {site.upper()}. Assuming GCMS-Medusa"
+
+    if path.exists() == False:
+        print(warning_message)
+        return {"GCMS-Medusa": ["", ""]}
+
+    df = pd.read_csv(path,
+                    comment="#")
+
+    # Replace NaNs with empty strings
+    df = df.fillna("")
+
+    # Select where species column matches species
+    df = df[df["Species"].str.lower() == species.lower()]
+
+    df = df[["Instrument", "Start", "End"]].drop_duplicates()
+    df = df.set_index("Instrument")
+    
+    instrument_dates = {}
+    for instrument in df.index:
+        instrument_dates[instrument] = [df.loc[instrument, "Start"],
+                                        df.loc[instrument, "End"]]
+
+    if len(instrument_dates) == 0:
+        print(warning_message)
+        return {"GCMS-Medusa": ["", ""]}
+    else:
+        return instrument_dates
