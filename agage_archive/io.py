@@ -20,10 +20,8 @@ instrument_number = {"ALE": 0,
                     "GCMS-Medusa": 4}
 
 
-paths = Paths()
-
-
-def read_agage(species, site, instrument):
+def read_agage(species, site, instrument,
+               testing_path = False):
     """Read GCWerks netCDF files
 
     Args:
@@ -37,6 +35,8 @@ def read_agage(species, site, instrument):
     Returns:
         xarray.Dataset: Contents of netCDF file
     """
+
+    paths = Paths(test=testing_path)
 
     species_search = species.lower()
 
@@ -87,7 +87,8 @@ def read_agage(species, site, instrument):
     return ds
 
 
-def read_ale_gage(species, site, network):
+def read_ale_gage(species, site, network,
+                  testing_path = False):
     """Read GA Tech ALE/GAGE files
 
     Args:
@@ -101,6 +102,8 @@ def read_ale_gage(species, site, network):
 
     if network not in ["ALE", "GAGE"]:
         raise ValueError("network must be ALE or GAGE")
+
+    paths = Paths(test=testing_path)
 
     # Get data on ALE/GAGE sites
     with open(paths.root / "data/ale_gage_sites.json") as f:
@@ -225,7 +228,8 @@ def read_ale_gage(species, site, network):
     return ds
 
 
-def combine_datasets(species, site, scale = "SIO-05"):
+def combine_datasets(species, site, scale = "SIO-05",
+                     testing_path = False):
     '''Combine ALE/GAGE/AGAGE datasets for a given species and site
 
     Args:
@@ -237,6 +241,8 @@ def combine_datasets(species, site, scale = "SIO-05"):
     Returns:
         xr.Dataset: Dataset containing data
     '''
+
+    paths = Paths(test=testing_path)
 
     # Get instructions on how to combine datasets
     with open(paths.root / "data/data_selector.json") as f:
@@ -255,19 +261,29 @@ def combine_datasets(species, site, scale = "SIO-05"):
     attrs = []
     instrument_rec = []
     dates_rec = []
+    networks = []
 
     for instrument, date in instruments.items():
 
+        # Read data
         if instrument in ["ALE", "GAGE"]:
-            ds = read_ale_gage(species, site, instrument)
+            ds = read_ale_gage(species, site, instrument,
+                               testing_path=testing_path)
         else:
-            ds = read_agage(species, site, instrument)
+            ds = read_agage(species, site, instrument,
+                            testing_path=testing_path)
 
+        # Store attributes
         attrs.append(ds.attrs)
 
+        # Store instrument info
         instrument_rec.append({key:value for key, value in ds.attrs.items() if "instrument" in key})
 
+        # Store comments
         comments.append(ds.attrs["comment"])
+
+        # Store network
+        networks.append(ds.attrs["network"])
 
         # Subset date
         date = [None if d == "" else d for d in date]
@@ -311,19 +327,25 @@ def combine_datasets(species, site, scale = "SIO-05"):
     if len(np.unique(ds_combined.instrument_type.values)) == 1:
         ds_combined = ds_combined.drop_vars("instrument_type")
 
+    # Update network attribute
+    ds_combined.attrs["network"] = "/".join(set(networks))
+
     return ds_combined
 
 
 def output_dataset(ds,
                    network = "AGAGE",
                    instrument = "GCMD",
-                   end_date = None):
+                   end_date = None,
+                   testing_path = False):
     '''Output dataset to netCDF file
 
     Args:
         ds (xr.Dataset): Dataset to output
         end_date (str, optional): End date to subset to. Defaults to None.
     '''
+
+    paths = Paths(test=testing_path)
 
     filename = f"{network}-{instrument}_{ds.attrs['site_code']}_{format_species(ds.attrs['species'])}.nc"
 

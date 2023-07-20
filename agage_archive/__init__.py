@@ -31,30 +31,42 @@ def get_path(sub_path=""):
 
 
 class Paths():
-    def __init__(self):
+    def __init__(self, test=False):
         """Class to store paths to data folders
         """
 
         # Get repository root
         self.root = get_path().parent
 
-        # Check if config file exists
-        config_file = get_path("config.ini")
-        if not config_file.exists():
-            raise FileNotFoundError(
-                "Config file not found. Try running util.setup first")
+        if test == False:
 
-        # Read config file
-        config = configparser.ConfigParser()
-        config.read(get_path("config.ini"))
+            # Check if config file exists
+            config_file = get_path("config.ini")
+            if not config_file.exists():
+                raise FileNotFoundError(
+                    "Config file not found. Try running util.setup first")
 
-        self.agage = Path(config["Paths"]["agage_path"])
-        self.agage_gcmd = self.agage / "data-nc"
-        self.agage_gcms = self.agage / "data-gcms-nc"
-        self.ale = Path(config["Paths"]["ale_path"])
-        self.gage = Path(config["Paths"]["gage_path"])
+            # Read config file
+            config = configparser.ConfigParser()
+            config.read(get_path("config.ini"))
 
-        self.output = Path(config["Paths"]["output_path"])
+            self.agage = Path(config["Paths"]["agage_path"])
+            self.agage_gcmd = self.agage / "data-nc"
+            self.agage_gcms = self.agage / "data-gcms-nc"
+            self.ale = Path(config["Paths"]["ale_path"])
+            self.gage = Path(config["Paths"]["gage_path"])
+
+            self.output = Path(config["Paths"]["output_path"])
+
+        else:
+
+            # Use test data
+            self.agage_gcmd = self.root / "data/agage_test/data-nc"
+            self.agage_gcms = self.root / "data/agage_test/data-gcms-nc"
+            self.ale = self.root / "data/ale_gage_sio1993/ale"
+            self.gage = self.root / "data/ale_gage_sio1993/gage"
+
+            self.output = self.root / "data/agage_test/output"
 
         # Check that data folders are there
         for pth in [self.agage_gcmd,
