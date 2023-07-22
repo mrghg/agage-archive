@@ -32,17 +32,35 @@ def read_agage(species, site, instrument,
 
     species_search = species.lower()
 
-    if instrument == "GCMD" or instrument == "GCECD":
-        pth = paths.agage_gcmd
-    elif "GCMS" in instrument:
-        pth = paths.agage_gcms
+    gcmd_instruments = ["GCMD", "GCECD", "Picarro", "LGR"]
+    gcms_instruments = ["GCMS-ADS", "GCMS-Medusa", "GCMS-MteCimone"]
+
+
+    # Determine path
+
+    pth = None
+
+    for gcmd_instrument in gcmd_instruments:
+        if gcmd_instrument in instrument:
+            pth = paths.agage_gcmd
+            break
+    for gcms_instrument in gcms_instruments:
+        if gcms_instrument in instrument:
+            pth = paths.agage_gcms
+            break
+    
+    if pth == None:
+        raise ValueError(f"Instrument must be one of {gcmd_instruments} {gcms_instruments}")
+
+    # search for netcdf files matching instrument, site and species
+    nc_files = list(pth.glob(f"AGAGE-{instrument}*_{site}_{species_search}.nc"))
+
+    if len(nc_files) == 0:
+        raise FileNotFoundError(f"Can't find file AGAGE-{instrument}*_{site}_{species_search}.nc")
+    elif len(nc_files) > 1:
+        raise FileNotFoundError(f"Found more than one file matching AGAGE-{instrument}*_{site}_{species_search}.nc")
     else:
-        raise ValueError("instrument must be GCMD, GCMS-ADS, GCMS-Medusa or GCECD")
-
-    nc_file = pth / f"AGAGE-{instrument}_{site}_{species_search}.nc"
-
-    if not nc_file.exists():
-        raise FileNotFoundError(f"Can't find file {nc_file}")
+        nc_file = nc_files[0]
 
     with xr.open_dataset(nc_file) as f:
         ds = f.load()
