@@ -9,16 +9,7 @@ import numpy as np
 from agage_archive import Paths
 from agage_archive.processing import format_species, \
     format_variables, format_attributes, scale_convert, \
-    read_instrument_dates_csv
-
-
-# Define instrument numbers
-# NOTE: If this changes, make sure you update the instrument_type comment in variables.json
-instrument_number = {"ALE": 0,
-                    "GAGE": 1,
-                    "GCMD": 2,
-                    "GCMS-ADS": 3,
-                    "GCMS-Medusa": 4}
+    read_instrument_dates_csv, instrument_type_definition
 
 
 def read_agage(species, site, instrument,
@@ -41,10 +32,12 @@ def read_agage(species, site, instrument,
 
     species_search = species.lower()
 
-    if instrument == "GCMD":
+    if instrument == "GCMD" or instrument == "GCECD":
         pth = paths.agage_gcmd
     elif "GCMS" in instrument:
         pth = paths.agage_gcms
+    else:
+        raise ValueError("instrument must be GCMD, GCMS-ADS, GCMS-Medusa or GCECD")
 
     nc_file = pth / f"AGAGE-{instrument}_{site}_{species_search}.nc"
 
@@ -245,6 +238,8 @@ def combine_datasets(species, site, scale = "SIO-05",
 
     # Read instrument dates from CSV files
     instruments = read_instrument_dates_csv(species, site)
+
+    instrument_number, instrument_number_str = instrument_type_definition()
 
     # Combine datasets    
     dss = []

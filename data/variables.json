@@ -62,7 +62,7 @@
     "instrument_type": {
         "attrs": {
             "long_name": "ALE/GAGE/AGAGE instrument type",
-            "comment": "0 = GC multi-detector (GCMD) from the ALE project; 1 = GCMD from the GAGE project; 2, 3, 4 are GCMD, GCMS-ADS or GCMS-Medusa instruments from AGAGE, respectively"
+            "comment": ""
         },
         "encoding": {
             "dtype": "i1"

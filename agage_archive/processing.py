@@ -25,6 +25,31 @@ nc4_types = {"f4": "float32",
 
 paths = Paths()
 
+
+def instrument_type_definition():
+    '''Define instrument numbers for each instrument type
+
+    Returns:
+        str: Instrument type definition
+    '''
+
+    instrument_number = {"ALE": 0,
+                        "GAGE": 1,
+                        "GCMD": 2,
+                        "GCMS-ADS": 3,
+                        "GCMS-Medusa": 4,
+                        "GCECD": 5,
+                        "GCTOFMS": 6,
+                        "Picarro": 7,
+                        "LGR": 8,
+                        "GCMS-MteCimone": 9}
+    
+    # Create string from dictionary defining instrument numbers
+    instrument_number_string = ", ".join([f"{k}={v}" for k, v in instrument_number.items()])
+
+    return instrument_number, instrument_number_string
+
+
 def scale_convert(ds, scale_new):
     """Convert mole fraction from one scale to another
 
@@ -347,6 +372,11 @@ def format_variables(ds,
                                                         lookup_locals_and_attrs("species", locals(), attrs))
             ds[var].attrs["units"] = lookup_locals_and_attrs("units", locals(), attrs)
             ds[var].attrs["calibration_scale"] = lookup_locals_and_attrs("calibration_scale", locals(), attrs)
+
+    # If instrument_type variable is in file, make sure comment is formatted properly
+    if "instrument_type" in ds.variables:
+        instrument_number, instrument_number_string = instrument_type_definition()
+        ds.instrument_type.attrs["comment"] = instrument_number_string
 
     return ds
 
