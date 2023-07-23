@@ -542,10 +542,10 @@ def lookup_username():
                     return os.environ["LOGNAME"]
                 except:
                     return "unknown user"
-                
+    
 
-def read_instrument_dates_csv(species, site):
-    '''Read instrument dates from csv file
+def read_instrument_dates_xlsx(species, site):
+    '''Read instrument dates from Excel file
 
     Args:
         species (str): Species
@@ -555,33 +555,37 @@ def read_instrument_dates_csv(species, site):
         dict: Dictionary of instrument dates
     '''
 
-    path = paths.root / "data" / "data_selection" / f"{site.upper()}.csv"
+    path = paths.root / "data" / "data_selection" / "data_selection.xlsx"
 
     warning_message = f"WARNING: No instrument dates found for {species} at {site.upper()}. Assuming GCMS-Medusa"
 
-    if path.exists() == False:
-        print(warning_message)
-        return {"GCMS-Medusa": ["", ""]}
-
-    df = pd.read_csv(path,
-                    comment="#")
-
-    # Replace NaNs with empty strings
-    df = df.fillna("")
-
-    # Select where species column matches species
-    df = df[df["Species"].str.lower() == species.lower()]
-
-    df = df[["Instrument", "Start", "End"]].drop_duplicates()
-    df = df.set_index("Instrument")
+    df = pd.read_excel(path,
+                    comment="#",
+                    sheet_name=site.upper(),
+                    index_col="Species")
     
-    instrument_dates = {}
-    for instrument in df.index:
-        instrument_dates[instrument] = [df.loc[instrument, "Start"],
-                                        df.loc[instrument, "End"]]
+    # Look for species name in table, return Medusa if not there
+    df = df[df.index.str.lower() == species.lower()]
 
-    if len(instrument_dates) == 0:
+    if len(df) == 0:
         print(warning_message)
-        return {"GCMS-Medusa": ["", ""]}
-    else:
-        return instrument_dates
+        return {"GCMS-Medusa": [None, None]}
+    
+    if len(df) > 1: 
+        raise ValueError("Can only have each species appear at most once in data_selection table")
+
+    # Extract instrument names from column names
+    instruments = [col.split(" ")[0] for col in df.columns]
+
+    # For each instrument, find start and end dates
+    instrument_dates = {}
+
+    for instrument in set(instruments):
+
+        dates = df.loc[:, [f"{instrument} start", f"{instrument} end"]].values[0].astype(str)
+
+        if "x" not in dates:
+            instrument_dates[instrument] = [date if date != "nan" else None for date in dates]
+
+    return instrument_dates
+

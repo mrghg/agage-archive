@@ -9,7 +9,7 @@ import numpy as np
 from agage_archive import Paths
 from agage_archive.processing import format_species, \
     format_variables, format_attributes, scale_convert, \
-    read_instrument_dates_csv, instrument_type_definition
+    read_instrument_dates_xlsx, instrument_type_definition
 
 
 def read_agage(species, site, instrument,
@@ -255,7 +255,7 @@ def combine_datasets(species, site, scale = "SIO-05",
     '''
 
     # Read instrument dates from CSV files
-    instruments = read_instrument_dates_csv(species, site)
+    instruments = read_instrument_dates_xlsx(species, site)
 
     instrument_number, instrument_number_str = instrument_type_definition()
 
@@ -290,7 +290,7 @@ def combine_datasets(species, site, scale = "SIO-05",
         networks.append(ds.attrs["network"])
 
         # Subset date
-        date = [None if d == "" else d for d in date]
+        #date = [None if d == "" else d for d in date]
         ds = ds.sel(time=slice(*date))
 
         dates_rec.append(ds.time[0].dt.strftime("%Y-%m-%d").values)
