@@ -509,8 +509,13 @@ def format_calibration_scale(scale):
         str: Formatted scale
     '''
 
-    return scale
+    scale_translator = {"TU1987": "TU-87"}
 
+    if scale in scale_translator:
+        return scale_translator[scale]
+    else:
+        return scale
+    
 
 def lookup_username():
     '''Look up username
@@ -589,3 +594,16 @@ def read_instrument_dates_xlsx(species, site):
 
     return instrument_dates
 
+
+def calibration_scale_default(species):
+
+    # Read scale_defaults csv file
+    scale_defaults = pd.read_csv(paths.root / "data/scale_defaults.csv",
+                                index_col="Species")
+    
+    scale_defaults = scale_defaults.applymap(lambda x: x.strip() if isinstance(x, str) else x)
+
+    if format_species(species) not in scale_defaults.index.str.lower():
+        return scale_defaults.loc["all", "calibration_scale"]
+    else:
+        return scale_defaults.loc[format_species(species), "calibration_scale"]

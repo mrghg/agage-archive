@@ -9,7 +9,8 @@ import numpy as np
 from agage_archive import Paths
 from agage_archive.processing import format_species, \
     format_variables, format_attributes, scale_convert, \
-    read_instrument_dates_xlsx, instrument_type_definition
+    read_instrument_dates_xlsx, instrument_type_definition, \
+    calibration_scale_default
 
 
 def read_agage(species, site, instrument,
@@ -240,15 +241,17 @@ def read_ale_gage(species, site, network,
     return ds
 
 
-def combine_datasets(species, site, scale = "SIO-05",
-                     testing_path = False):
+def combine_datasets(species, site, 
+                    scale = "default",
+                    testing_path = False):
     '''Combine ALE/GAGE/AGAGE datasets for a given species and site
 
     Args:
         species (str): Species
         site (str): Site
-        scale (str, optional): Calibration scale. Defaults to "SIO-05".
-            If None, no scale conversion is attempted
+        scale (str, optional): Calibration scale. Defaults to value in scale_defaults.csv.
+            If None, will attempt to leave scale unchanged.
+        convert_scale (bool, optional): Convert calibration scale, or keep the same. Defaults to True.
 
     Returns:
         xr.Dataset: Dataset containing data
@@ -257,7 +260,12 @@ def combine_datasets(species, site, scale = "SIO-05",
     # Read instrument dates from CSV files
     instruments = read_instrument_dates_xlsx(species, site)
 
-    instrument_number, instrument_number_str = instrument_type_definition()
+    instrument_types, instrument_number_str = instrument_type_definition()
+
+    # Get default calibration scale, if needed
+    if scale != None:
+        if scale == "default":
+            scale = calibration_scale_default(species)
 
     # Combine datasets    
     dss = []
@@ -266,6 +274,7 @@ def combine_datasets(species, site, scale = "SIO-05",
     instrument_rec = []
     dates_rec = []
     networks = []
+    scales = []
 
     for instrument, date in instruments.items():
 
@@ -290,7 +299,6 @@ def combine_datasets(species, site, scale = "SIO-05",
         networks.append(ds.attrs["network"])
 
         # Subset date
-        #date = [None if d == "" else d for d in date]
         ds = ds.sel(time=slice(*date))
 
         dates_rec.append(ds.time[0].dt.strftime("%Y-%m-%d").values)
@@ -299,11 +307,21 @@ def combine_datasets(species, site, scale = "SIO-05",
         if scale != None:
             ds = scale_convert(ds, scale)
 
+        # Record scale
+        scales.append(ds.attrs["calibration_scale"])
+
         # Add instrument_type to dataset as variable
-        ds["instrument_type"] = xr.DataArray(np.repeat(instrument_number[instrument], len(ds.time)),
+        ds["instrument_type"] = xr.DataArray(np.repeat(instrument_types[instrument], len(ds.time)),
                                         dims="time", coords={"time": ds.time})
 
         dss.append(ds)
+
+    # Check that we don't have different scales
+    if len(set(scales)) > 1:
+        error_message = "Can't combine scales that do not match. Either specify a scale, or add to scale_defaults.csv. "
+        for instrument, sc in zip(instruments.keys(), scales):
+            error_message += f"{instrument}:{sc}, " 
+        raise ValueError(error_message)
 
     ds_combined = xr.concat(dss, dim="time")
 
