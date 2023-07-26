@@ -596,6 +596,14 @@ def read_instrument_dates_xlsx(species, site):
 
 
 def calibration_scale_default(species):
+    '''Get default calibration scale
+
+    Args:
+        species (str): Species
+
+    Returns:
+        str: Calibration scale
+    '''
 
     # Read scale_defaults csv file
     scale_defaults = pd.read_csv(paths.root / "data/scale_defaults.csv",
@@ -607,3 +615,42 @@ def calibration_scale_default(species):
         return scale_defaults.loc["all", "calibration_scale"]
     else:
         return scale_defaults.loc[format_species(species), "calibration_scale"]
+
+
+def data_exclude(ds, species, site, instrument):
+    '''Read data_exclude file and return start and end date for exclusion
+
+    Args:
+        ds (xr.Dataset): Dataset
+        species (str): Species
+        site (str): Site code
+        instrument (str): Instrument
+
+    Returns:
+        xr.Dataset: Dataset with NaNs between start and end dates
+    '''
+
+    # Determine if data_exclude.xlsx contains sheet name called site.upper()
+    if site.upper() not in pd.ExcelFile(paths.root / "data/data_selection/data_exclude.xlsx").sheet_names:
+        return ds
+
+    # Read data_exclude
+    data_exclude = pd.read_excel(paths.root / "data/data_selection/data_exclude.xlsx",
+                                comment="#",
+                                sheet_name=site.upper())
+    
+    # Remove whitespace from strings
+    data_exclude = data_exclude.applymap(lambda x: x.strip() if isinstance(x, str) else x)
+
+    # columns are Species, Instrument, Start, End
+    # Find rows that match species and instrument and then extract start and end dates
+    data_exclude = data_exclude[(data_exclude["Species"] == format_species(species)) &
+                                (data_exclude["Instrument"] == instrument)][["Start", "End"]]
+
+    if len(data_exclude) == 0:
+        return ds
+    else:
+        # Replace values in xarray dataset with NaN between start and end dates
+        for start, end in data_exclude.values:
+            ds.loc[dict(time=slice(start, end))] = np.nan
+        return ds

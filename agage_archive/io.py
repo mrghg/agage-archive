@@ -10,7 +10,7 @@ from agage_archive import Paths
 from agage_archive.processing import format_species, \
     format_variables, format_attributes, scale_convert, \
     read_instrument_dates_xlsx, instrument_type_definition, \
-    calibration_scale_default
+    calibration_scale_default, data_exclude
 
 
 def read_agage(species, site, instrument,
@@ -96,6 +96,9 @@ def read_agage(species, site, instrument,
     ds = format_attributes(ds,
                         instruments=instruments,
                         species=species)
+
+    # Remove any excluded data
+    ds = data_exclude(ds, species, site, instrument)
 
     return ds
 
@@ -237,6 +240,9 @@ def read_ale_gage(species, site, network,
                         units=species_info["units"])
 
     ds = format_variables(ds)
+
+    # Remove any excluded data
+    ds = data_exclude(ds, species, site, network)
 
     return ds
 
