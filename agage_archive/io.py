@@ -11,6 +11,7 @@ from agage_archive.processing import format_species, \
     format_variables, format_attributes, scale_convert, \
     read_instrument_dates_xlsx, instrument_type_definition, \
     calibration_scale_default, data_exclude
+from agage_archive.run import read_release_schedule
 
 
 def read_agage(species, site, instrument,
@@ -99,6 +100,12 @@ def read_agage(species, site, instrument,
 
     # Remove any excluded data
     ds = data_exclude(ds, species, site, instrument)
+
+    # Check against release schedule
+    rs = read_release_schedule(instrument,
+                               species=species, site=site)
+    ds = ds.sel(time=slice(None, rs))
+
 
     return ds
 
@@ -243,6 +250,11 @@ def read_ale_gage(species, site, network,
 
     # Remove any excluded data
     ds = data_exclude(ds, species, site, network)
+
+    # Check against release schedule
+    rs = read_release_schedule(network,
+                               species=species, site=site)
+    ds = ds.sel(time=slice(None, rs))
 
     return ds
 

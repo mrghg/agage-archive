@@ -570,7 +570,7 @@ def read_instrument_dates_xlsx(species, site):
                     index_col="Species")
     
     # Look for species name in table, return Medusa if not there
-    df = df[df.index.str.lower() == species.lower()]
+    df = df[df.index == format_species(species)]
 
     if len(df) == 0:
         print(warning_message)

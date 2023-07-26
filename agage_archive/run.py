@@ -2,11 +2,14 @@ import pandas as pd
 
 from agage_archive import Paths
 from agage_archive.io import combine_datasets, read_agage, read_ale_gage, output_dataset
+from agage_archive.processing import read_instrument_dates_xlsx
 
 path = Paths()
 
 
-def read_release_schedule(instrument):
+def read_release_schedule(instrument,
+                          species = None,
+                          site = None):
 
     with open(path.root / "data/data_selection/data_release_schedule.xlsx", "+rb") as f:
         df_all = pd.read_excel(f, sheet_name=instrument)
@@ -25,7 +28,10 @@ def read_release_schedule(instrument):
 
     df.set_index("Species", inplace=True)
 
-    return df
+    if species is not None:
+        return df.loc[species, site]
+    else:
+        return df
 
 
 def run_individual_instrument(instrument):
@@ -50,4 +56,32 @@ def run_individual_instrument(instrument):
                 else:
                     ds = read_function(species, site, instrument)
                 output_dataset(ds, network, instrument=instrument_out,
+                               end_date=rs.loc[species, site])
+                
+
+def run_combined_instruments(network = "AGAGE"):
+
+
+    # Get release schedule for end dates
+    rs = read_release_schedule(instrument)
+
+    file_path = path.root / "data" / "data_selection" / "data_selection.xlsx"
+
+    # Read sheet names in file_path to determine which sites to process
+    sites = pd.ExcelFile(file_path).sheet_names
+
+    for site in sites:
+
+        df = pd.read_excel(file_path,
+                        comment="#",
+                        sheet_name=site,
+                        index_col="Species")
+
+        # Loop through species in index
+        for species in df.index:
+
+            # Produce combined dataset
+            ds = combine_datasets(species, site)
+
+            output_dataset(ds, network, instrument="combined",
                                end_date=rs.loc[species, site])
