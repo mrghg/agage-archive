@@ -28,24 +28,26 @@ def read_release_schedule(instrument):
     return df
 
 
-def run_instrument(instrument):
+def run_individual_instrument(instrument):
 
     rs = read_release_schedule(instrument)
 
     if instrument == "ALE" or instrument == "GAGE":
         network = instrument
+        instrument_out = "GCMD"
         read_function = read_ale_gage
     else:
         network = "AGAGE"
+        instrument_out = instrument
         read_function = read_agage
 
     # Process for all species and sites
     for species in rs.index:
         for site in rs.columns:
-            if rs.loc[species, site] != "x":
+            if rs.loc[species, site].lower() != "x":
                 if instrument == "ALE" or instrument == "GAGE":
                     ds = read_function(species, site, instrument)
                 else:
                     ds = read_function(species, site, instrument)
-                output_dataset(ds, network, instrument=instrument,
+                output_dataset(ds, network, instrument=instrument_out,
                                end_date=rs.loc[species, site])
