@@ -1,8 +1,10 @@
-from agage_archive import io
+from agage_archive.convert import scale_convert
 import pandas as pd
 import xarray as xr
 
-paths = io.Paths()
+from agage_archive import Paths
+
+paths = Paths()
 
 def test_scale_convert():
 
@@ -29,7 +31,7 @@ def test_scale_convert():
 
     for test in tests:
         ds = test_dataset("1991-01-01", test[0], test[1])
-        ds_new = io.scale_convert(ds, test[2])
+        ds_new = scale_convert(ds, test[2])
 
         ratio = test[3].split("*")
         if len(ratio) == 1:
@@ -42,7 +44,7 @@ def test_scale_convert():
                 
     # Period where N2O time conversion applies
     ds = test_dataset("1985-01-01", "n2o", "SIO-93")
-    ds_new = io.scale_convert(ds, "SIO-05")
+    ds_new = scale_convert(ds, "SIO-05")
 
     assert ds_new.mf.values[0] / ds.mf.values[0] == \
         scale_conversion.loc["n2o", "SIO-98/SIO-93"] * \

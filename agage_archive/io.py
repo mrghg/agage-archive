@@ -7,11 +7,12 @@ import tarfile
 import numpy as np
 
 from agage_archive import Paths
-from agage_archive.processing import format_species, \
-    format_variables, format_attributes, scale_convert, \
-    read_instrument_dates_xlsx, instrument_type_definition, \
-    calibration_scale_default, data_exclude
-from agage_archive.run import read_release_schedule
+from agage_archive.convert import scale_convert
+from agage_archive.formatting import format_species, \
+    format_variables, format_attributes
+from agage_archive.data_selection import read_release_schedule, data_exclude, \
+    calibration_scale_default, read_instrument_dates_xlsx
+from agage_archive.definitions import instrument_type_definition
 
 
 def read_agage(species, site, instrument,
@@ -32,7 +33,7 @@ def read_agage(species, site, instrument,
 
     paths = Paths(test=testing_path)
 
-    species_search = species.lower()
+    species_search = format_species(species)
 
     gcmd_instruments = ["GCMD", "GCECD", "Picarro", "LGR"]
     gcms_instruments = ["GCMS-ADS", "GCMS-Medusa", "GCMS-MteCimone"]
@@ -99,11 +100,12 @@ def read_agage(species, site, instrument,
                         species=species)
 
     # Remove any excluded data
-    ds = data_exclude(ds, species, site, instrument)
+    ds = data_exclude(ds, format_species(species), site, instrument)
 
     # Check against release schedule
     rs = read_release_schedule(instrument,
-                               species=species, site=site)
+                               species=format_species(species),
+                               site=site)
     ds = ds.sel(time=slice(None, rs))
 
 
@@ -134,7 +136,7 @@ def read_ale_gage(species, site, network,
 
     # Get species info
     with open(paths.root / "data/ale_gage_species.json") as f:
-        species_info = json.load(f)[species]
+        species_info = json.load(f)[format_species(species)]
 
     # For now, hardwire path
     folder = paths.__getattribute__(network.lower())
@@ -242,18 +244,19 @@ def read_ale_gage(species, site, network,
 
     ds = format_attributes(ds,
                         instruments=[{"instrument": f"{network.upper()}_GCMD"}],
-                        species=species,
+                        species=format_species(species),
                         calibration_scale=species_info["scale"],
                         units=species_info["units"])
 
     ds = format_variables(ds)
 
     # Remove any excluded data
-    ds = data_exclude(ds, species, site, network)
+    ds = data_exclude(ds, format_species(species), site, network)
 
     # Check against release schedule
     rs = read_release_schedule(network,
-                               species=species, site=site)
+                               species=format_species(species),
+                               site=site)
     ds = ds.sel(time=slice(None, rs))
 
     return ds
@@ -276,14 +279,14 @@ def combine_datasets(species, site,
     '''
 
     # Read instrument dates from CSV files
-    instruments = read_instrument_dates_xlsx(species, site)
+    instruments = read_instrument_dates_xlsx(format_species(species), site)
 
     instrument_types, instrument_number_str = instrument_type_definition()
 
     # Get default calibration scale, if needed
     if scale != None:
         if scale == "default":
-            scale = calibration_scale_default(species)
+            scale = calibration_scale_default(format_species(species))
 
     # Combine datasets    
     dss = []

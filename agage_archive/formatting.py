@@ -1,145 +1,14 @@
 import json
-import pandas as pd
-import xarray as xr
 import numpy as np
+import xarray as xr
 from datetime import datetime
-import os
-import configparser
 
-from agage_archive import Paths, get_path
-from agage_archive.util import is_number
-
-
-nc4_types = {"f4": "float32",
-            "f8": "float64",
-            "i4": "int32",
-            "i2": "int16",
-            "i8": "int64",
-            "i1": "int8",
-            "u1": "uint8",
-            "u2": "uint16",
-            "u4": "uint32",
-            "u8": "uint64",
-            "S1": "S1"}
+from agage_archive import Paths
+from agage_archive.util import is_number, lookup_username
+from agage_archive.definitions import instrument_type_definition, nc4_types
 
 
 paths = Paths()
-
-
-def instrument_type_definition():
-    '''Define instrument numbers for each instrument type
-
-    Returns:
-        str: Instrument type definition
-    '''
-
-    instrument_number = {"ALE": 0,
-                        "GAGE": 1,
-                        "GCMD": 2,
-                        "GCMS-ADS": 3,
-                        "GCMS-Medusa": 4,
-                        "GCECD": 5,
-                        "GCTOFMS": 6,
-                        "Picarro": 7,
-                        "LGR": 8,
-                        "GCMS-MteCimone": 9}
-    
-    # Create string from dictionary defining instrument numbers
-    instrument_number_string = ", ".join([f"{k}={v}" for k, v in instrument_number.items()])
-
-    return instrument_number, instrument_number_string
-
-
-def scale_convert(ds, scale_new):
-    """Convert mole fraction from one scale to another
-
-    Args:
-        species (str): Species
-        scale_original (str): Original scale
-        scale_new (str): Output scale
-        t (pd.Timestamp): Timestamp
-        mf (float): Mole fraction
-    
-    Returns:
-        ndarray,float: Mole fraction in new scale
-    """
-
-    def n2o_scale_function(time):
-        """Function to apply to N2O mole fractions to convert from SIO-93 to SIO-98
-
-        Args:
-            time (pd.Timestamp): Timestamp
-            mf (ndarray): Mole fractions
-
-        Returns:
-            ndarray: Mole fractions adjusted for time-variation between scales (excluding factor)
-        """
-
-        # calculate days elapsed since 2nd March 1978
-        days_since_ale_start = (time - \
-                                pd.Timestamp("1978-03-02")).dt.days.values
-
-        a0=1.00664
-        a1=-0.56994e-3
-        a2=-0.65398e-3
-        a3=0.13083e-3
-        a4=-0.20742e-4
-
-        t = (days_since_ale_start-3227.)/365.25
-        f = 1./(a0 + a1*t + a2*t**2 + a3*t**3 + a4*t**4)
-
-        # Apply f to mf only between 1st May 1984 and 31st March 1990
-        f_out = np.ones_like(f).astype(float)
-        idx = (days_since_ale_start>=2252) & (days_since_ale_start<=4412)
-        f_out[idx] = f[idx]
-
-        return f_out
-    
-    # Check if scales are the same
-    if ds.attrs["calibration_scale"] == scale_new:
-        return ds
-    else:
-        scale_original = ds.attrs["calibration_scale"]
-    
-    species = ds.attrs["species"]
-
-    # Make a deep copy of the dataset
-    ds_out = ds.copy(deep=True)
-
-    # Read scale conversion factors
-    scale_converter = pd.read_csv(paths.root / "data/scale_convert.csv",
-                                  index_col="Species")
-
-    scale_numerator = [ratio.split("/")[0] for ratio in scale_converter.columns]
-    scale_denominator = [ratio.split("/")[1] for ratio in scale_converter.columns]
-
-    # Check for duplicates in numerator or denominator (can't handle this yet)
-    if (len(set(scale_denominator)) != len(scale_denominator)) or \
-        (len(set(scale_numerator)) != len(scale_numerator)):
-        raise NotImplementedError("Can't deal with multiple factors for same scale at the moment")
-
-    # Find chain of ratios to apply (start from end and work backwards)
-    columns = [scale_numerator.index(scale_new)]
-    while scale_denominator[columns[-1]] != scale_original:
-        columns.append(scale_numerator.index(scale_denominator[columns[-1]]))
-
-    # Now reverse to propagate forwards
-    columns = columns[::-1]    
-
-    # Apply scale conversion factors
-    for column in columns:
-        column_name = scale_converter.columns[column]
-
-        if species.lower() == "n2o" and column_name == "SIO-98/SIO-93":
-            # Apply time-varying factor to N2O (scale factor is not included)
-            ds_out.mf.values *= n2o_scale_function(ds.time.to_series())
-
-        ds_out.mf.values *= scale_converter.loc[species, column_name]
-
-    # Update attributes
-    ds_out.attrs["calibration_scale"] = scale_new
-
-    return ds_out
 
 
 def format_attributes_global_instrument(ds,
@@ -381,31 +250,6 @@ def format_variables(ds,
     return ds
 
 
-def lookup_locals_and_attrs(v, local, attrs):
-    '''Look up variable in locals and attrs, and format the output
-
-    Args:
-        v (str): Variable name
-        local (dict): Dictionary of local variables
-        attrs (dict): Dictionary of attributes
-
-    Returns:
-        str: Variable name
-    '''
-
-    #TODO: this assumes that the variable is in locals
-    if local[v] is None:
-        # If not set as keyword, check if it is in dataset attributes
-        if v not in attrs:
-            raise ValueError(f"{v} not set and not found in dataset attributes")
-        else:
-            # If in dataset attributes, format it
-            return eval(f"format_{v}('{attrs[v]}')")
-    else:
-        # If set, format it
-        return eval(f"format_{v}('{local[v]}')")
-
-
 def format_attributes(ds, instruments = [],
                       species = None,
                       units = None,
@@ -470,7 +314,7 @@ def format_species(species):
         str: Formatted species name
     '''
 
-    return species.lower() #.replace("-", "")
+    return species.lower()
 
 
 def format_units(units):
@@ -483,15 +327,7 @@ def format_units(units):
         str: Formatted units
     '''
 
-    unit_translator = {"ppm": "1e-6",
-                       "ppb": "1e-9",
-                       "ppt": "1e-12",
-                       "ppq": "1e-15",
-                       "nmol/mol": "1e-9",
-                       "nmol mol-1": "1e-9",
-                       "pmol/mol": "1e-12",
-                       "pmol mol-1": "1e-12",
-                       }
+    from agage_archive.definitions import unit_translator
 
     if units in unit_translator:
         return unit_translator[units]
@@ -509,148 +345,34 @@ def format_calibration_scale(scale):
         str: Formatted scale
     '''
 
-    scale_translator = {"TU1987": "TU-87"}
+    from agage_archive.definitions import scale_translator
 
     if scale in scale_translator:
         return scale_translator[scale]
     else:
         return scale
-    
 
-def lookup_username():
-    '''Look up username
 
-    Returns:
-        str: Username
-    '''
-
-    # Check if config file exists
-    config_file = get_path("config.ini")
-    if not config_file.exists():
-        raise FileNotFoundError(
-            "Config file not found. Try running util.setup first")
-    
-    # Take username from config file if it exists, otherwise try to get it from the system
-    config = configparser.ConfigParser()
-    config.read(config_file)
-
-    if "User" in config:
-        return config["User"]["name"]
-    else:
-        try:
-            return os.environ["USER"]
-        except:
-            try:
-                return os.environ["USERNAME"]
-            except:
-                try:
-                    return os.environ["LOGNAME"]
-                except:
-                    return "unknown user"
-    
-
-def read_instrument_dates_xlsx(species, site):
-    '''Read instrument dates from Excel file
+def lookup_locals_and_attrs(v, local, attrs):
+    '''Look up variable in locals and attrs, and format the output
 
     Args:
-        species (str): Species
-        site (str): Site code
+        v (str): Variable name
+        local (dict): Dictionary of local variables
+        attrs (dict): Dictionary of attributes
 
     Returns:
-        dict: Dictionary of instrument dates
+        str: Variable name
     '''
 
-    path = paths.root / "data" / "data_selection" / "data_selection.xlsx"
-
-    warning_message = f"WARNING: No instrument dates found for {species} at {site.upper()}. Assuming GCMS-Medusa"
-
-    df = pd.read_excel(path,
-                    comment="#",
-                    sheet_name=site.upper(),
-                    index_col="Species")
-    
-    # Look for species name in table, return Medusa if not there
-    df = df[df.index == format_species(species)]
-
-    if len(df) == 0:
-        print(warning_message)
-        return {"GCMS-Medusa": [None, None]}
-    
-    if len(df) > 1: 
-        raise ValueError("Can only have each species appear at most once in data_selection table")
-
-    # Extract instrument names from column names
-    instruments = [col.split(" ")[0] for col in df.columns]
-
-    # For each instrument, find start and end dates
-    instrument_dates = {}
-
-    for instrument in set(instruments):
-
-        dates = df.loc[:, [f"{instrument} start", f"{instrument} end"]].values[0].astype(str)
-
-        if "x" not in dates:
-            instrument_dates[instrument] = [date if date != "nan" else None for date in dates]
-
-    return instrument_dates
-
-
-def calibration_scale_default(species):
-    '''Get default calibration scale
-
-    Args:
-        species (str): Species
-
-    Returns:
-        str: Calibration scale
-    '''
-
-    # Read scale_defaults csv file
-    scale_defaults = pd.read_csv(paths.root / "data/scale_defaults.csv",
-                                index_col="Species")
-    
-    scale_defaults = scale_defaults.applymap(lambda x: x.strip() if isinstance(x, str) else x)
-
-    if format_species(species) not in scale_defaults.index.str.lower():
-        return scale_defaults.loc["all", "calibration_scale"]
+    #TODO: this assumes that the variable is in locals
+    if local[v] is None:
+        # If not set as keyword, check if it is in dataset attributes
+        if v not in attrs:
+            raise ValueError(f"{v} not set and not found in dataset attributes")
+        else:
+            # If in dataset attributes, format it
+            return eval(f"format_{v}('{attrs[v]}')")
     else:
-        return scale_defaults.loc[format_species(species), "calibration_scale"]
-
-
-def data_exclude(ds, species, site, instrument):
-    '''Read data_exclude file and return start and end date for exclusion
-
-    Args:
-        ds (xr.Dataset): Dataset
-        species (str): Species
-        site (str): Site code
-        instrument (str): Instrument
-
-    Returns:
-        xr.Dataset: Dataset with NaNs between start and end dates
-    '''
-
-    # Determine if data_exclude.xlsx contains sheet name called site.upper()
-    if site.upper() not in pd.ExcelFile(paths.root / "data/data_selection/data_exclude.xlsx").sheet_names:
-        return ds
-
-    # Read data_exclude
-    data_exclude = pd.read_excel(paths.root / "data/data_selection/data_exclude.xlsx",
-                                comment="#",
-                                sheet_name=site.upper())
-    
-    # Remove whitespace from strings
-    data_exclude = data_exclude.applymap(lambda x: x.strip() if isinstance(x, str) else x)
-
-    # columns are Species, Instrument, Start, End
-    # Find rows that match species and instrument and then extract start and end dates
-    data_exclude = data_exclude[(data_exclude["Species"] == format_species(species)) &
-                                (data_exclude["Instrument"] == instrument)][["Start", "End"]]
-
-    if len(data_exclude) == 0:
-        return ds
-    else:
-        # Replace values in xarray dataset with NaN between start and end dates
-        for start, end in data_exclude.values:
-            ds.loc[dict(time=slice(start, end))] = np.nan
-        return ds
+        # If set, format it
+        return eval(f"format_{v}('{local[v]}')")

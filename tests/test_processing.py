@@ -1,7 +1,8 @@
-from agage_archive import get_path, Paths
-from agage_archive.processing import lookup_locals_and_attrs, \
-    format_species, format_units, format_calibration_scale, \
-    calibration_scale_default
+from agage_archive import Paths
+from agage_archive.formatting import lookup_locals_and_attrs, \
+    format_species, format_units, format_calibration_scale
+from agage_archive.data_selection import calibration_scale_default
+
 
 path = Paths()
 

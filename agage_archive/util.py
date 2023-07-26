@@ -1,5 +1,6 @@
 import configparser
 from pathlib import Path
+import os
 
 from agage_archive import get_path
 
@@ -43,6 +44,38 @@ def is_number(s):
         return True
     except ValueError:
         return False
+
+
+def lookup_username():
+    '''Look up username
+
+    Returns:
+        str: Username
+    '''
+
+    # Check if config file exists
+    config_file = get_path("config.ini")
+    if not config_file.exists():
+        raise FileNotFoundError(
+            "Config file not found. Try running util.setup first")
+    
+    # Take username from config file if it exists, otherwise try to get it from the system
+    config = configparser.ConfigParser()
+    config.read(config_file)
+
+    if "User" in config:
+        return config["User"]["name"]
+    else:
+        try:
+            return os.environ["USER"]
+        except:
+            try:
+                return os.environ["USERNAME"]
+            except:
+                try:
+                    return os.environ["LOGNAME"]
+                except:
+                    return "unknown user"
 
 
 if __name__ == "__main__":
