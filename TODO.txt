@@ -1,0 +1,8 @@
+- Process picarros
+- Run Combined
+- Folder structure
+- DECC network files
+- Preprocessing
+    - PDD
+    - Sampling period for picarros
+- Visualisation
