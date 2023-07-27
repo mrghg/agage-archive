@@ -7,7 +7,16 @@ from agage_archive.io import combine_datasets, read_agage, read_ale_gage, output
 path = Paths()
 
 
-def run_individual_instrument(instrument):
+def run_individual_instrument(instrument,
+                              verbose=False):
+    """Process individual data files for a given instrument.
+    Reads the release schedule for the instrument
+
+    Args:
+        instrument (str): Instrument to process. Must match sheet names in release schedule, e.g.:
+            "AGAGE", "ALE", "GAGE", "GCMD", ...
+        verbose (bool): Print progress to screen
+    """
 
     rs = read_release_schedule(instrument)
 
@@ -34,7 +43,13 @@ def run_individual_instrument(instrument):
 
 def run_combined_instruments(network = "AGAGE",
                              verbose = False):
+    """Process combined data files for a given network.
+    Reads the data selection file to determine which sites to process
 
+    Args:
+        network (str): Network for output filenames
+        verbose (bool): Print progress to screen
+    """
 
     file_path = path.root / "data" / "data_selection" / "data_selection.xlsx"
 
