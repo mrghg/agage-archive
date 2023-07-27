@@ -395,6 +395,7 @@ def output_dataset(ds,
                    instrument = "GCMD",
                    end_date = None,
                    testing_path = False,
+                   output_subpath = None,
                    verbose = False):
     '''Output dataset to netCDF file
 
@@ -405,15 +406,28 @@ def output_dataset(ds,
 
     paths = Paths(test=testing_path)
 
+    if output_subpath == None:
+        output_path = paths.output
+    else:
+        output_path = paths.output / output_subpath
+
+    # Test if output_path exists and if not create it
+    if not output_path.exists():
+        output_path.mkdir(parents=True)
+
+    # Create filename
     filename = f"{network}-{instrument}_{ds.attrs['site_code']}_{format_species(ds.attrs['species'])}.nc"
 
     ds_out = ds.copy(deep = True)
 
+    # Can't have some time attributes
     if "units" in ds_out.time.attrs:
         del ds_out.time.attrs["units"]
+    if "calendar" in ds_out.time.attrs:
         del ds_out.time.attrs["calendar"]
 
     if verbose:
         print(f"... writing {paths.output / filename}")
 
-    ds_out.sel(time=slice(None, end_date)).to_netcdf(paths.output / filename, mode="w", format="NETCDF4")
+    # Subset time and write netCDF
+    ds_out.sel(time=slice(None, end_date)).to_netcdf(output_path / filename, mode="w", format="NETCDF4")

@@ -1,4 +1,5 @@
 import pandas as pd
+from shutil import rmtree
 
 from agage_archive import Paths
 from agage_archive.data_selection import read_release_schedule
@@ -34,11 +35,23 @@ def run_individual_instrument(instrument,
         for site in rs.columns:
             if rs.loc[species, site].lower() != "x":
                 if instrument == "ALE" or instrument == "GAGE":
-                    ds = read_function(species, site, instrument)
+                    ds = read_function(species, site, instrument,
+                                       verbose=verbose)
                 else:
-                    ds = read_function(species, site, instrument)
+                    ds = read_function(species, site, instrument,
+                                       verbose=verbose)
+
+                # If combined file exists in output_directory/species, store individual file in subdirectory
+                # Look for file name with "combined" and site in it
+                if list((path.output / species).glob(f"*combined*{site}*.nc")):
+                    output_subpath = f"{species}/individual"
+                else:
+                    output_subpath = species
+
                 output_dataset(ds, network, instrument=instrument_out,
-                               end_date=rs.loc[species, site])
+                               output_subpath=output_subpath,
+                               end_date=rs.loc[species, site],
+                               verbose=verbose)
                 
 
 def run_combined_instruments(network = "AGAGE",
@@ -51,16 +64,16 @@ def run_combined_instruments(network = "AGAGE",
         verbose (bool): Print progress to screen
     """
 
-    file_path = path.root / "data" / "data_selection" / "data_selection.xlsx"
+    data_selection_path = path.root / "data" / "data_selection" / "data_selection.xlsx"
 
     # Read sheet names in file_path to determine which sites to process
-    sites = pd.ExcelFile(file_path).sheet_names
+    sites = pd.ExcelFile(data_selection_path).sheet_names
 
     for site in sites:
 
         print(f"Processing files for {site}")
 
-        df = pd.read_excel(file_path,
+        df = pd.read_excel(data_selection_path,
                         comment="#",
                         sheet_name=site,
                         index_col="Species")
@@ -75,4 +88,25 @@ def run_combined_instruments(network = "AGAGE",
 
             if verbose:
                 print(f"... outputting combined dataset for {species} at {site}")
-            output_dataset(ds, network, instrument="combined", verbose=verbose)
+            output_dataset(ds, network,
+                           output_subpath=species,
+                           instrument="combined",
+                           verbose=verbose)
+
+
+if __name__ == "__main__":
+
+    # Clear output directory, removing all files and subdirectories
+    pths = path.output.glob("*")
+
+    for pth in pths:
+        if pth.is_file():
+            pth.unlink()
+        elif pth.is_dir():
+            rmtree(pth)
+
+    # Must run combined instruments first
+    run_combined_instruments(verbose=True)
+
+    # Then fill in individual instruments
+    run_individual_instrument("GCMD", verbose=True)
