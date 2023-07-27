@@ -7,3 +7,5 @@
     - Sampling period for picarros
 - Visualisation
 - Add data selection file explanations to README/TUTORIAL
+- Add error/warning logger
+- Default scales

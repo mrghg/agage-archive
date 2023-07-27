@@ -32,7 +32,8 @@ def run_individual_instrument(instrument):
                                end_date=rs.loc[species, site])
                 
 
-def run_combined_instruments(network = "AGAGE"):
+def run_combined_instruments(network = "AGAGE",
+                             verbose = False):
 
 
     file_path = path.root / "data" / "data_selection" / "data_selection.xlsx"
@@ -41,6 +42,8 @@ def run_combined_instruments(network = "AGAGE"):
     sites = pd.ExcelFile(file_path).sheet_names
 
     for site in sites:
+
+        print(f"Processing files for {site}")
 
         df = pd.read_excel(file_path,
                         comment="#",
@@ -51,6 +54,10 @@ def run_combined_instruments(network = "AGAGE"):
         for species in df.index:
 
             # Produce combined dataset
-            ds = combine_datasets(species, site)
+            if verbose:
+                print(f"... combining datasets for {species} at {site}")
+            ds = combine_datasets(species, site, verbose=verbose)
 
-            output_dataset(ds, network, instrument="combined")
+            if verbose:
+                print(f"... outputting combined dataset for {species} at {site}")
+            output_dataset(ds, network, instrument="combined", verbose=verbose)

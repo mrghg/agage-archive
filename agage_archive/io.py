@@ -16,7 +16,8 @@ from agage_archive.definitions import instrument_type_definition
 
 
 def read_agage(species, site, instrument,
-               testing_path = False):
+               testing_path = False,
+               verbose = False):
     """Read GCWerks netCDF files
 
     Args:
@@ -64,6 +65,9 @@ def read_agage(species, site, instrument,
         raise FileNotFoundError(f"Found more than one file matching AGAGE-{instrument}*_{site}_{species_search}.nc")
     else:
         nc_file = nc_files[0]
+
+    if verbose:
+        print(f"... reading {nc_file}")
 
     with xr.open_dataset(nc_file) as f:
         ds = f.load()
@@ -113,7 +117,8 @@ def read_agage(species, site, instrument,
 
 
 def read_ale_gage(species, site, network,
-                  testing_path = False):
+                  testing_path = False,
+                  verbose = False):
     """Read GA Tech ALE/GAGE files
 
     Args:
@@ -142,6 +147,9 @@ def read_ale_gage(species, site, network,
     folder = paths.__getattribute__(network.lower())
 
     pth = folder / f"{site_info[site]['gcwerks_name']}_sio1993.gtar.gz"
+
+    if verbose:
+        print(f"... opening {pth}")
 
     with tarfile.open(pth, "r:gz") as tar:
 
@@ -264,7 +272,8 @@ def read_ale_gage(species, site, network,
 
 def combine_datasets(species, site, 
                     scale = "default",
-                    testing_path = False):
+                    testing_path = False,
+                    verbose = False):
     '''Combine ALE/GAGE/AGAGE datasets for a given species and site
 
     Args:
@@ -302,10 +311,12 @@ def combine_datasets(species, site,
         # Read data
         if instrument in ["ALE", "GAGE"]:
             ds = read_ale_gage(species, site, instrument,
-                               testing_path=testing_path)
+                               testing_path=testing_path,
+                               verbose=verbose)
         else:
             ds = read_agage(species, site, instrument,
-                            testing_path=testing_path)
+                            testing_path=testing_path,
+                            verbose=verbose)
 
         # Store attributes
         attrs.append(ds.attrs)
@@ -322,6 +333,9 @@ def combine_datasets(species, site,
         # Subset date
         ds = ds.sel(time=slice(*date))
 
+        if len(ds) == 0:
+            raise ValueError(f"No data retained for {species} {site} {instrument}. " + \
+                             "Check dates in data_selection.")
         dates_rec.append(ds.time[0].dt.strftime("%Y-%m-%d").values)
 
         # Convert scale
@@ -380,7 +394,8 @@ def output_dataset(ds,
                    network = "AGAGE",
                    instrument = "GCMD",
                    end_date = None,
-                   testing_path = False):
+                   testing_path = False,
+                   verbose = False):
     '''Output dataset to netCDF file
 
     Args:
@@ -397,5 +412,8 @@ def output_dataset(ds,
     if "units" in ds_out.time.attrs:
         del ds_out.time.attrs["units"]
         del ds_out.time.attrs["calendar"]
+
+    if verbose:
+        print(f"... writing {paths.output / filename}")
 
     ds_out.sel(time=slice(None, end_date)).to_netcdf(paths.output / filename, mode="w", format="NETCDF4")
