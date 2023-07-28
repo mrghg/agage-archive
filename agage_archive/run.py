@@ -2,7 +2,7 @@ import pandas as pd
 from shutil import rmtree
 
 from agage_archive import Paths
-from agage_archive.data_selection import read_release_schedule
+from agage_archive.data_selection import read_release_schedule, read_instrument_dates_xlsx
 from agage_archive.io import combine_datasets, read_agage, read_ale_gage, output_dataset
 
 path = Paths()
@@ -34,6 +34,8 @@ def run_individual_instrument(instrument,
     for species in rs.index:
         for site in rs.columns:
             if rs.loc[species, site].lower() != "x":
+
+                # Determine which read function to use
                 if instrument == "ALE" or instrument == "GAGE":
                     ds = read_function(species, site, instrument,
                                        verbose=verbose)
@@ -41,12 +43,19 @@ def run_individual_instrument(instrument,
                     ds = read_function(species, site, instrument,
                                        verbose=verbose)
 
-                # If combined file exists in output_directory/species, store individual file in subdirectory
-                # Look for file name with "combined" and site in it
-                if list((path.output / species).glob(f"*combined*{site}*.nc")):
+                # If multiple instruments, store individual file in subdirectory
+                instrument_dates = read_instrument_dates_xlsx(species, site, verbose=False)
+                if len(instrument_dates) > 1:
                     output_subpath = f"{species}/individual"
                 else:
                     output_subpath = species
+
+                # If combined file exists in output_directory/species, store individual file in subdirectory
+                # Look for file name with "combined" and site in it
+                # if list((path.output / species).glob(f"*combined*{site}*.nc")):
+                #     output_subpath = f"{species}/individual"
+                # else:
+                #     output_subpath = species
 
                 output_dataset(ds, network, instrument=instrument_out,
                                output_subpath=output_subpath,
@@ -94,19 +103,35 @@ def run_combined_instruments(network = "AGAGE",
                            verbose=verbose)
 
 
-if __name__ == "__main__":
+def run_all(delete = True):
 
-    # Clear output directory, removing all files and subdirectories
-    pths = path.output.glob("*")
+    #TODO: SORT THIS OUT!!!!!!
+    exclude = ["GCPDD"]
 
-    for pth in pths:
-        if pth.is_file():
-            pth.unlink()
-        elif pth.is_dir():
-            rmtree(pth)
+    rs_path = path.root / "data" / "data_selection" / "data_release_schedule.xlsx"
+
+    if delete:
+        print("Deleting all files in output directory")
+        # Clear output directory, removing all files and subdirectories
+        pths = path.output.glob("*")
+
+        for pth in pths:
+            if pth.is_file():
+                pth.unlink()
+            elif pth.is_dir():
+                rmtree(pth)
 
     # Must run combined instruments first
     run_combined_instruments(verbose=True)
 
-    # Then fill in individual instruments
-    run_individual_instrument("GCMD", verbose=True)
+    instruments = pd.ExcelFile(rs_path).sheet_names
+
+    for instrument in instruments:
+
+        if instrument not in exclude:
+            run_individual_instrument(instrument, verbose=True)
+
+
+if __name__ == "__main__":
+
+    run_all()

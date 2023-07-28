@@ -8,12 +8,14 @@ from agage_archive.formatting import format_species
 paths = Paths()
 
 
-def read_instrument_dates_xlsx(species, site):
+def read_instrument_dates_xlsx(species, site,
+                               verbose=True):
     '''Read instrument dates from Excel file
 
     Args:
         species (str): Species
         site (str): Site code
+        verbose (bool): Print warning message if no instrument dates found
 
     Returns:
         dict: Dictionary of instrument dates
@@ -27,7 +29,8 @@ def read_instrument_dates_xlsx(species, site):
 
     # Determine if data_exclude.xlsx contains sheet name called site.upper()
     if site.upper() not in pd.ExcelFile(path).sheet_names:
-        print(warning_message)
+        if verbose:
+            print(warning_message)
         return default_output
 
     # Read data_selection
@@ -40,7 +43,8 @@ def read_instrument_dates_xlsx(species, site):
     df = df[df.index == format_species(species)]
 
     if len(df) == 0:
-        print(warning_message)
+        if verbose:
+            print(warning_message)
         return default_output
     
     if len(df) > 1: 
