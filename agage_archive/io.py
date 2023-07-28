@@ -11,7 +11,7 @@ from agage_archive.convert import scale_convert
 from agage_archive.formatting import format_species, \
     format_variables, format_attributes
 from agage_archive.data_selection import read_release_schedule, data_exclude, \
-    calibration_scale_default, read_instrument_dates_xlsx
+    calibration_scale_default, read_data_combination
 from agage_archive.definitions import instrument_type_definition
 
 
@@ -288,7 +288,7 @@ def combine_datasets(species, site,
     '''
 
     # Read instrument dates from CSV files
-    instruments = read_instrument_dates_xlsx(format_species(species), site)
+    instruments = read_data_combination(format_species(species), site)
 
     instrument_types, instrument_number_str = instrument_type_definition()
 

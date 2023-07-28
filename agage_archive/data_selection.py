@@ -8,8 +8,8 @@ from agage_archive.formatting import format_species
 paths = Paths()
 
 
-def read_instrument_dates_xlsx(species, site,
-                               verbose=True):
+def read_data_combination(species, site,
+                        verbose=True):
     '''Read instrument dates from Excel file
 
     Args:
@@ -21,7 +21,7 @@ def read_instrument_dates_xlsx(species, site,
         dict: Dictionary of instrument dates
     '''
 
-    path = paths.root / "data" / "data_selection" / "data_selection.xlsx"
+    path = paths.root / "data" / "data_selection" / "data_combination.xlsx"
 
     warning_message = f"WARNING: No instrument dates found for {species} at {site.upper()}. Assuming GCMS-Medusa"
 
@@ -69,6 +69,16 @@ def read_instrument_dates_xlsx(species, site,
 def read_release_schedule(instrument,
                           species = None,
                           site = None):
+    '''Read release schedule from Excel file
+
+    Args:
+        instrument (str): Instrument
+        species (str): Species
+        site (str): Site code
+
+    Returns:
+        pd.DataFrame: Release schedule
+    '''
 
     with open(paths.root / "data/data_selection/data_release_schedule.xlsx", "+rb") as f:
         df_all = pd.read_excel(f, sheet_name=instrument)

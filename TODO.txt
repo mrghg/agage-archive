@@ -1,6 +1,3 @@
-- Process picarros
-- Run Combined
-- Folder structure
 - DECC network files
 - Preprocessing
     - PDD

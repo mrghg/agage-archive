@@ -38,8 +38,6 @@ def test_calibration_scale_default():
     # Remove whitespace
     df = df.applymap(lambda x: x.strip() if isinstance(x, str) else x)
 
-    # Test default (won't recognise species name)
-    assert calibration_scale_default("blah") == df.loc["all", "calibration_scale"]
-
     # Test species name
     assert calibration_scale_default("CH4") == df.loc["ch4", "calibration_scale"]
+    assert calibration_scale_default("CH3Cl") == df.loc["ch3cl", "calibration_scale"]

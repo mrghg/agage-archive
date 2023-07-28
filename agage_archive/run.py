@@ -50,13 +50,6 @@ def run_individual_instrument(instrument,
                 else:
                     output_subpath = species
 
-                # If combined file exists in output_directory/species, store individual file in subdirectory
-                # Look for file name with "combined" and site in it
-                # if list((path.output / species).glob(f"*combined*{site}*.nc")):
-                #     output_subpath = f"{species}/individual"
-                # else:
-                #     output_subpath = species
-
                 output_dataset(ds, network, instrument=instrument_out,
                                output_subpath=output_subpath,
                                end_date=rs.loc[species, site],
