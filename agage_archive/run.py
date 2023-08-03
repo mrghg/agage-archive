@@ -2,7 +2,7 @@ import pandas as pd
 from shutil import rmtree
 
 from agage_archive import Paths
-from agage_archive.data_selection import read_release_schedule, read_instrument_dates_xlsx
+from agage_archive.data_selection import read_release_schedule, read_data_combination
 from agage_archive.io import combine_datasets, read_agage, read_ale_gage, output_dataset
 
 path = Paths()
@@ -44,7 +44,7 @@ def run_individual_instrument(instrument,
                                        verbose=verbose)
 
                 # If multiple instruments, store individual file in subdirectory
-                instrument_dates = read_instrument_dates_xlsx(species, site, verbose=False)
+                instrument_dates = read_data_combination(species, site, verbose=False)
                 if len(instrument_dates) > 1:
                     output_subpath = f"{species}/individual"
                 else:
@@ -66,7 +66,7 @@ def run_combined_instruments(network = "AGAGE",
         verbose (bool): Print progress to screen
     """
 
-    data_selection_path = path.root / "data" / "data_selection" / "data_selection.xlsx"
+    data_selection_path = path.root / "data" / "data_selection" / "data_combination.xlsx"
 
     # Read sheet names in file_path to determine which sites to process
     sites = pd.ExcelFile(data_selection_path).sheet_names

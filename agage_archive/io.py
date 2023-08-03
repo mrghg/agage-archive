@@ -333,9 +333,9 @@ def combine_datasets(species, site,
         # Subset date
         ds = ds.sel(time=slice(*date))
 
-        if len(ds) == 0:
+        if len(ds.time) == 0:
             raise ValueError(f"No data retained for {species} {site} {instrument}. " + \
-                             "Check dates in data_selection.")
+                             "Check dates in data_combination or omit this instrument.")
         dates_rec.append(ds.time[0].dt.strftime("%Y-%m-%d").values)
 
         # Convert scale

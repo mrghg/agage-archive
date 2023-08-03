@@ -87,6 +87,10 @@ def read_release_schedule(instrument,
         idx = df_all[df_all.iloc[:, 0] == "General release date"].index[0]
         general_end_date = df_all.iloc[idx, 1]
 
+        # Determine if general_end_date is a string
+        if not isinstance(general_end_date, str):
+            print(f"WARNING: No general end date found for {instrument}. Assuming no limit.")
+
         df = pd.read_excel(f, sheet_name=instrument, skiprows=idx+2)
 
     # Remove whitespace
@@ -98,7 +102,13 @@ def read_release_schedule(instrument,
     df.set_index("Species", inplace=True)
 
     if species is not None:
-        return df.loc[species, site]
+        if df.loc[species, site] == "x":
+            # Return a value before any data was collected, to remove everything
+            return "1970-01-01"
+        elif not isinstance(df.loc[species, site], str):
+            return None
+        else:
+            return df.loc[species, site]
     else:
         return df
 
@@ -120,7 +130,7 @@ def calibration_scale_default(species):
     scale_defaults = scale_defaults.applymap(lambda x: x.strip() if isinstance(x, str) else x)
 
     if format_species(species) not in scale_defaults.index.str.lower():
-        return scale_defaults.loc["all", "calibration_scale"]
+        raise ValueError(f"No default calibration scale found for {species}")
     else:
         return scale_defaults.loc[format_species(species), "calibration_scale"]
 
