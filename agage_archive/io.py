@@ -116,6 +116,27 @@ def read_agage(species, site, instrument,
     return ds
 
 
+def ale_gage_timestamp_issues(datetime, timestamp_issues):
+    """Check for timestamp issues in ALE/GAGE data
+
+    Args:
+        datetime (pd.Series): Datetime series
+        timestamp_issues (dict): Dictionary of timestamp issues from ale_gage_timestamp_issues.json
+
+    Returns:
+        pd.Series: Datetime series with issues fixed
+    """
+
+    if len(timestamp_issues) == 0:
+        return datetime
+    
+    for timestamp_issue in timestamp_issues:
+        if timestamp_issue in datetime.values:
+            print(f"... Timestamp issue at {timestamp_issue} replacing with {timestamp_issues[timestamp_issue]}")
+            datetime = datetime.replace(timestamp_issue, timestamp_issues[timestamp_issue])
+
+    return datetime
+
 def read_ale_gage(species, site, network,
                   testing_path = False,
                   verbose = False):
@@ -143,7 +164,15 @@ def read_ale_gage(species, site, network,
     with open(paths.root / "data/ale_gage_species.json") as f:
         species_info = json.load(f)[format_species(species)]
 
-    # For now, hardwire path
+    # Get Datetime issues list
+    with open(paths.root / "data/ale_gage_timestamp_issues.json") as f:
+        timestamp_issues = json.load(f)
+        if site in timestamp_issues[network]:
+            timestamp_issues = timestamp_issues[network][site]
+        else:
+            timestamp_issues = {}
+
+    # Path to relevant folder
     folder = paths.__getattribute__(network.lower())
 
     pth = folder / f"{site_info[site]['gcwerks_name']}_sio1993.gtar.gz"
@@ -183,23 +212,28 @@ def read_ale_gage(species, site, network,
                             names=columns,
                             na_values = -99.9)
 
-            # Some HHMM labeled as 2400, increment to following day
-            midnight = df["TIME"] == 2400
-            df.loc[midnight, "DA"] += 1
-            df.loc[midnight, "TIME"] = 0
-
-            # Create datetime string
-            datetime = df["DA"].astype(str) + \
-                f"/{month}/{year}:" + \
+            # Create datetime string. This format is a little weird, but it's an easy way to construct it
+            datetime = df["DA"].astype(str).str.zfill(2) + \
+                f"-{month}-{year} " + \
                 df["TIME"].astype(str).str.zfill(4)
+            
+            # Check for datetime issues
+            datetime = ale_gage_timestamp_issues(datetime, timestamp_issues)
 
             # Convert datetime string
-            # There are some strange entries in here. If we can't understand the format, reject that point.
-            df.index = pd.to_datetime(datetime, format="%d/%b/%y:%H%M",
-                                    errors="coerce")
+            df.index = pd.to_datetime(datetime, format="%d-%b-%y %H%M")
+
+            # Drop duplicates
+            if "duplicates" in timestamp_issues:
+                keep = timestamp_issues["duplicates"]
+            else:
+                keep = "first"
+            df = df[~df.index.duplicated(keep=keep)]
+
+            # Timestamps are local time
             df.index = df.index.tz_localize(site_info[site]["tz"],
-                                            ambiguous="NaT",
-                                            nonexistent="NaT")
+                                           ambiguous="NaT",
+                                           nonexistent="NaT")
 
             dfs.append(df)
 
@@ -212,11 +246,18 @@ def read_ale_gage(species, site, network,
     # Sort
     df_combined.sort_index(inplace=True)
 
-    # Drop duplicated indices
-    df_combined = df_combined.loc[df_combined.index.drop_duplicates(),:]
+    # Check if there are NaN indices
+    # if len(df_combined.index[df_combined.index.isna()]) > 0:
+    #     raise ValueError("NaN indices found. Check timestamp issues.")
 
     # Drop na indices
     df_combined = df_combined.loc[~df_combined.index.isna(),:]
+
+    # Check if there are duplicate indices
+    if len(df_combined.index) != len(df_combined.index.drop_duplicates()):
+        # Find which indices are duplicated
+        duplicated_indices = df_combined.index[df_combined.index.duplicated(keep=False)]
+        raise ValueError(f"Duplicate indices found. Check timestamp issues: {duplicated_indices}")
 
     # Output one species
     df_combined = df_combined[species_info["species_name_gatech"]]
