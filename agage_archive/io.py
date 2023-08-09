@@ -1,10 +1,9 @@
-import configparser
-from pathlib import Path
 import xarray as xr
 import json
 import pandas as pd
 import tarfile
 import numpy as np
+import pytz
 
 from agage_archive import Paths
 from agage_archive.convert import scale_convert
@@ -137,6 +136,7 @@ def ale_gage_timestamp_issues(datetime, timestamp_issues):
 
     return datetime
 
+
 def read_ale_gage(species, site, network,
                   testing_path = False,
                   verbose = False):
@@ -230,10 +230,10 @@ def read_ale_gage(species, site, network,
                 keep = "first"
             df = df[~df.index.duplicated(keep=keep)]
 
-            # Timestamps are local time
-            df.index = df.index.tz_localize(site_info[site]["tz"],
-                                           ambiguous="NaT",
-                                           nonexistent="NaT")
+            # Timestamps are local time (no daylight savings)
+            tzoffset_hours = site_info[site]["tz"].split("UTC")[1]
+            local_offset = pytz.FixedOffset(int(tzoffset_hours)*60)
+            df.index = df.index.tz_localize(local_offset)
 
             dfs.append(df)
 
@@ -241,14 +241,14 @@ def read_ale_gage(species, site, network,
     df_combined = pd.concat(dfs)
 
     # Convert to UTC
-    df_combined.index = df_combined.index.tz_convert(None)
+    df_combined.index = df_combined.index.tz_convert("UTC")
 
     # Sort
     df_combined.sort_index(inplace=True)
 
     # Check if there are NaN indices
-    # if len(df_combined.index[df_combined.index.isna()]) > 0:
-    #     raise ValueError("NaN indices found. Check timestamp issues.")
+    if len(df_combined.index[df_combined.index.isna()]) > 0:
+        raise ValueError("NaN indices found. Check timestamp issues.")
 
     # Drop na indices
     df_combined = df_combined.loc[~df_combined.index.isna(),:]

@@ -6,7 +6,7 @@
         "data_owner_email": "s.odoherty@bristol.ac.uk",
         "longitude": -9.7299995422,
         "latitude": 51.6800003052,
-        "tz": "Europe/Dublin",
+        "tz": "UTC+0",
         "inlet_height": 10,
         "inlet_base_elevation_masl": 42
     },
@@ -17,7 +17,7 @@
         "data_owner_email": "paul.krummel@csiro.au",
         "longitude": 144.689,
         "latitude": -40.683,
-        "tz": "Australia/Melbourne",
+        "tz": "UTC+10",
         "inlet_height": 70,
         "inlet_base_elevation_masl": 94.0
     },
@@ -28,7 +28,7 @@
         "data_owner_email": "rfweiss@ucsd.edu, jmuhle@ucsd.edu",
         "longitude": -123.9575,
         "latitude": 45.49,
-        "tz": "America/Los_Angeles",
+        "tz": "UTC-8",
         "inlet_height": 10,
         "inlet_base_elevation_masl": 22
     },
@@ -39,7 +39,7 @@
         "data_owner_email": "s.odoherty@bristol.ac.uk",
         "longitude": -9.90456,
         "latitude": 53.32663,
-        "tz": "Europe/Dublin",
+        "tz": "UTC+0",
         "inlet_height": 10,
         "inlet_base_elevation_masl": 8.4
     },
@@ -50,7 +50,7 @@
         "data_owner_email": "dickon.young@bristol.ac.uk",
         "longitude": -59.43208,
         "latitude": 13.16512,
-        "tz": "America/Barbados",
+        "tz": "UTC-4",
         "inlet_height": 10,
         "inlet_base_elevation_masl": 45
     },
@@ -61,7 +61,7 @@
         "data_owner_email": "rfweiss@ucsd.edu, jmuhle@ucsd.edu",
         "longitude": -170.5644,
         "latitude": -14.2474,
-        "tz": "US/Samoa",
+        "tz": "UTC-11",
         "inlet_height": 10,
         "inlet_base_elevation_masl": 42
     }
