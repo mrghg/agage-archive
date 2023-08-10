@@ -12,6 +12,7 @@ from agage_archive.formatting import format_species, \
 from agage_archive.data_selection import read_release_schedule, data_exclude, \
     calibration_scale_default, read_data_combination
 from agage_archive.definitions import instrument_type_definition
+from agage_archive.util import tz_local_to_utc
 
 
 def read_agage(species, site, instrument,
@@ -38,9 +39,7 @@ def read_agage(species, site, instrument,
     gcmd_instruments = ["GCMD", "GCECD", "Picarro", "LGR"]
     gcms_instruments = ["GCMS-ADS", "GCMS-Medusa", "GCMS-MteCimone"]
 
-
     # Determine path
-
     pth = None
 
     for gcmd_instrument in gcmd_instruments:
@@ -139,13 +138,15 @@ def ale_gage_timestamp_issues(datetime, timestamp_issues):
 
 def read_ale_gage(species, site, network,
                   testing_path = False,
-                  verbose = False):
+                  verbose = False,
+                  utc = True):
     """Read GA Tech ALE/GAGE files
 
     Args:
         species (str): Species
         site (str): Three-letter site code
         network (str): "ALE" or "GAGE"
+        utc (bool, optional): Convert to UTC. Defaults to True.
 
     Returns:
         pd.DataFrame: Pandas dataframe containing file contents
@@ -231,17 +232,13 @@ def read_ale_gage(species, site, network,
             df = df[~df.index.duplicated(keep=keep)]
 
             # Timestamps are local time (no daylight savings)
-            tzoffset_hours = site_info[site]["tz"].split("UTC")[1]
-            local_offset = pytz.FixedOffset(int(tzoffset_hours)*60)
-            df.index = df.index.tz_localize(local_offset)
+            if utc:
+                df.index = tz_local_to_utc(df.index, site)
 
             dfs.append(df)
 
     # Concatenate monthly dataframes into single dataframe
     df_combined = pd.concat(dfs)
-
-    # Convert to UTC
-    df_combined.index = df_combined.index.tz_convert("UTC")
 
     # Sort
     df_combined.sort_index(inplace=True)
@@ -299,8 +296,9 @@ def read_ale_gage(species, site, network,
 
     ds = format_variables(ds)
 
-    # Remove any excluded data
-    ds = data_exclude(ds, format_species(species), site, network)
+    # Remove any excluded data. Only do this if time is UTC, otherwise it won't be in the file
+    if utc:
+        ds = data_exclude(ds, format_species(species), site, network)
 
     # Check against release schedule
     rs = read_release_schedule(network,

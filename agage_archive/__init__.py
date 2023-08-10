@@ -1,9 +1,9 @@
-from pathlib import Path
+from pathlib import Path as _Path
 import configparser
 
 __version__ = "0.0.1"
 
-_ROOT = Path(__file__).parent
+_ROOT = _Path(__file__).parent
 
 
 def get_path(sub_path=""):
@@ -50,13 +50,13 @@ class Paths():
             config = configparser.ConfigParser()
             config.read(get_path("config.ini"))
 
-            self.agage = Path(config["Paths"]["agage_path"])
+            self.agage = _Path(config["Paths"]["agage_path"])
             self.agage_gcmd = self.agage / "data-nc"
             self.agage_gcms = self.agage / "data-gcms-nc"
-            self.ale = Path(config["Paths"]["ale_path"])
-            self.gage = Path(config["Paths"]["gage_path"])
+            self.ale = _Path(config["Paths"]["ale_path"])
+            self.gage = _Path(config["Paths"]["gage_path"])
 
-            self.output = Path(config["Paths"]["output_path"])
+            self.output = _Path(config["Paths"]["output_path"])
 
         else:
 

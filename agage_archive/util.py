@@ -1,6 +1,8 @@
 import configparser
 from pathlib import Path
 import os
+import json
+import pytz
 
 from agage_archive import get_path
 
@@ -76,6 +78,29 @@ def lookup_username():
                     return os.environ["LOGNAME"]
                 except:
                     return "unknown user"
+
+
+def tz_local_to_utc(index, site):
+    """ Convert local time to UTC. 
+    
+    Args:
+        index (pandas.DatetimeIndex): Datetime index in local time
+        site (str): Site name
+
+    Returns:
+        pandas.DatetimeIndex: Datetime index in UTC
+    """
+
+    with open(get_path().parent / "data/ale_gage_sites.json", "r") as file:
+        site_info = json.load(file)
+
+    tzoffset_hours = site_info[site]["tz"].split("UTC")[1]
+
+    local_offset = pytz.FixedOffset(int(tzoffset_hours)*60)
+    
+    ind = index.tz_localize(local_offset)
+    
+    return ind.tz_convert("UTC")
 
 
 if __name__ == "__main__":
