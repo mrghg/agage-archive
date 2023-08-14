@@ -12,7 +12,7 @@ home = Path.home()
 species_wang = {
     "cfc-11": "CFC-11S",
     "cfc-12": "CFC-12",
-    "cfc-113": "CFC-113",
+    "cfc-113": "F-113",
     "ccl4": "CCl4",
     "ch3ccl3": "CH3CCl3",
     "n2o": "N2O",

@@ -2,7 +2,8 @@ import pandas as pd
 import numpy as np
 
 from agage_archive import Paths
-
+from agage_archive.data_selection import calibration_scale_default
+from agage_archive.formatting import format_species
 
 paths = Paths()
 
@@ -11,12 +12,10 @@ def scale_convert(ds, scale_new):
     """Convert mole fraction from one scale to another
 
     Args:
-        species (str): Species
-        scale_original (str): Original scale
-        scale_new (str): Output scale
-        t (pd.Timestamp): Timestamp
-        mf (float): Mole fraction
-    
+        ds (xarray.Dataset): Dataset containing mole fractions
+        scale_new (str): New scale to convert to. If None, no conversion is applied.
+            If "default", the default scale for the species is used.
+        
     Returns:
         ndarray,float: Mole fraction in new scale
     """
@@ -52,13 +51,21 @@ def scale_convert(ds, scale_new):
 
         return f_out
     
-    # Check if scales are the same
+    # If scales are the same, return original dataset
     if ds.attrs["calibration_scale"] == scale_new:
         return ds
     else:
         scale_original = ds.attrs["calibration_scale"]
     
+    # Find species
     species = ds.attrs["species"]
+
+    if scale_new == "default":
+        scale_new = calibration_scale_default(format_species(species))
+
+    # If no conversion required, return original dataset
+    if scale_new == None:
+        return ds
 
     # Make a deep copy of the dataset
     ds_out = ds.copy(deep=True)

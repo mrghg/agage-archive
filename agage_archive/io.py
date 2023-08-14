@@ -17,13 +17,17 @@ from agage_archive.util import tz_local_to_utc
 
 def read_agage(species, site, instrument,
                testing_path = False,
-               verbose = False):
+               verbose = False,
+               scale = "default"):
     """Read GCWerks netCDF files
 
     Args:
         species (str): Species
         site (str): Site code
         instrument (str): Instrument
+        testing_path (str, optional): Path to use for testing. Defaults to False.
+        verbose (bool, optional): Print verbose output. Defaults to False.
+        scale (str, optional): Scale to convert to. Defaults to "default". If None, will keep original scale.
 
     Raises:
         FileNotFoundError: Can't find netCDF file
@@ -75,8 +79,8 @@ def read_agage(species, site, instrument,
         sampling_period = int(ds.time.attrs["sampling_time_seconds"])
     else:
         # GCMD files don't have sampling time in the file
-        # assume it's 30s (Peter Salameh, pers. comm., 2023-07-06)
-        sampling_period = 30
+        # assume it's 1s (Peter Salameh, pers. comm., 2023-07-06)
+        sampling_period = 1
 
     # Add sampling time to variables
     ds["sampling_period"] = xr.DataArray(np.ones(len(ds.time)).astype(np.int16)*sampling_period,
@@ -110,6 +114,8 @@ def read_agage(species, site, instrument,
                                site=site)
     ds = ds.sel(time=slice(None, rs))
 
+    # Convert scale, if needed
+    ds = scale_convert(ds, scale)
 
     return ds
 
@@ -139,14 +145,19 @@ def ale_gage_timestamp_issues(datetime, timestamp_issues):
 def read_ale_gage(species, site, network,
                   testing_path = False,
                   verbose = False,
-                  utc = True):
+                  utc = True,
+                  scale = "default"):
     """Read GA Tech ALE/GAGE files
 
     Args:
         species (str): Species
         site (str): Three-letter site code
         network (str): "ALE" or "GAGE"
+        testing_path (bool, optional): Use testing path. Defaults to False.
+        verbose (bool, optional): Print verbose output. Defaults to False.
         utc (bool, optional): Convert to UTC. Defaults to True.
+        scale (str, optional): Calibration scale. Defaults to None, which means no conversion is attempted.
+            Set to "default" to use value in scale_defaults.csv.
 
     Returns:
         pd.DataFrame: Pandas dataframe containing file contents
@@ -306,6 +317,9 @@ def read_ale_gage(species, site, network,
                                site=site)
     ds = ds.sel(time=slice(None, rs))
 
+    # Convert scale, if needed
+    ds = scale_convert(ds, scale)
+
     return ds
 
 
@@ -331,10 +345,10 @@ def combine_datasets(species, site,
 
     instrument_types, instrument_number_str = instrument_type_definition()
 
-    # Get default calibration scale, if needed
-    if scale != None:
-        if scale == "default":
-            scale = calibration_scale_default(format_species(species))
+    # # Get default calibration scale, if needed
+    # if scale != None:
+    #     if scale == "default":
+    #         scale = calibration_scale_default(format_species(species))
 
     # Combine datasets    
     dss = []
@@ -377,9 +391,7 @@ def combine_datasets(species, site,
                              "Check dates in data_combination or omit this instrument.")
         dates_rec.append(ds.time[0].dt.strftime("%Y-%m-%d").values)
 
-        # Convert scale
-        if scale != None:
-            ds = scale_convert(ds, scale)
+        ds = scale_convert(ds, scale)
 
         # Record scale
         scales.append(ds.attrs["calibration_scale"])
