@@ -1,11 +1,41 @@
 import pandas as pd
 import numpy as np
+import networkx as nx
 
 from agage_archive import Paths
 from agage_archive.data_selection import calibration_scale_default
 from agage_archive.formatting import format_species
 
 paths = Paths()
+
+
+def scale_graph(species):
+    """Build an directed graph from scale_convert.csv
+
+    Args:
+        species (str): Species
+        
+    Returns:
+        nx.Graph: Undirected graph
+    """
+
+    file_path = paths.root / "data/scale_convert.csv"
+
+    data = pd.read_csv(file_path)
+
+    # Filter the data for the specified species
+    species_data = data[data['Species'] == species].iloc[0]
+
+    G = nx.DiGraph()
+
+    # Add edges to the graph based on the species data
+    for col in data.columns[1:]:
+        source, target = col.split('/')
+        if not pd.isna(species_data[col]):
+            G.add_edge(target, source, weight=species_data[col])
+            G.add_edge(source, target, weight=1/species_data[col])
+
+    return G
 
 
 def scale_convert(ds, scale_new):
@@ -20,12 +50,13 @@ def scale_convert(ds, scale_new):
         ndarray,float: Mole fraction in new scale
     """
 
-    def n2o_scale_function(time):
+    def n2o_scale_function(time, invert = False):
         """Function to apply to N2O mole fractions to convert from SIO-93 to SIO-98
 
         Args:
             time (pd.Timestamp): Timestamp
             mf (ndarray): Mole fractions
+            invert (bool, optional): If True, apply the inverse function. Defaults to False.
 
         Returns:
             ndarray: Mole fractions adjusted for time-variation between scales (excluding factor)
@@ -43,6 +74,8 @@ def scale_convert(ds, scale_new):
 
         t = (days_since_ale_start-3227.)/365.25
         f = 1./(a0 + a1*t + a2*t**2 + a3*t**3 + a4*t**4)
+        if invert:
+            f = 1./f
 
         # Apply f to mf only between 1st May 1984 and 31st March 1990
         f_out = np.ones_like(f).astype(float)
@@ -70,35 +103,28 @@ def scale_convert(ds, scale_new):
     # Make a deep copy of the dataset
     ds_out = ds.copy(deep=True)
 
-    # Read scale conversion factors
-    scale_converter = pd.read_csv(paths.root / "data/scale_convert.csv",
-                                  index_col="Species")
+    G = scale_graph(format_species(species))
 
-    scale_numerator = [ratio.split("/")[0] for ratio in scale_converter.columns]
-    scale_denominator = [ratio.split("/")[1] for ratio in scale_converter.columns]
+    # Find the path and calculate the conversion factor
+    try:
+        path = nx.shortest_path(G, source=scale_original,
+                                target=scale_new,
+                                weight='weight')
+        conversion_factor = np.ones_like(ds.time.values).astype(float)
+        for i in range(len(path)-1):
+            if format_species(species) == "n2o":
+                if path[i] == "SIO-93" and path[i+1] == "SIO-98":
+                    conversion_factor *= n2o_scale_function(ds.time.to_series())
+                elif path[i] == "SIO-98" and path[i+1] == "SIO-93":
+                    conversion_factor *= n2o_scale_function(ds.time.to_series(), invert=True)                
+            conversion_factor *= G[path[i]][path[i+1]]['weight']
 
-    # Check for duplicates in numerator or denominator (can't handle this yet)
-    if (len(set(scale_denominator)) != len(scale_denominator)) or \
-        (len(set(scale_numerator)) != len(scale_numerator)):
-        raise NotImplementedError("Can't deal with multiple factors for same scale at the moment")
+    except nx.NetworkXNoPath:
+        raise ValueError(f"No conversion path found between {scale_original} and {scale_new} for {species}.")
 
-    # Find chain of ratios to apply (start from end and work backwards)
-    columns = [scale_numerator.index(scale_new)]
-    while scale_denominator[columns[-1]] != scale_original:
-        columns.append(scale_numerator.index(scale_denominator[columns[-1]]))
-
-    # Now reverse to propagate forwards
-    columns = columns[::-1]    
-
-    # Apply scale conversion factors
-    for column in columns:
-        column_name = scale_converter.columns[column]
-
-        if species.lower() == "n2o" and column_name == "SIO-98/SIO-93":
-            # Apply time-varying factor to N2O (scale factor is not included)
-            ds_out.mf.values *= n2o_scale_function(ds.time.to_series())
-
-        ds_out.mf.values *= scale_converter.loc[species, column_name]
+    # Apply conversion factor
+    ds_out.mf.values *= conversion_factor
+    ds_out.mf_repeatability.values *= conversion_factor
 
     # Update attributes
     ds_out.attrs["calibration_scale"] = scale_new

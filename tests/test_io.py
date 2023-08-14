@@ -10,7 +10,8 @@ def test_scale_convert():
 
     def test_dataset(time, species, scale):
         coords = {"time": pd.date_range(time, time)}
-        data = {"mf": (["time"], [1.])}
+        data = {"mf": (["time"], [1.]),
+                "mf_repeatability": (["time"], [0.1])}
         ds = xr.Dataset(coords=coords, data_vars=data)
         ds.attrs["species"] = species
         ds.attrs["calibration_scale"] = scale
@@ -44,9 +45,23 @@ def test_scale_convert():
                 
     # Period where N2O time conversion applies
     ds = test_dataset("1985-01-01", "n2o", "SIO-93")
-    ds_new = scale_convert(ds, "SIO-05")
+    ds_new = scale_convert(ds, "SIO-98")
 
     assert ds_new.mf.values[0] / ds.mf.values[0] == \
         scale_conversion.loc["n2o", "SIO-98/SIO-93"] * \
         0.9962230167482587
 
+    # Period where N2O time conversion applies (inverse of above)
+    ds = test_dataset("1985-01-01", "n2o", "SIO-98")
+    ds_new = scale_convert(ds, "SIO-93")
+
+    assert ds_new.mf.values[0] / ds.mf.values[0] == \
+        1./(scale_conversion.loc["n2o", "SIO-98/SIO-93"] * \
+        0.9962230167482587)
+
+    # Test one where we go backwards
+    ds = test_dataset("1991-01-01", "cfc-11", "SIO-05")
+    ds_new = scale_convert(ds, "SIO-93")
+    assert ds_new.mf.values[0] / ds.mf.values[0] == \
+        (1./scale_conversion.loc["cfc-11", "SIO-98/SIO-93"]) * \
+        (1./scale_conversion.loc["cfc-11", "SIO-05/SIO-98"])
