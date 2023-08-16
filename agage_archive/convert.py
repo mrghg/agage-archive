@@ -63,8 +63,7 @@ def scale_convert(ds, scale_new):
         """
 
         # calculate days elapsed since 2nd March 1978
-        days_since_ale_start = (time - \
-                                pd.Timestamp("1978-03-02")).dt.days.values
+        days_since_ale_start = (time - pd.Timestamp("1978-03-02")).days.values
 
         a0=1.00664
         a1=-0.56994e-3
@@ -114,9 +113,9 @@ def scale_convert(ds, scale_new):
         for i in range(len(path)-1):
             if format_species(species) == "n2o":
                 if path[i] == "SIO-93" and path[i+1] == "SIO-98":
-                    conversion_factor *= n2o_scale_function(ds.time.to_series())
+                    conversion_factor *= n2o_scale_function(ds.time.to_series().index)
                 elif path[i] == "SIO-98" and path[i+1] == "SIO-93":
-                    conversion_factor *= n2o_scale_function(ds.time.to_series(), invert=True)                
+                    conversion_factor *= n2o_scale_function(ds.time.to_series().index, invert=True)                
             conversion_factor *= G[path[i]][path[i+1]]['weight']
 
     except nx.NetworkXNoPath:

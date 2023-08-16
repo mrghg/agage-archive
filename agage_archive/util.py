@@ -100,7 +100,7 @@ def tz_local_to_utc(index, site):
     
     ind = index.tz_localize(local_offset)
     
-    return ind.tz_convert("UTC")
+    return ind.tz_convert(None)
 
 
 if __name__ == "__main__":

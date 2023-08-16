@@ -3,14 +3,13 @@ import json
 import pandas as pd
 import tarfile
 import numpy as np
-import pytz
 
 from agage_archive import Paths
 from agage_archive.convert import scale_convert
 from agage_archive.formatting import format_species, \
     format_variables, format_attributes
 from agage_archive.data_selection import read_release_schedule, data_exclude, \
-    calibration_scale_default, read_data_combination
+    read_data_combination
 from agage_archive.definitions import instrument_type_definition
 from agage_archive.util import tz_local_to_utc
 
@@ -18,6 +17,7 @@ from agage_archive.util import tz_local_to_utc
 def read_agage(species, site, instrument,
                testing_path = False,
                verbose = False,
+               data_exclude = True,
                scale = "default"):
     """Read GCWerks netCDF files
 
@@ -27,6 +27,7 @@ def read_agage(species, site, instrument,
         instrument (str): Instrument
         testing_path (str, optional): Path to use for testing. Defaults to False.
         verbose (bool, optional): Print verbose output. Defaults to False.
+        data_exclude (bool, optional): Exclude data based on data_exclude.xlsx. Defaults to True.
         scale (str, optional): Scale to convert to. Defaults to "default". If None, will keep original scale.
 
     Raises:
@@ -71,6 +72,7 @@ def read_agage(species, site, instrument,
     if verbose:
         print(f"... reading {nc_file}")
 
+    # Read netCDF file
     with xr.open_dataset(nc_file) as f:
         ds = f.load()
 
@@ -86,7 +88,7 @@ def read_agage(species, site, instrument,
     ds["sampling_period"] = xr.DataArray(np.ones(len(ds.time)).astype(np.int16)*sampling_period,
                                         coords={"time": ds.time})
 
-    # Everything should have been flagged already, but just in case...
+    # Everything should have been flagged in the AGAGE files already, but just in case...
     flagged = ds.data_flag != 0
     ds.mf[flagged] = np.nan
     ds.mf_repeatability[flagged] = np.nan
@@ -106,7 +108,8 @@ def read_agage(species, site, instrument,
                         species=species)
 
     # Remove any excluded data
-    ds = data_exclude(ds, format_species(species), site, instrument)
+    if data_exclude:
+        ds = data_exclude(ds, format_species(species), site, instrument)
 
     # Check against release schedule
     rs = read_release_schedule(instrument,
@@ -146,8 +149,9 @@ def read_ale_gage(species, site, network,
                   testing_path = False,
                   verbose = False,
                   utc = True,
+                  data_exclude = True,
                   scale = "default"):
-    """Read GA Tech ALE/GAGE files
+    """Read GA Tech ALE/GAGE files, process and clean
 
     Args:
         species (str): Species
@@ -156,6 +160,8 @@ def read_ale_gage(species, site, network,
         testing_path (bool, optional): Use testing path. Defaults to False.
         verbose (bool, optional): Print verbose output. Defaults to False.
         utc (bool, optional): Convert to UTC. Defaults to True.
+        data_exclude (bool, optional): Exclude data based on data_exclude.xlsx. Defaults to True. 
+            utc must also be true, as timestamps are in UTC.
         scale (str, optional): Calibration scale. Defaults to None, which means no conversion is attempted.
             Set to "default" to use value in scale_defaults.csv.
 
@@ -308,7 +314,9 @@ def read_ale_gage(species, site, network,
     ds = format_variables(ds)
 
     # Remove any excluded data. Only do this if time is UTC, otherwise it won't be in the file
-    if utc:
+    if data_exclude:
+        if not utc:
+            raise ValueError("Can't exclude data if time is not UTC")
         ds = data_exclude(ds, format_species(species), site, network)
 
     # Check against release schedule
@@ -334,7 +342,6 @@ def combine_datasets(species, site,
         site (str): Site
         scale (str, optional): Calibration scale. Defaults to value in scale_defaults.csv.
             If None, will attempt to leave scale unchanged.
-        convert_scale (bool, optional): Convert calibration scale, or keep the same. Defaults to True.
 
     Returns:
         xr.Dataset: Dataset containing data
@@ -344,11 +351,6 @@ def combine_datasets(species, site,
     instruments = read_data_combination(format_species(species), site)
 
     instrument_types, instrument_number_str = instrument_type_definition()
-
-    # # Get default calibration scale, if needed
-    # if scale != None:
-    #     if scale == "default":
-    #         scale = calibration_scale_default(format_species(species))
 
     # Combine datasets    
     dss = []
@@ -365,11 +367,13 @@ def combine_datasets(species, site,
         if instrument in ["ALE", "GAGE"]:
             ds = read_ale_gage(species, site, instrument,
                                testing_path=testing_path,
-                               verbose=verbose)
+                               verbose=verbose,
+                               scale=scale)
         else:
             ds = read_agage(species, site, instrument,
                             testing_path=testing_path,
-                            verbose=verbose)
+                            verbose=verbose,
+                            scale=scale)
 
         # Store attributes
         attrs.append(ds.attrs)
@@ -390,8 +394,6 @@ def combine_datasets(species, site,
             raise ValueError(f"No data retained for {species} {site} {instrument}. " + \
                              "Check dates in data_combination or omit this instrument.")
         dates_rec.append(ds.time[0].dt.strftime("%Y-%m-%d").values)
-
-        ds = scale_convert(ds, scale)
 
         # Record scale
         scales.append(ds.attrs["calibration_scale"])

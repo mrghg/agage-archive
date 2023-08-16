@@ -2,9 +2,11 @@ import pandas as pd
 from pathlib import Path
 import numpy as np
 import json
+import tarfile
+from fnmatch import fnmatch
 
 from agage_archive import Paths as Pth
-
+from agage_archive.util import tz_local_to_utc
 
 paths = Pth()
 home = Path.home()
@@ -30,16 +32,29 @@ sites_wang = {
 }
 
 def read_wang_file(file):
+    """ Read one file prepared by Ray Wang (see data/ancilliary) and return a dataframe
+
+    Args:
+        file (file): File object that can be read by pandas.read_csv
+
+    Returns:
+        df (pd.DataFrame): Dataframe with one column for the species
+    """
+
 
     # Reading the first 10 lines of the file to understand its structure
-    with open(file, "r") as f:
-        first_lines = [f.readline().strip() for _ in range(10)]
+    first_lines = [file.readline().strip() for _ in range(10)]
 
-    # 1. Read the file into a Pandas dataframe with correct headers
+    # Go back to beginning of file
+    file.seek(0)
+
+    # Read the file into a Pandas dataframe with correct headers
     complete_data = pd.read_csv(file, skiprows=6, delim_whitespace=True,
-                                names=first_lines[5].split())
+                                names=first_lines[5].split(), encoding='ascii')
 
-    # 2. Construct the datetime column and set it as the index
+    complete_data.columns = complete_data.columns.astype(str)
+
+    # Construct the datetime column and set it as the index
     complete_data['datetime'] = pd.to_datetime(complete_data['YYYY'].astype(str) + '-' + 
                                             complete_data['MM'].astype(str).str.zfill(2) + '-' + 
                                             complete_data['DD'].astype(str).str.zfill(2) + ' ' + 
@@ -47,16 +62,16 @@ def read_wang_file(file):
                                             complete_data['min'].astype(str).str.zfill(2))
     complete_data.set_index('datetime', inplace=True)
 
-    # 3. Drop unnecessary columns
+    # Drop unnecessary columns
     complete_data.drop(columns=['time', 'DD', 'MM', 'YYYY', 'hh', 'min', 'ABSDA'], inplace=True)
 
-    # 4. Remove non-numeric characters
+    # Remove non-numeric characters
     complete_data = complete_data.replace(to_replace=r'[^\d.]', value='', regex=True)
 
-    # 5. Convert all data columns to float type
+    # Convert all data columns to float type
     complete_data = complete_data.astype(float)
 
-    # 6. Replace 0.0 values with NaN
+    # Replace 0.0 values with NaN
     complete_data.replace(0.0, np.nan, inplace=True)
 
     # Return the first few rows for verification
@@ -65,7 +80,18 @@ def read_wang_file(file):
     return complete_data
 
 
-def read_wang(species, site, network):
+def read_wang(species, site, network, utc = False):
+    """ Read data from Ray Wang's files, concatinating individual years
+
+    Args:
+        species (str): Species name
+        site (str): Site name
+        network (str): Network name
+        utc (bool): Convert to UTC
+
+    Returns:
+        df (pd.DataFrame): Dataframe with one column for the species
+    """
 
     # Read ale_gage_sites.json
     with open(paths.root / "data/ale_gage_sites.json", "r") as file:
@@ -78,14 +104,24 @@ def read_wang(species, site, network):
     site_name = site_info[site]["gcwerks_name"]
     site_code = sites_wang[site]
 
-    data_folder = home / f"data/ale_gage_wang/{network.lower()}_data_all/complete/{site_name}"
-    files = data_folder.glob(f"{site_code}-{network.lower()}*.dap")
+    # Open tar file for network
+    tar_file = paths.root / f"data/ancilliary/wang_{network.lower()}.tar.gz"
 
-    dfs = []
+    with tarfile.open(tar_file, "r:gz") as tar:
+        files = []
 
-    for file in files:
+        # Determine which matching files are in the tar file
+        for tarinfo in tar:
+            search_str = f"*{site_name}/{site_code}-{network.lower()}*.dap"
+            if fnmatch(tarinfo.name, search_str):
+                files.append(tarinfo.name)
 
-        dfs.append(read_wang_file(file))
+        dfs = []
+
+        # Read each file and append to list
+        for file in files:
+            with tar.extractfile(file) as f:
+                dfs.append(read_wang_file(f))
 
     df = pd.concat(dfs)
 
@@ -103,7 +139,8 @@ def read_wang(species, site, network):
     # Remove duplicate indices
     df = df[~df.index.duplicated(keep='first')]
 
+    # Convert to UTC, if needed
+    if utc:
+        df.index = tz_local_to_utc(df.index, site)
+
     return df
-
-
-    

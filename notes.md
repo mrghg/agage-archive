@@ -14,7 +14,7 @@ Some features of the ALE/GAGE data have to be reconstructed from literature or p
 ## File format
 The ALE/GAGE files were created by Derek Cunnold and his team at Georgia Tech (GA Tech.) in the early 1990s. These data were all converted from earlier scales to the Scripps Institution of Oceanography (SIO) 1993 scale (SIO-93; see Cunnold et al., 1994 and Prinn et al., 2000).
 
-Data are in *local time* at each site. One file per site, per month.
+Data are in *local time* (no daylight savings time applied) at each site. One file per site, per month.
 
 Columns refer to:
 
@@ -23,9 +23,11 @@ Columns refer to:
 - 3rd column, "ABSDA", days elapsed since the start of ALE program (2nd March, 1978?)
 - 4th through last column is the dry air mole fraction of measured compounds. -99.0 indicates missing values. The "P" after mole fraction indicates pollution event according to the GA Tech statistcal pollution algorithm.
 
-F-11S and F-11P refer to silicone or Porasil chromatographic columns. The "S" column is preferred.
+F-11S and F-11P refer to silicone or Porasil chromatographic columns. **The "S" column is preferred.**
 
 ## Scale conversions
+
+The following scale conversion factors were provided by Ray Wang. These are in the ```scale_convert.csv``` file. The ```convert.scale_convert``` function chains these factors together, as needed.
 
 |Species|SIO-98/SIO-93|SIO-05/SIO-98|TU-87/CSIRO-94|
 |--|--|--|--|
@@ -66,7 +68,7 @@ Prinn et al. (1983) estimates monthly variances (so repeatability + variability)
 
 Cunnold et al. (1983) notes repeat measurement of standards with a repeatability of 0.5% for CFC-11, although 1% discontinuities for CFC-11 and CFC-12 found in Cunnold et al. (1986) due to tank changes.
 
-Prinn et al. (2000) states *AGAGE* repeatabilities of 0.07% for CFC-11, 0.04% for CFC-12, 0.15% for CFC-113, 0.32% for CH3CCl3, 0.16% for CCl4 and 0.03% for N2O. States that this is improved over GAGE by 1 - 3 times at stations with good environmental control (e.g., CGO), and 2 - 6 times for other stations (e.g. RPB and SMO). A factor of 3 or 6 increase over AGAGE would give (for GAGE):
+Prinn et al. (2000) states *AGAGE* repeatabilities of 0.07% for CFC-11, 0.04% for CFC-12, 0.15% for CFC-113, 0.32% for CH3CCl3, 0.16% for CCl4 and 0.03% for N2O. They state that this is improved over GAGE by 1 - 3 times at stations with good environmental control (e.g., CGO), and 2 - 6 times for other stations (e.g. RPB and SMO). A factor of 3 or 6 increase over AGAGE would give (for GAGE):
 - CFC-11: 0.21% - 0.42%
 - CFC-12: 0.12% - 0.24%
 - CFC-113: 0.45% - 0.9%
@@ -98,6 +100,16 @@ SIO-93 scale uncertainty estimated as 0.8% for CFC-11 and 0.5% for CFC-12 (Cunno
 ## Site locations
 
 Prinn et al. (2000) has Adrigole inlet 52m above sea level and Cape Mears, Oregon inlet 32m above sea level. Have assumed inlets were 10m high and adjusted ```inlet_base_height``` attribute accordingly.
+
+## Data cleaning and flagging
+
+The ALE/GAGE data need additional cleaning flagging from the original files that were prepared by GA Tech. The following steps have been applied:
+
+1. There are some issues with timestamps that have been picked up by Ray Wang. These include duplicate stamps, or typos (e.g., 0175 should have been 1759). These are noted in ale_gage_timestamp_issues.csv, and are replaced as part of the read_ale_gage function.
+
+2. There are several data points that need to be flagged. Most of these have been found by Ray Wang, in discussion with station PIs over the years, however, for most of them there are no notes as to which points need to be removed. To identify them, I compared my processing to Ray Wang's files in ```wang_compare.ipynb```. The points that have been flagged are in ```data_exclude.xlsx```, including several additional points that weren't found by Ray (e.g., duplicate timestamps that weren't picked up). Ray's files are included in the "ancilliary" data folder. 
+
+3. The ALE/GAGE data have a "P" flag for pollution events as identified by the GA Tech algorithm. I'd rather not have non-measurement data in the public files, so have removed these. We can create a separate set of files with pollution flags, if needed.
 
 ## References
 Cunnold, D. M., Prinn, R. G., Rasmussen, R. A., Simmonds, P. G., Alyea, F. N., Cardelino, C. A., Crawford, A. J., Fraser, P. J., and Rosen, R. D.: The Atmospheric Lifetime Experiment 3. Lifetime Methodology and Application to Three Years of CFCl3 Data, Journal of Geophysical Research, 88, 8379–8400, https://doi.org/10.1029/JC088iC13p08379, 1983.
