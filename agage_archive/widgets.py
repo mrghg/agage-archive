@@ -50,8 +50,11 @@ def update_network_site(change, network_site_dropdown):
 
     files = file_search_species(change["new"])
     networks, sites = networks_sites(files)
-    network_site_dropdown.options = sorted([f"{s}, {n}" for (s, n) in zip(sites, networks)])
-
+    options = sorted([f"{s}, {n}" for (s, n) in zip(sites, networks)])
+    if network_site_dropdown:
+        network_site_dropdown.options = options
+    else:
+        return options
 
 def get_filenames(species, network_sites):
     """ Get filenames from species and network/site

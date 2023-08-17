@@ -12,6 +12,17 @@ instrument_number, instrument_number_string = instrument_type_definition()
 def plot_add_trace(fig, ds,
                 name=""):
 
+    # If data density is more than one point every hour, thin the dataset
+    time_diff = ds.time.diff(dim="time")
+
+    # Calculate the average time difference in seconds
+    avg_time_diff = time_diff.mean().values / 1e9  
+    if avg_time_diff < 600:
+        print("Thinning dataset")
+        ds_plot = ds.isel(time=slice(None, None, 60))
+    else:
+        ds_plot = ds.copy()
+
     # Add trace
     fig.add_trace(
         go.Scatter(
@@ -20,8 +31,8 @@ def plot_add_trace(fig, ds,
             #marker=dict(color=colours[colour_counter % colour_max], size=3),
             line=dict(color=colours[colour_counter % colour_max], width=2),
             name=name,
-            x=ds.time,
-            y=ds.mf)
+            x=ds_plot.time,
+            y=ds_plot.mf)
         )
 
     return fig
