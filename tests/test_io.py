@@ -1,10 +1,18 @@
-from agage_archive.convert import scale_convert
 import pandas as pd
 import xarray as xr
+import numpy as np
 
 from agage_archive import Paths
+from agage_archive.convert import scale_convert
+from agage_archive.io import read_ale_gage, combine_datasets
 
-paths = Paths()
+
+paths = Paths(test=True)
+
+# Scale conversion factors are used in multiple tests
+scale_conversion = pd.read_csv(paths.root / "data/scale_convert.csv",
+                        index_col="Species")
+
 
 def test_scale_convert():
 
@@ -17,9 +25,6 @@ def test_scale_convert():
         ds.attrs["calibration_scale"] = scale
         return ds
     
-    scale_conversion = pd.read_csv(paths.root / "data/scale_convert.csv",
-                                   index_col="Species")
-
     # Create xarray dataset with one time point
     ds = test_dataset("1991-01-01", "cfc-11", "SIO-93")
 
@@ -65,3 +70,39 @@ def test_scale_convert():
     assert ds_new.mf.values[0] / ds.mf.values[0] == \
         (1./scale_conversion.loc["cfc-11", "SIO-98/SIO-93"]) * \
         (1./scale_conversion.loc["cfc-11", "SIO-05/SIO-98"])
+    
+
+def test_read_ale_gage():
+
+    ds_ale = read_ale_gage("cfc-11", "CGO", "ALE", testing_path=True)
+
+    # test UTC conversion
+    ds_ale_local = read_ale_gage("cfc-11", "CGO", "ALE", testing_path=True,
+                                 utc=False, data_exclude=False)
+    
+    # check that all df_ale_local timestamps are 10 hours ahead of df_ale (CGO is UTC+10)
+    assert ((ds_ale_local.time.to_series().index - ds_ale.time.to_series().index) == pd.Timedelta("10H")).all()
+
+    # Check that some data have been excluded
+    assert ds_ale.mf.to_series().isnull().sum() > ds_ale_local.mf.to_series().isnull().sum()
+
+    ds_ale_noscale = read_ale_gage("cfc-11", "CGO", "ALE", testing_path=True,
+                                scale=None)
+
+    # Check that the scale conversion has been applied
+    assert np.isclose(np.nanmean(ds_ale.mf.values / ds_ale_noscale.mf.values),
+        scale_conversion.loc["cfc-11", "SIO-98/SIO-93"] * scale_conversion.loc["cfc-11", "SIO-05/SIO-98"])
+
+
+def test_combine_datasets():
+
+    species = "ch3ccl3"
+
+    ds = combine_datasets(species, "CGO", testing_path=True)
+
+    ds_ale_noscale = read_ale_gage(species, "CGO", "ALE", testing_path=True, scale=None)
+
+    # Check that the scale conversion has been applied
+    assert np.isclose(np.nanmean(ds.reindex_like(ds_ale_noscale).mf.values / ds_ale_noscale.mf.values),
+        scale_conversion.loc[species, "SIO-98/SIO-93"] * scale_conversion.loc[species, "SIO-05/SIO-98"])
+
