@@ -8,10 +8,15 @@ from agage_archive import Paths
 from agage_archive.convert import scale_convert
 from agage_archive.formatting import format_species, \
     format_variables, format_attributes
-from agage_archive.data_selection import read_release_schedule, data_exclude, \
+from agage_archive.data_selection import read_release_schedule, read_data_exclude, \
     read_data_combination
 from agage_archive.definitions import instrument_type_definition
 from agage_archive.util import tz_local_to_utc
+
+
+gcwerks_species = {"c2f6": "pfc-116",
+                   "c3f8": "pfc-218",
+                   "c4f8": "pfc-318"}
 
 
 def read_agage(species, site, instrument,
@@ -40,6 +45,8 @@ def read_agage(species, site, instrument,
     paths = Paths(test=testing_path)
 
     species_search = format_species(species)
+    if species_search in gcwerks_species:
+        species_search = gcwerks_species[species_search]
 
     gcmd_instruments = ["GCMD", "GCECD", "Picarro", "LGR"]
     gcms_instruments = ["GCMS-ADS", "GCMS-Medusa", "GCMS-MteCimone"]
@@ -109,7 +116,7 @@ def read_agage(species, site, instrument,
 
     # Remove any excluded data
     if data_exclude:
-        ds = data_exclude(ds, format_species(species), site, instrument)
+        ds = read_data_exclude(ds, format_species(species), site, instrument)
 
     # Check against release schedule
     rs = read_release_schedule(instrument,
@@ -317,7 +324,7 @@ def read_ale_gage(species, site, network,
     if data_exclude:
         if not utc:
             raise ValueError("Can't exclude data if time is not UTC")
-        ds = data_exclude(ds, format_species(species), site, network)
+        ds = read_data_exclude(ds, format_species(species), site, network)
 
     # Check against release schedule
     rs = read_release_schedule(network,

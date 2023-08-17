@@ -23,6 +23,10 @@ def scale_graph(species):
 
     data = pd.read_csv(file_path)
 
+    # Check if species is in the data
+    if species not in data['Species'].values:
+        raise ValueError(f"Species {species} not found in scale_convert.csv")
+
     # Filter the data for the specified species
     species_data = data[data['Species'] == species].iloc[0]
 
@@ -82,22 +86,25 @@ def scale_convert(ds, scale_new):
         f_out[idx] = f[idx]
 
         return f_out
-    
-    # If scales are the same, return original dataset
-    if ds.attrs["calibration_scale"] == scale_new:
-        return ds
-    else:
-        scale_original = ds.attrs["calibration_scale"]
-    
-    # Find species
-    species = ds.attrs["species"]
-
-    if scale_new == "default":
-        scale_new = calibration_scale_default(format_species(species))
 
     # If no conversion required, return original dataset
     if scale_new == None:
         return ds
+
+    # Find species
+    species = ds.attrs["species"]
+
+    # Get default scale, if needed
+    if scale_new == "default":
+        scale_new = calibration_scale_default(format_species(species))
+
+    # If scales are the same, return original dataset
+    if ds.attrs["calibration_scale"] == scale_new:
+        return ds
+    
+    scale_original = ds.attrs["calibration_scale"]
+    
+    # TODO: CHECK IF SCALES ARE IN SCALE_CONVERT.CSV
 
     # Make a deep copy of the dataset
     ds_out = ds.copy(deep=True)
@@ -115,7 +122,7 @@ def scale_convert(ds, scale_new):
                 if path[i] == "SIO-93" and path[i+1] == "SIO-98":
                     conversion_factor *= n2o_scale_function(ds.time.to_series().index)
                 elif path[i] == "SIO-98" and path[i+1] == "SIO-93":
-                    conversion_factor *= n2o_scale_function(ds.time.to_series().index, invert=True)                
+                    conversion_factor *= n2o_scale_function(ds.time.to_series().index, invert=True)
             conversion_factor *= G[path[i]][path[i+1]]['weight']
 
     except nx.NetworkXNoPath:

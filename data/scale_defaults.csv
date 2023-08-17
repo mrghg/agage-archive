@@ -1,7 +1,8 @@
 Species,calibration_scale,units
+co2,WMO-X2019,ppm
 ch4,TU-87,ppb
 n2o,SIO-16,ppb
-co,WMO-X2014,ppb
+co,WMO-X2014A,ppb
 h2,MPI-2009,ppb
 cfc-11,SIO-05,ppt
 cfc-12,SIO-05,ppt

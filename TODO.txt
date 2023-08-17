@@ -4,4 +4,3 @@
     - Sampling period for picarros
 - Add data selection file explanations to README/TUTORIAL
 - Add error/warning logger
-

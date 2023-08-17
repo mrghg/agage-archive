@@ -135,7 +135,7 @@ def calibration_scale_default(species):
         return scale_defaults.loc[format_species(species), "calibration_scale"]
 
 
-def data_exclude(ds, species, site, instrument):
+def read_data_exclude(ds, species, site, instrument):
     '''Read data_exclude file and return start and end date for exclusion
 
     Args:

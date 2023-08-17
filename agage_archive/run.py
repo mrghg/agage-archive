@@ -96,10 +96,19 @@ def run_combined_instruments(network = "AGAGE",
                            verbose=verbose)
 
 
-def run_all(delete = True):
+def run_all(delete = True,
+            combined = True,
+            include = [],
+            exclude = ["GCPDD"]):
+    """Process data files for multiple instruments. Reads the release schedule to determine which
+    instruments to process
 
-    #TODO: SORT THIS OUT!!!!!!
-    exclude = ["GCPDD"]
+    Args:
+        delete (bool): Delete all files in output directory before running
+        combined (bool): Process combined data files
+        include (list): List of instruments to process. If empty, process all instruments
+        exclude (list): List of instruments to exclude from processing
+    """
 
     rs_path = path.root / "data" / "data_selection" / "data_release_schedule.xlsx"
 
@@ -115,12 +124,17 @@ def run_all(delete = True):
                 rmtree(pth)
 
     # Must run combined instruments first
-    run_combined_instruments(verbose=True)
+    if combined:
+        run_combined_instruments(verbose=True)
 
-    instruments = pd.ExcelFile(rs_path).sheet_names
+    # If include is empty, process all instruments in release schedule
+    if len(include) == 0:
+        instruments = pd.ExcelFile(rs_path).sheet_names
+    else:
+        instruments = include
 
+    # Processing
     for instrument in instruments:
-
         if instrument not in exclude:
             run_individual_instrument(instrument, verbose=True)
 

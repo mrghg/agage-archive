@@ -314,7 +314,12 @@ def format_species(species):
         str: Formatted species name
     '''
 
-    return species.lower()
+    from agage_archive.definitions import species_translator
+
+    if species.lower() in species_translator:
+        return species_translator[species]
+    else:
+        return species.lower()
 
 
 def format_units(units):
