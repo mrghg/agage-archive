@@ -5,7 +5,7 @@ import json
 import pytz
 
 from agage_archive import get_path
-
+from agage_archive.io import open_data_file
 
 def setup():
     """ Setup the config file for the agage_archive package. """
@@ -16,7 +16,6 @@ def setup():
     repo_path = Path(__file__).parents[1].absolute()
     ale_default = repo_path / "data/ale_gage_sio1993/ale"
     gage_default = repo_path / "data/ale_gage_sio1993/gage"
-
 
     # Paths to data files
     agage_path = input("Path to folder containing AGAGE GCWerks NetCDF files:")
@@ -40,7 +39,14 @@ def setup():
 
 
 def is_number(s):
-    """ Check if a string is a number. """
+    """ Check if a string is a number. 
+    
+    Args:
+        s (str): String to check
+
+    Returns:
+        bool: True if s is a number, False otherwise
+    """
     try:
         float(s)
         return True
@@ -80,18 +86,19 @@ def lookup_username():
                     return "unknown user"
 
 
-def tz_local_to_utc(index, site):
+def tz_local_to_utc(index, network, site):
     """ Convert local time to UTC. 
     
     Args:
         index (pandas.DatetimeIndex): Datetime index in local time
+        network (str): Network name
         site (str): Site name
 
     Returns:
         pandas.DatetimeIndex: Datetime index in UTC
     """
 
-    with open(get_path().parent / "data/ale_gage_sites.json", "r") as file:
+    with open_data_file("ale_gage_sites.json", network=network) as file:
         site_info = json.load(file)
 
     tzoffset_hours = site_info[site]["tz"].split("UTC")[1]

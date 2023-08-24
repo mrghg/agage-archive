@@ -1,0 +1,13 @@
+# Use this file to store configuration settings
+# All paths are relative to the network subfolder in the data directory
+# If you need to put data files elsewhere, you'll need to use symlinks
+---
+user:
+  name: Matt Rigby, University of Bristol
+paths:
+  agage_test:
+    agage_md_path: data-nc
+    agage_gcms_path: data-gcms-nc
+    ale_path: ale
+    gage_path: gage
+    output_path: output

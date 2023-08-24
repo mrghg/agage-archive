@@ -2,11 +2,9 @@ import pandas as pd
 import numpy as np
 import networkx as nx
 
-from agage_archive import Paths
+from agage_archive.io import open_data_file
 from agage_archive.data_selection import calibration_scale_default
 from agage_archive.formatting import format_species
-
-paths = Paths()
 
 
 def scale_graph(species):
@@ -19,9 +17,8 @@ def scale_graph(species):
         nx.Graph: Undirected graph
     """
 
-    file_path = paths.root / "data/scale_convert.csv"
-
-    data = pd.read_csv(file_path)
+    with open_data_file("scale_convert.csv") as f:
+        data = pd.read_csv(f)
 
     # Check if species is in the data
     if species not in data['Species'].values:
@@ -96,7 +93,7 @@ def scale_convert(ds, scale_new):
 
     # Get default scale, if needed
     if scale_new == "default":
-        scale_new = calibration_scale_default(format_species(species))
+        scale_new = calibration_scale_default(ds.attrs["network"], format_species(species))
 
     # If scales are the same, return original dataset
     if ds.attrs["calibration_scale"] == scale_new:

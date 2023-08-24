@@ -4,7 +4,7 @@ import numpy as np
 
 from agage_archive import Paths
 from agage_archive.convert import scale_convert
-from agage_archive.io import read_ale_gage, combine_datasets
+from agage_archive.io import read_ale_gage, combine_datasets, open_data_file
 
 
 paths = Paths(test=True)
@@ -111,4 +111,7 @@ def test_combine_datasets():
     # Check that the scale conversion has been applied
     assert np.isclose(np.nanmean(ds.reindex_like(ds_gage_noscale).mf.values / ds_gage_noscale.mf.values),
         scale_conversion.loc[species, "SIO-98/SIO-93"] * scale_conversion.loc[species, "SIO-05/SIO-98"], rtol=0.00001)
+
+
+def test_open_data_file():
 

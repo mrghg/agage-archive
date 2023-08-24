@@ -3,12 +3,9 @@ import numpy as np
 import xarray as xr
 from datetime import datetime
 
-from agage_archive import Paths
+from agage_archive.io import open_data_file
 from agage_archive.util import is_number, lookup_username
 from agage_archive.definitions import instrument_type_definition, nc4_types
-
-
-paths = Paths()
 
 
 def format_attributes_global_instrument(ds,
@@ -192,7 +189,7 @@ def format_variables(ds,
 
     '''
 
-    with open(paths.root / "data/variables.json") as f:
+    with open_data_file("variables.json") as f:
         variables = json.load(f)
 
     attrs = ds.attrs.copy()
@@ -251,6 +248,7 @@ def format_variables(ds,
 
 
 def format_attributes(ds, instruments = [],
+                      network = None,
                       species = None,
                       units = None,
                       calibration_scale = None):
@@ -264,7 +262,7 @@ def format_attributes(ds, instruments = [],
         xr.Dataset: Dataset with formatted attributes
     '''
 
-    with open(paths.root / "data/attributes.json") as f:
+    with open_data_file("attributes.json") as f:
         attributes_default = json.load(f)
 
     attrs = {}
@@ -295,7 +293,7 @@ def format_attributes(ds, instruments = [],
                     attrs[attr] = ds.attrs[attr]
 
     # Format certain key attributes, and determine if they have been set as keywords
-    for v in ["species", "units", "calibration_scale"]:
+    for v in ["species", "units", "calibration_scale", "network"]:
         attrs[v] = lookup_locals_and_attrs(v, locals(), ds.attrs.copy())
 
     ds_out = ds.copy(deep=True)
@@ -356,6 +354,19 @@ def format_calibration_scale(scale):
         return scale_translator[scale]
     else:
         return scale
+
+
+def format_network(network):
+    """Format network name
+
+    Args:
+        network (str): Network name
+
+    Returns:
+        str: Formatted network name
+    """
+
+    return network.lower()
 
 
 def lookup_locals_and_attrs(v, local, attrs):
