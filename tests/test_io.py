@@ -115,3 +115,14 @@ def test_combine_datasets():
 
 def test_open_data_file():
 
+    #TODO: FINISH THIS
+
+    # Open a global data file
+    file_contents = open_data_file("attributes.json")
+
+    # Open a network specific file
+    file_contents = open_data_file("data-gcms-nc/AGAGE-GCMS-Medusa_CGO_ch3ccl3.nc",
+                                   network = "agage_test")
+
+    # Open a zipped file
+    file_contents = open_data_file("...")
