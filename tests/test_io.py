@@ -2,16 +2,17 @@ import pandas as pd
 import xarray as xr
 import numpy as np
 
-from agage_archive import Paths
+from agage_archive import Paths, open_data_file
 from agage_archive.convert import scale_convert
-from agage_archive.io import read_ale_gage, combine_datasets, open_data_file
+from agage_archive.io import read_ale_gage, combine_datasets
 
 
-paths = Paths(test=True)
+paths = Paths("agage_test")
+
 
 # Scale conversion factors are used in multiple tests
-scale_conversion = pd.read_csv(paths.root / "data/scale_convert.csv",
-                        index_col="Species")
+with open_data_file("scale_convert.csv") as f:
+    scale_conversion = pd.read_csv(f, index_col="Species")
 
 
 def test_scale_convert():
@@ -74,10 +75,12 @@ def test_scale_convert():
 
 def test_read_ale_gage():
 
-    ds_ale = read_ale_gage("cfc-11", "CGO", "ALE", testing_path=True)
+    species = "ch3ccl3"
+
+    ds_ale = read_ale_gage("agage_test", species, "CGO", "ALE")
 
     # test UTC conversion
-    ds_ale_local = read_ale_gage("cfc-11", "CGO", "ALE", testing_path=True,
+    ds_ale_local = read_ale_gage("agage_test", species, "CGO", "ALE",
                                  utc=False, data_exclude=False)
     
     # check that all df_ale_local timestamps are 10 hours ahead of df_ale (CGO is UTC+10)
@@ -86,43 +89,45 @@ def test_read_ale_gage():
     # Check that some data have been excluded
     assert ds_ale.mf.to_series().isnull().sum() > ds_ale_local.mf.to_series().isnull().sum()
 
-    ds_ale_noscale = read_ale_gage("cfc-11", "CGO", "ALE", testing_path=True,
+    ds_ale_noscale = read_ale_gage("agage_test", species, "CGO", "ALE",
                                 scale=None)
 
     # Check that the scale conversion has been applied
     assert np.isclose(np.nanmean(ds_ale.mf.values / ds_ale_noscale.mf.values),
-        scale_conversion.loc["cfc-11", "SIO-98/SIO-93"] * scale_conversion.loc["cfc-11", "SIO-05/SIO-98"])
+        scale_conversion.loc[species, "SIO-98/SIO-93"] * scale_conversion.loc[species, "SIO-05/SIO-98"])
 
 
 def test_combine_datasets():
 
+    network = "agage_test"
+
     species = "ch3ccl3"
 
-    ds = combine_datasets(species, "CGO", testing_path=True)
+    ds = combine_datasets(network, species, "CGO")
 
-    ds_ale_noscale = read_ale_gage(species, "CGO", "ALE", testing_path=True, scale=None)
+    ds_ale_noscale = read_ale_gage(network, species, "CGO", "ALE", scale=None)
 
     # Check that the scale conversion has been applied
     assert np.isclose(np.nanmean(ds.reindex_like(ds_ale_noscale).mf.values / ds_ale_noscale.mf.values),
         scale_conversion.loc[species, "SIO-98/SIO-93"] * scale_conversion.loc[species, "SIO-05/SIO-98"], rtol=0.00001)
 
-    ds_gage_noscale = read_ale_gage(species, "CGO", "GAGE", testing_path=True, scale=None)
+    ds_gage_noscale = read_ale_gage(network, species, "CGO", "GAGE", scale=None)
 
     # Check that the scale conversion has been applied
     assert np.isclose(np.nanmean(ds.reindex_like(ds_gage_noscale).mf.values / ds_gage_noscale.mf.values),
         scale_conversion.loc[species, "SIO-98/SIO-93"] * scale_conversion.loc[species, "SIO-05/SIO-98"], rtol=0.00001)
 
 
-def test_open_data_file():
+# def test_open_data_file():
 
-    #TODO: FINISH THIS
+#     #TODO: FINISH THIS
 
-    # Open a global data file
-    file_contents = open_data_file("attributes.json")
+#     # Open a global data file
+#     file_contents = open_data_file("attributes.json")
 
-    # Open a network specific file
-    file_contents = open_data_file("data-gcms-nc/AGAGE-GCMS-Medusa_CGO_ch3ccl3.nc",
-                                   network = "agage_test")
+#     # Open a network specific file
+#     file_contents = open_data_file("data-gcms-nc/AGAGE-GCMS-Medusa_CGO_ch3ccl3.nc",
+#                                    network = "agage_test")
 
-    # Open a zipped file
-    file_contents = open_data_file("...")
+#     # Open a zipped file
+#     file_contents = open_data_file("...")

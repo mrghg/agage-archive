@@ -93,7 +93,8 @@ def scale_convert(ds, scale_new):
 
     # Get default scale, if needed
     if scale_new == "default":
-        scale_new = calibration_scale_default(ds.attrs["network"], format_species(species))
+        scale_new = calibration_scale_default(ds.attrs["network"],
+                                              format_species(species))
 
     # If scales are the same, return original dataset
     if ds.attrs["calibration_scale"] == scale_new:

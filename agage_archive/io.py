@@ -329,7 +329,7 @@ def read_ale_gage(network, species, site, instrument,
     if data_exclude:
         if not utc:
             raise ValueError("Can't exclude data if time is not UTC")
-        ds = read_data_exclude(ds, format_species(species), site, network)
+        ds = read_data_exclude(ds, format_species(species), site, instrument)
 
     # Check against release schedule
     rs = read_release_schedule(network, instrument,
