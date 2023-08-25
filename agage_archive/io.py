@@ -1,15 +1,12 @@
 import xarray as xr
 import json
 import pandas as pd
-import tarfile
 import numpy as np
-from zipfile import ZipFile
-from fnmatch import fnmatch
 
-from agage_archive import Paths
+from agage_archive import Paths, open_data_file, data_file_list
 from agage_archive.convert import scale_convert
 from agage_archive.formatting import format_species, \
-    format_variables, format_attributes, format_network
+    format_variables, format_attributes
 from agage_archive.data_selection import read_release_schedule, read_data_exclude, \
     read_data_combination
 from agage_archive.definitions import instrument_type_definition
@@ -19,86 +16,6 @@ from agage_archive.util import tz_local_to_utc
 gcwerks_species = {"c2f6": "pfc-116",
                    "c3f8": "pfc-218",
                    "c4f8": "pfc-318"}
-
-
-def data_file_list(network = "",
-                   sub_path = "",
-                   pattern = "*"):
-    """List files in data directory. Structure is data/network/sub_path
-    sub_path can be a zip archive
-
-    Args:
-        network (str, optional): Network. Defaults to "".
-        sub_path (str, optional): Sub-path. Defaults to "".
-        pattern (str, optional): Pattern to match. Defaults to "*".
-
-    Returns:
-        tuple: Tuple containing network, sub-path and list of files
-    """
-
-    def return_sub_path(full_path):
-        pth = ""
-        for p in full_path.parts[::-1]:
-            if (p == "data") or (p == network):
-                break
-            else:
-                pth = p + "/" + pth
-        return pth
-
-    paths = Paths(network)
-
-    if network:
-        pth = paths.data / network / sub_path
-    else:
-        pth = paths.data / sub_path
-
-    if pth.suffix == ".zip":
-        with ZipFile(pth, "r") as z:
-            return network, return_sub_path(pth), [f.filename for f in z.filelist if fnmatch(f.filename, pattern)]
-    else:
-        return network, return_sub_path(pth), [str(s.name) for s in pth.glob(pattern)]
-    
-
-def open_data_file(filename,
-                   network = "",
-                   sub_path = "",
-                   verbose = False):
-    """Open data file. Structure is data/network/sub_path
-    sub_path can be a zip archive
-
-    Args:
-        filename (str): Filename
-        network (str, optional): Network. Defaults to "".
-        sub_path (str, optional): Sub-path. Defaults to "". Can be a zip archive or directory
-        verbose (bool, optional): Print verbose output. Defaults to False.
-
-    Raises:
-        FileNotFoundError: Can't find file
-
-    Returns:
-        file: File object
-    """
-
-    paths = Paths(network)
-
-    if network:
-        pth = paths.data / network
-    else:
-        pth = paths.data
-
-    if sub_path:
-        pth = pth / sub_path
-    
-    if verbose:
-        print(f"... opening {pth / filename}")
-
-    if pth.suffix == ".zip":
-        with ZipFile(pth, "r") as z:
-            return z.open(filename)
-    elif "tar.gz" in filename:
-        return tarfile.open(pth / filename, "r:gz")
-    else:
-        return (pth / filename).open("rb")
     
 
 def read_nc(network, species, site, instrument,
@@ -214,13 +131,15 @@ def read_nc(network, species, site, instrument,
     return ds
 
 
-def ale_gage_timestamp_issues(datetime, timestamp_issues):
+def ale_gage_timestamp_issues(datetime, timestamp_issues,
+                              verbose = True):
     """Check for timestamp issues in ALE/GAGE data
 
     Args:
         datetime (pd.Series): Datetime series
         timestamp_issues (dict): Dictionary of timestamp issues from ale_gage_timestamp_issues.json
-
+        verbose (bool, optional): Print verbose output. Defaults to False.
+        
     Returns:
         pd.Series: Datetime series with issues fixed
     """
@@ -230,14 +149,15 @@ def ale_gage_timestamp_issues(datetime, timestamp_issues):
     
     for timestamp_issue in timestamp_issues:
         if timestamp_issue in datetime.values:
-            print(f"... Timestamp issue at {timestamp_issue} replacing with {timestamp_issues[timestamp_issue]}")
+            if verbose:
+                print(f"... Timestamp issue at {timestamp_issue} replacing with {timestamp_issues[timestamp_issue]}")
             datetime = datetime.replace(timestamp_issue, timestamp_issues[timestamp_issue])
 
     return datetime
 
 
 def read_ale_gage(network, species, site, instrument,
-                  verbose = False,
+                  verbose = True,
                   utc = True,
                   data_exclude = True,
                   scale = "default"):
@@ -248,7 +168,6 @@ def read_ale_gage(network, species, site, instrument,
         species (str): Species
         site (str): Three-letter site code
         instrument (str): "ALE" or "GAGE"
-        testing_path (bool, optional): Use testing path. Defaults to False.
         verbose (bool, optional): Print verbose output. Defaults to False.
         utc (bool, optional): Convert to UTC. Defaults to True.
         data_exclude (bool, optional): Exclude data based on data_exclude.xlsx. Defaults to True. 
@@ -328,7 +247,8 @@ def read_ale_gage(network, species, site, instrument,
                 df["TIME"].astype(str).str.zfill(4)
             
             # Check for datetime issues
-            datetime = ale_gage_timestamp_issues(datetime, timestamp_issues)
+            datetime = ale_gage_timestamp_issues(datetime, timestamp_issues,
+                                                 verbose=verbose)
 
             # Convert datetime string
             df.index = pd.to_datetime(datetime, format="%d-%b-%y %H%M")
@@ -423,24 +343,25 @@ def read_ale_gage(network, species, site, instrument,
     return ds
 
 
-def combine_datasets(species, site, 
+def combine_datasets(network, species, site, 
                     scale = "default",
-                    testing_path = False,
-                    verbose = False):
+                    verbose = True):
     '''Combine ALE/GAGE/AGAGE datasets for a given species and site
 
     Args:
+        network (str): Network
         species (str): Species
         site (str): Site
         scale (str, optional): Calibration scale. Defaults to value in scale_defaults.csv.
             If None, will attempt to leave scale unchanged.
+        verbose (bool, optional): Print verbose output. Defaults to False.
 
     Returns:
         xr.Dataset: Dataset containing data
     '''
 
     # Read instrument dates from CSV files
-    instruments = read_data_combination(format_species(species), site)
+    instruments = read_data_combination(network, format_species(species), site)
 
     instrument_types, instrument_number_str = instrument_type_definition()
 
@@ -457,15 +378,13 @@ def combine_datasets(species, site,
 
         # Read data
         if instrument in ["ALE", "GAGE"]:
-            ds = read_ale_gage(species, site, instrument,
-                               testing_path=testing_path,
+            ds = read_ale_gage(network, species, site, instrument,
                                verbose=verbose,
                                scale=scale)
         else:
-            ds = read_nc(species, site, instrument,
-                            testing_path=testing_path,
-                            verbose=verbose,
-                            scale=scale)
+            ds = read_nc(network, species, site, instrument,
+                        verbose=verbose,
+                        scale=scale)
 
         # Store attributes
         attrs.append(ds.attrs)
@@ -535,33 +454,29 @@ def combine_datasets(species, site,
     return ds_combined
 
 
-def output_dataset(ds,
-                   network = "AGAGE",
+def output_dataset(network, ds,
                    instrument = "GCMD",
                    end_date = None,
-                   testing_path = False,
-                   output_subpath = None,
                    verbose = False):
     '''Output dataset to netCDF file
 
     Args:
         ds (xr.Dataset): Dataset to output
+        network (str): Network
+        instrument (str, optional): Instrument. Defaults to "GCMD".
         end_date (str, optional): End date to subset to. Defaults to None.
     '''
 
-    paths = Paths(test=testing_path)
+    paths = Paths(network)
 
-    if output_subpath == None:
-        output_path = paths.output
-    else:
-        output_path = paths.output / output_subpath
+    output_path = paths.data / network / paths.output_path
 
     # Test if output_path exists and if not create it
     if not output_path.exists():
         output_path.mkdir(parents=True)
 
     # Create filename
-    filename = f"{network}-{instrument}_{ds.attrs['site_code']}_{format_species(ds.attrs['species'])}.nc"
+    filename = f"{network.upper()}-{instrument}_{ds.attrs['site_code']}_{format_species(ds.attrs['species'])}.nc"
 
     ds_out = ds.copy(deep = True)
 

@@ -1,7 +1,7 @@
 import pandas as pd
 import numpy as np
 
-from agage_archive.io import open_data_file
+from agage_archive import open_data_file
 from agage_archive.formatting import format_species
 
 

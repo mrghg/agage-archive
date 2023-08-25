@@ -1,6 +1,9 @@
 from pathlib import Path as _Path
-import configparser
+import tarfile
+from zipfile import ZipFile
 import yaml
+from fnmatch import fnmatch
+
 
 __version__ = "0.0.1"
 
@@ -75,68 +78,81 @@ class Paths():
                 raise FileNotFoundError(f"{full_path} is not a folder or zip archive")
 
 
-# class Paths():
-#     def __init__(self, test=False):
-#         """Class to store paths to data folders
-#         """
+def data_file_list(network = "",
+                   sub_path = "",
+                   pattern = "*"):
+    """List files in data directory. Structure is data/network/sub_path
+    sub_path can be a zip archive
 
-#         # Get repository root
-#         self.root = get_path().parent
-#         self.data = self.root / "data"
+    Args:
+        network (str, optional): Network. Defaults to "".
+        sub_path (str, optional): Sub-path. Defaults to "".
+        pattern (str, optional): Pattern to match. Defaults to "*".
 
-#         if test == False:
+    Returns:
+        tuple: Tuple containing network, sub-path and list of files
+    """
 
-#             # Check if config file exists
-#             config_file = get_path("config.ini")
-#             if not config_file.exists():
-#                 raise FileNotFoundError(
-#                     "Config file not found. Try running util.setup first")
+    def return_sub_path(full_path):
+        pth = ""
+        for p in full_path.parts[::-1]:
+            if (p == "data") or (p == network):
+                break
+            else:
+                pth = p + "/" + pth
+        return pth
 
-#             # Read config file
-#             config = configparser.ConfigParser()
-#             config.read(get_path("config.ini"))
+    paths = Paths(network)
 
-#             self.agage_gcmd = _Path(config["Paths"]["agage_md_path"])
-#             #self.agage_gcmd = self.agage / "data-nc"
-#             self.agage_gcms = _Path(config["Paths"]["agage_gcms_path"])
-#             self.ale = _Path(config["Paths"]["ale_path"])
-#             self.gage = _Path(config["Paths"]["gage_path"])
+    if network:
+        pth = paths.data / network / sub_path
+    else:
+        pth = paths.data / sub_path
 
-#             self.output = _Path(config["Paths"]["output_path"])
+    if pth.suffix == ".zip":
+        with ZipFile(pth, "r") as z:
+            return network, return_sub_path(pth), [f.filename for f in z.filelist if fnmatch(f.filename, pattern)]
+    else:
+        return network, return_sub_path(pth), [str(s.name) for s in pth.glob(pattern)]
+    
 
-#         else:
+def open_data_file(filename,
+                   network = "",
+                   sub_path = "",
+                   verbose = False):
+    """Open data file. Structure is data/network/sub_path
+    sub_path can be a zip archive
 
-#             # Use test data
-#             self.agage_gcmd = self.root / "data/agage_test/data-nc"
-#             self.agage_gcms = self.root / "data/agage_test/data-gcms-nc"
-#             self.ale = self.root / "data/ale_gage_sio1993/ale"
-#             self.gage = self.root / "data/ale_gage_sio1993/gage"
+    Args:
+        filename (str): Filename
+        network (str, optional): Network. Defaults to "".
+        sub_path (str, optional): Sub-path. Defaults to "". Can be a zip archive or directory
+        verbose (bool, optional): Print verbose output. Defaults to False.
 
-#             self.output = self.root / "data/agage_test/output"
+    Raises:
+        FileNotFoundError: Can't find file
 
-#         # Check that data folders are there
-#         for pth in [self.agage_gcmd,
-#                     self.agage_gcms,
-#                     self.ale,
-#                     self.gage]:
+    Returns:
+        file: File object
+    """
 
-#             if not pth.exists():
-#                 raise FileNotFoundError(
-#                     f"Folder {pth} doesn't exist")
-        
-#         # Check that NetCDF folders contain .nc files
-#         for pth in [self.agage_gcmd, self.agage_gcms]:
-#             if pth.suffix != ".zip":
-#                 if not list(pth.glob("*.nc")):
-#                     raise FileNotFoundError(
-#                         f"""{pth} directory doesn't
-#                         contain any NetCDF files"""
-#                     )
+    paths = Paths(network)
 
-#         # Check that ALE and GAGE folder contain tar.gz files
-#         for pth in [self.ale, self.gage]:
-#             if not list(pth.glob("*.gtar.gz")):
-#                 raise FileNotFoundError(
-#                     f"""{pth} directory doesn't
-#                     contain any GCWerks .gtar.gz files"""
-#                 )
+    if network:
+        pth = paths.data / network
+    else:
+        pth = paths.data
+
+    if sub_path:
+        pth = pth / sub_path
+    
+    if verbose:
+        print(f"... opening {pth / filename}")
+
+    if pth.suffix == ".zip":
+        with ZipFile(pth, "r") as z:
+            return z.open(filename)
+    elif "tar.gz" in filename:
+        return tarfile.open(pth / filename, "r:gz")
+    else:
+        return (pth / filename).open("rb")

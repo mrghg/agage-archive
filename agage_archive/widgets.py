@@ -1,6 +1,5 @@
 import xarray as xr
-from IPython.display import clear_output, display, HTML
-import plotly.offline as pyo
+from IPython.display import clear_output
 
 from agage_archive import Paths
 from agage_archive.visualise import plot_datasets

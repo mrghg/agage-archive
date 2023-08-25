@@ -3,9 +3,10 @@ from pathlib import Path
 import os
 import json
 import pytz
+import yaml
 
-from agage_archive import get_path
-from agage_archive.io import open_data_file
+from agage_archive import get_path, open_data_file
+
 
 def setup():
     """ Setup the config file for the agage_archive package. """
@@ -60,16 +61,10 @@ def lookup_username():
     Returns:
         str: Username
     '''
-
-    # Check if config file exists
-    config_file = get_path("config.ini")
-    if not config_file.exists():
-        raise FileNotFoundError(
-            "Config file not found. Try running util.setup first")
     
     # Take username from config file if it exists, otherwise try to get it from the system
-    config = configparser.ConfigParser()
-    config.read(config_file)
+    with open(get_path("config.yaml"), "r") as f:
+        config = yaml.safe_load(f)
 
     if "User" in config:
         return config["User"]["name"]
