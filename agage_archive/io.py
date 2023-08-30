@@ -3,7 +3,7 @@ import json
 import pandas as pd
 import numpy as np
 
-from agage_archive import Paths, open_data_file, data_file_list
+from agage_archive import Paths, open_data_file, data_file_list, data_file_path
 from agage_archive.convert import scale_convert
 from agage_archive.formatting import format_species, \
     format_variables, format_attributes
@@ -428,8 +428,7 @@ def combine_datasets(network, species, site,
     ds_combined = ds_combined.sortby("time")
 
     # Add details on instruments to global attributes
-    ds_combined = format_attributes(ds_combined,
-                                instrument_rec)
+    ds_combined = format_attributes(ds_combined, instrument_rec)
 
     # Extend comment attribute describing all datasets
     if len(comments) > 1:
@@ -454,9 +453,10 @@ def combine_datasets(network, species, site,
     return ds_combined
 
 
-def output_dataset(network, ds,
+def output_dataset(ds, network,
                    instrument = "GCMD",
                    end_date = None,
+                   output_subpath = "",
                    verbose = False):
     '''Output dataset to netCDF file
 
@@ -469,11 +469,18 @@ def output_dataset(network, ds,
 
     paths = Paths(network)
 
-    output_path = paths.data / network / paths.output_path
+    output_path = data_file_path("", network = network, sub_path = paths.output_path)
+
+    # Check if the output path exists
+    if not output_path.exists():
+        raise FileNotFoundError(f"Can't find output path {output_path}")
+    
+    # If output_subpath is specified, add it to the output path (unlike output path, this one will be created if not present)
+    output_path = output_path / output_subpath
 
     # Test if output_path exists and if not create it
     if not output_path.exists():
-        output_path.mkdir(parents=True)
+        output_path.mkdir()
 
     # Create filename
     filename = f"{network.upper()}-{instrument}_{ds.attrs['site_code']}_{format_species(ds.attrs['species'])}.nc"
@@ -487,7 +494,8 @@ def output_dataset(network, ds,
         del ds_out.time.attrs["calendar"]
 
     if verbose:
-        print(f"... writing {paths.output / filename}")
+        print(f"... writing {output_path / filename}")
 
     # Subset time and write netCDF
-    ds_out.sel(time=slice(None, end_date)).to_netcdf(output_path / filename, mode="w", format="NETCDF4")
+    ds_out.sel(time=slice(None, end_date)).to_netcdf(output_path / filename,
+                                                    mode="w", format="NETCDF4", engine="h5netcdf")

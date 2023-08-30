@@ -80,7 +80,8 @@ class Paths():
 
 def data_file_list(network = "",
                    sub_path = "",
-                   pattern = "*"):
+                   pattern = "*",
+                   ignore_hidden = True):
     """List files in data directory. Structure is data/network/sub_path
     sub_path can be a zip archive
 
@@ -102,19 +103,64 @@ def data_file_list(network = "",
                 pth = p + "/" + pth
         return pth
 
-    paths = Paths(network)
-
-    if network:
-        pth = paths.data / network / sub_path
-    else:
-        pth = paths.data / sub_path
+    pth = data_file_path("", network=network, sub_path=sub_path)
 
     if pth.suffix == ".zip":
         with ZipFile(pth, "r") as z:
-            return network, return_sub_path(pth), [f.filename for f in z.filelist if fnmatch(f.filename, pattern)]
+            files = []
+            for f in z.filelist:
+                if fnmatch(f.filename, pattern) and not (ignore_hidden and f.filename.startswith(".")):
+                    files.append(f.filename)
+            return network, return_sub_path(pth), files
     else:
-        return network, return_sub_path(pth), [str(s.name) for s in pth.glob(pattern)]
+        files = [f.name for f in pth.glob(pattern) if not (ignore_hidden and f.name.startswith("."))]
+        return network, return_sub_path(pth), files
     
+
+def data_file_path(filename,
+                   network = "",
+                   sub_path = ""):
+    """Get path to data file. Structure is data/network/sub_path
+    sub_path can be a zip archive, in which case the path to the zip archive is returned
+
+    Args:
+        filename (str): Filename
+        network (str, optional): Network. Defaults to "".
+        sub_path (str, optional): Sub-path. Defaults to "".
+
+    Raises:
+        FileNotFoundError: Can't find file
+
+    Returns:
+        pathlib.Path: Path to file
+    """
+
+    paths = Paths(network)
+
+    if network:
+        pth = paths.data / network
+    else:
+        pth = paths.data
+
+    if sub_path:
+        pth = pth / sub_path
+    
+    if not pth.exists():
+        raise FileNotFoundError(f"Can't find path {pth}")
+
+    if pth.suffix == ".zip":
+        # If filename is empty, user is just asking to return completed directory
+        if filename == "":
+            return pth
+        # Otherwise, check if filename is in zip archive
+        with ZipFile(pth, "r") as z:
+            for f in z.filelist:
+                if f.filename == filename:
+                    return pth
+            raise FileNotFoundError(f"Can't find {filename} in {pth}")
+    else:
+        return pth / filename
+
 
 def open_data_file(filename,
                    network = "",
@@ -136,15 +182,7 @@ def open_data_file(filename,
         file: File object
     """
 
-    paths = Paths(network)
-
-    if network:
-        pth = paths.data / network
-    else:
-        pth = paths.data
-
-    if sub_path:
-        pth = pth / sub_path
+    pth = data_file_path("", network=network, sub_path=sub_path)
     
     if verbose:
         print(f"... opening {pth / filename}")

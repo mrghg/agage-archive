@@ -1,14 +1,12 @@
 import pandas as pd
 from shutil import rmtree
 
-from agage_archive import Paths
+from agage_archive import Paths, open_data_file, data_file_list, data_file_path
 from agage_archive.data_selection import read_release_schedule, read_data_combination
-from agage_archive.io import combine_datasets, read_agage, read_ale_gage, output_dataset
-
-path = Paths()
+from agage_archive.io import combine_datasets, read_nc, read_ale_gage, output_dataset
 
 
-def run_individual_instrument(instrument,
+def run_individual_instrument(network, instrument,
                               verbose=False):
     """Process individual data files for a given instrument.
     Reads the release schedule for the instrument
@@ -19,32 +17,26 @@ def run_individual_instrument(instrument,
         verbose (bool): Print progress to screen
     """
 
-    rs = read_release_schedule(instrument)
+    rs = read_release_schedule(network, instrument)
 
-    if instrument == "ALE" or instrument == "GAGE":
-        network = instrument
-        instrument_out = "GCMD"
+    if instrument.upper() == "ALE" or instrument.upper() == "GAGE":
         read_function = read_ale_gage
+        instrument_out = instrument.upper() + "-GCMD"
     else:
-        network = "AGAGE"
-        instrument_out = instrument
-        read_function = read_agage
+        read_function = read_nc
+        instrument_out = instrument.upper()
 
     # Process for all species and sites
     for species in rs.index:
         for site in rs.columns:
             if rs.loc[species, site].lower() != "x":
 
-                # Determine which read function to use
-                if instrument == "ALE" or instrument == "GAGE":
-                    ds = read_function(species, site, instrument,
-                                       verbose=verbose)
-                else:
-                    ds = read_function(species, site, instrument,
-                                       verbose=verbose)
+                ds = read_function(network, species, site, instrument,
+                                verbose=verbose)
 
                 # If multiple instruments, store individual file in subdirectory
-                instrument_dates = read_data_combination(species, site, verbose=False)
+                instrument_dates = read_data_combination(network, species, site,
+                                                        verbose=False)
                 if len(instrument_dates) > 1:
                     output_subpath = f"{species}/individual"
                 else:
@@ -56,7 +48,7 @@ def run_individual_instrument(instrument,
                                verbose=verbose)
                 
 
-def run_combined_instruments(network = "AGAGE",
+def run_combined_instruments(network,
                              verbose = False):
     """Process combined data files for a given network.
     Reads the data selection file to determine which sites to process
@@ -66,19 +58,19 @@ def run_combined_instruments(network = "AGAGE",
         verbose (bool): Print progress to screen
     """
 
-    data_selection_path = path.root / "data" / "data_selection" / "data_combination.xlsx"
-
-    # Read sheet names in file_path to determine which sites to process
-    sites = pd.ExcelFile(data_selection_path).sheet_names
+    with open_data_file("data_combination.xlsx", network=network) as data_selection_path:
+        sites = pd.ExcelFile(data_selection_path).sheet_names
 
     for site in sites:
 
         print(f"Processing files for {site}")
 
-        df = pd.read_excel(data_selection_path,
-                        comment="#",
-                        sheet_name=site,
-                        index_col="Species")
+        # Read data selection file
+        with open_data_file("data_combination.xlsx", network=network) as f:
+            df = pd.read_excel(f,
+                            comment="#",
+                            sheet_name=site,
+                            index_col="Species")
 
         # Loop through species in index
         for species in df.index:
@@ -86,7 +78,7 @@ def run_combined_instruments(network = "AGAGE",
             # Produce combined dataset
             if verbose:
                 print(f"... combining datasets for {species} at {site}")
-            ds = combine_datasets(species, site, verbose=verbose)
+            ds = combine_datasets(network, species, site, verbose=verbose)
 
             if verbose:
                 print(f"... outputting combined dataset for {species} at {site}")
@@ -96,7 +88,8 @@ def run_combined_instruments(network = "AGAGE",
                            verbose=verbose)
 
 
-def run_all(delete = True,
+def run_all(network,
+            delete = True,
             combined = True,
             include = [],
             exclude = ["GCPDD"]):
@@ -110,35 +103,47 @@ def run_all(delete = True,
         exclude (list): List of instruments to exclude from processing
     """
 
-    rs_path = path.root / "data" / "data_selection" / "data_release_schedule.xlsx"
+    if not network:
+        raise ValueError("Must specify network")
+
+    path = Paths(network)
 
     if delete:
-        print("Deleting all files in output directory")
         # Clear output directory, removing all files and subdirectories
-        pths = path.output.glob("*")
+        network, sub_path, files = data_file_list(network=network, sub_path=path.output_path)
+        
+        print(f'Deleting all files in {data_file_path("", network=network, sub_path=sub_path)}')
+        
+        for f in files:
 
-        for pth in pths:
-            if pth.is_file():
-                pth.unlink()
-            elif pth.is_dir():
-                rmtree(pth)
+            pth = data_file_path("", network=network, sub_path=sub_path) / f
+
+            # Make sure pth is in data/network directory (for safety)
+            if pth.parents[2] == path.data and pth.parents[1].name == network:
+                if pth.is_file():
+                    pth.unlink()
+                elif pth.is_dir():
+                    rmtree(pth)
+            else:
+                print(f"Warning: {pth} must be in a data/network directory")
 
     # Must run combined instruments first
     if combined:
-        run_combined_instruments(verbose=True)
+        run_combined_instruments(network, verbose=True)
 
     # If include is empty, process all instruments in release schedule
     if len(include) == 0:
-        instruments = pd.ExcelFile(rs_path).sheet_names
+        with open_data_file("data_release_schedule.xlsx", network=network) as frs:
+            instruments = pd.ExcelFile(frs).sheet_names
     else:
         instruments = include
 
     # Processing
     for instrument in instruments:
         if instrument not in exclude:
-            run_individual_instrument(instrument, verbose=True)
+            run_individual_instrument(network, instrument, verbose=True)
 
 
 if __name__ == "__main__":
 
-    run_all()
+    run_all("agage")

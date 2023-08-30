@@ -290,7 +290,15 @@ def format_attributes(ds, instruments = [],
             # If attribute is in dataset, and not empty, overwrite
             if attr in ds.attrs:
                 if ds.attrs[attr] != "":
-                    attrs[attr] = ds.attrs[attr]
+                    if isinstance(ds.attrs[attr], bytes):
+                        att = ds.attrs[attr].decode("utf-8")
+                    else:
+                        att = ds.attrs[attr]
+                    
+                    #There are some attributes that aren't encoded properly
+                    # e.g., the Å in Ny-Ålesund. This seems to fix it
+                    if isinstance(att, str):
+                        attrs[attr] = att.encode("utf-8", "surrogateescape").decode("UTF-8")
 
     # Format certain key attributes, and determine if they have been set as keywords
     for v in ["species", "units", "calibration_scale", "network"]:
