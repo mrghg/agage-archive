@@ -1,14 +1,11 @@
 import pandas as pd
 import numpy as np
 
-from agage_archive import Paths
+from agage_archive import open_data_file
 from agage_archive.formatting import format_species
 
 
-paths = Paths()
-
-
-def read_data_combination(species, site,
+def read_data_combination(network, species, site,
                         verbose=True):
     '''Read instrument dates from Excel file
 
@@ -21,23 +18,23 @@ def read_data_combination(species, site,
         dict: Dictionary of instrument dates
     '''
 
-    path = paths.root / "data" / "data_selection" / "data_combination.xlsx"
-
     warning_message = f"WARNING: No instrument dates found for {species} at {site.upper()}. Assuming GCMS-Medusa"
 
     default_output = {"GCMS-Medusa": [None, None]}
 
     # Determine if data_exclude.xlsx contains sheet name called site.upper()
-    if site.upper() not in pd.ExcelFile(path).sheet_names:
-        if verbose:
-            print(warning_message)
-        return default_output
+    with open_data_file("data_combination.xlsx", network=network) as f:
+        if site.upper() not in pd.ExcelFile(f).sheet_names:
+            if verbose:
+                print(warning_message)
+            return default_output
 
     # Read data_selection
-    df = pd.read_excel(path,
-                    comment="#",
-                    sheet_name=site.upper(),
-                    index_col="Species")
+    with open_data_file("data_combination.xlsx", network=network) as f:
+        df = pd.read_excel(f,
+                        comment="#",
+                        sheet_name=site.upper(),
+                        index_col="Species")
     
     # Look for species name in table, return Medusa if not there
     df = df[df.index == format_species(species)]
@@ -66,12 +63,13 @@ def read_data_combination(species, site,
     return instrument_dates
 
 
-def read_release_schedule(instrument,
+def read_release_schedule(network, instrument,
                           species = None,
                           site = None):
     '''Read release schedule from Excel file
 
     Args:
+        network (str): Network
         instrument (str): Instrument
         species (str): Species
         site (str): Site code
@@ -80,7 +78,7 @@ def read_release_schedule(instrument,
         pd.DataFrame: Release schedule
     '''
 
-    with open(paths.root / "data/data_selection/data_release_schedule.xlsx", "+rb") as f:
+    with open_data_file("data_release_schedule.xlsx", network=network) as f:
         df_all = pd.read_excel(f, sheet_name=instrument)
 
         # Get index of row that contains "General release date"
@@ -113,7 +111,7 @@ def read_release_schedule(instrument,
         return df
 
 
-def calibration_scale_default(species):
+def calibration_scale_default(network, species):
     '''Get default calibration scale
 
     Args:
@@ -124,8 +122,8 @@ def calibration_scale_default(species):
     '''
 
     # Read scale_defaults csv file
-    scale_defaults = pd.read_csv(paths.root / "data/scale_defaults.csv",
-                                index_col="Species")
+    with open_data_file("scale_defaults.csv", network=network) as f:
+        scale_defaults = pd.read_csv(f, index_col="Species")
     
     scale_defaults = scale_defaults.applymap(lambda x: x.strip() if isinstance(x, str) else x)
 
@@ -149,13 +147,15 @@ def read_data_exclude(ds, species, site, instrument):
     '''
 
     # Determine if data_exclude.xlsx contains sheet name called site.upper()
-    if site.upper() not in pd.ExcelFile(paths.root / "data/data_selection/data_exclude.xlsx").sheet_names:
-        return ds
+    with open_data_file("data_exclude.xlsx", network = ds.attrs["network"]) as f:
+        if site.upper() not in pd.ExcelFile(f).sheet_names:
+            return ds
 
     # Read data_exclude
-    data_exclude = pd.read_excel(paths.root / "data/data_selection/data_exclude.xlsx",
-                                comment="#",
-                                sheet_name=site.upper())
+    with open_data_file("data_exclude.xlsx", network = ds.attrs["network"]) as f:
+        data_exclude = pd.read_excel(f,
+                                    comment="#",
+                                    sheet_name=site.upper())
     
     # Remove whitespace from strings
     data_exclude = data_exclude.applymap(lambda x: x.strip() if isinstance(x, str) else x)

@@ -1,10 +1,9 @@
 import xarray as xr
 import json
 import pandas as pd
-import tarfile
 import numpy as np
 
-from agage_archive import Paths
+from agage_archive import Paths, open_data_file, data_file_list, data_file_path
 from agage_archive.convert import scale_convert
 from agage_archive.formatting import format_species, \
     format_variables, format_attributes
@@ -17,20 +16,19 @@ from agage_archive.util import tz_local_to_utc
 gcwerks_species = {"c2f6": "pfc-116",
                    "c3f8": "pfc-218",
                    "c4f8": "pfc-318"}
+    
 
-
-def read_agage(species, site, instrument,
-               testing_path = False,
-               verbose = False,
-               data_exclude = True,
-               scale = "default"):
+def read_nc(network, species, site, instrument,
+            verbose = False,
+            data_exclude = True,
+            scale = "default"):
     """Read GCWerks netCDF files
 
     Args:
+        network (str): Network, e.g., "agage"
         species (str): Species
         site (str): Site code
         instrument (str): Instrument
-        testing_path (str, optional): Path to use for testing. Defaults to False.
         verbose (bool, optional): Print verbose output. Defaults to False.
         data_exclude (bool, optional): Exclude data based on data_exclude.xlsx. Defaults to True.
         scale (str, optional): Scale to convert to. Defaults to "default". If None, will keep original scale.
@@ -42,7 +40,7 @@ def read_agage(species, site, instrument,
         xarray.Dataset: Contents of netCDF file
     """
 
-    paths = Paths(test=testing_path)
+    paths = Paths(network)
 
     species_search = format_species(species)
     if species_search in gcwerks_species:
@@ -51,28 +49,28 @@ def read_agage(species, site, instrument,
     gcmd_instruments = ["GCMD", "GCECD", "Picarro", "LGR"]
     gcms_instruments = ["GCMS-ADS", "GCMS-Medusa", "GCMS-MteCimone"]
 
-    # Determine path
-    pth = None
+    # Determine sub-path within data directory
+    sub_path = None
 
     for gcmd_instrument in gcmd_instruments:
         if gcmd_instrument in instrument:
-            pth = paths.agage_gcmd
+            sub_path = paths.agage_md_path
             break
     for gcms_instrument in gcms_instruments:
         if gcms_instrument in instrument:
-            pth = paths.agage_gcms
+            sub_path = paths.agage_gcms_path
             break
     
-    if pth == None:
+    if sub_path == None:
         raise ValueError(f"Instrument must be one of {gcmd_instruments} {gcms_instruments}")
 
     # search for netcdf files matching instrument, site and species
-    nc_files = list(pth.glob(f"AGAGE-{instrument}*_{site}_{species_search}.nc"))
+    nc_files = data_file_list(network, sub_path, f"*-{instrument}*_{site}_{species_search}.nc")[2]
 
     if len(nc_files) == 0:
-        raise FileNotFoundError(f"Can't find file AGAGE-{instrument}*_{site}_{species_search}.nc")
+        raise FileNotFoundError(f"Can't find file matching *-{instrument}*_{site}_{species_search}.nc in data/{network}/{sub_path}")
     elif len(nc_files) > 1:
-        raise FileNotFoundError(f"Found more than one file matching AGAGE-{instrument}*_{site}_{species_search}.nc")
+        raise FileNotFoundError(f"Found more than one file matching *-{instrument}*_{site}_{species_search}.nc in data/{network}/{sub_path}")
     else:
         nc_file = nc_files[0]
 
@@ -80,8 +78,9 @@ def read_agage(species, site, instrument,
         print(f"... reading {nc_file}")
 
     # Read netCDF file
-    with xr.open_dataset(nc_file) as f:
-        ds = f.load()
+    with open_data_file(nc_file, network, sub_path=sub_path, verbose=True) as f:
+        with xr.open_dataset(f, engine="h5netcdf") as ds_file:
+            ds = ds_file.load()
 
     # Read sampling time
     if "sampling_time_seconds" in ds.time.attrs:
@@ -112,6 +111,7 @@ def read_agage(species, site, instrument,
 
     ds = format_attributes(ds,
                         instruments=instruments,
+                        network=network,
                         species=species)
 
     # Remove any excluded data
@@ -119,7 +119,8 @@ def read_agage(species, site, instrument,
         ds = read_data_exclude(ds, format_species(species), site, instrument)
 
     # Check against release schedule
-    rs = read_release_schedule(instrument,
+    rs = read_release_schedule(network, 
+                               instrument,
                                species=format_species(species),
                                site=site)
     ds = ds.sel(time=slice(None, rs))
@@ -130,13 +131,15 @@ def read_agage(species, site, instrument,
     return ds
 
 
-def ale_gage_timestamp_issues(datetime, timestamp_issues):
+def ale_gage_timestamp_issues(datetime, timestamp_issues,
+                              verbose = True):
     """Check for timestamp issues in ALE/GAGE data
 
     Args:
         datetime (pd.Series): Datetime series
         timestamp_issues (dict): Dictionary of timestamp issues from ale_gage_timestamp_issues.json
-
+        verbose (bool, optional): Print verbose output. Defaults to False.
+        
     Returns:
         pd.Series: Datetime series with issues fixed
     """
@@ -146,25 +149,25 @@ def ale_gage_timestamp_issues(datetime, timestamp_issues):
     
     for timestamp_issue in timestamp_issues:
         if timestamp_issue in datetime.values:
-            print(f"... Timestamp issue at {timestamp_issue} replacing with {timestamp_issues[timestamp_issue]}")
+            if verbose:
+                print(f"... Timestamp issue at {timestamp_issue} replacing with {timestamp_issues[timestamp_issue]}")
             datetime = datetime.replace(timestamp_issue, timestamp_issues[timestamp_issue])
 
     return datetime
 
 
-def read_ale_gage(species, site, network,
-                  testing_path = False,
-                  verbose = False,
+def read_ale_gage(network, species, site, instrument,
+                  verbose = True,
                   utc = True,
                   data_exclude = True,
                   scale = "default"):
     """Read GA Tech ALE/GAGE files, process and clean
 
     Args:
+        network (str): Network. Can only be "agage" or "agage_test"
         species (str): Species
         site (str): Three-letter site code
-        network (str): "ALE" or "GAGE"
-        testing_path (bool, optional): Use testing path. Defaults to False.
+        instrument (str): "ALE" or "GAGE"
         verbose (bool, optional): Print verbose output. Defaults to False.
         utc (bool, optional): Convert to UTC. Defaults to True.
         data_exclude (bool, optional): Exclude data based on data_exclude.xlsx. Defaults to True. 
@@ -176,36 +179,37 @@ def read_ale_gage(species, site, network,
         pd.DataFrame: Pandas dataframe containing file contents
     """
 
-    if network not in ["ALE", "GAGE"]:
-        raise ValueError("network must be ALE or GAGE")
+    if network not in ["agage", "agage_test"]:
+        raise ValueError("network must be agage or agage_test")
+    
+    if instrument not in ["ALE", "GAGE"]:
+        raise ValueError("instrument must be ALE or GAGE")
 
-    paths = Paths(test=testing_path)
+    paths = Paths(network)
 
     # Get data on ALE/GAGE sites
-    with open(paths.root / "data/ale_gage_sites.json") as f:
+    with open_data_file("ale_gage_sites.json", network = network) as f:
         site_info = json.load(f)
 
     # Get species info
-    with open(paths.root / "data/ale_gage_species.json") as f:
+    with open_data_file("ale_gage_species.json", network = network) as f:
         species_info = json.load(f)[format_species(species)]
 
     # Get Datetime issues list
-    with open(paths.root / "data/ale_gage_timestamp_issues.json") as f:
+    with open_data_file("ale_gage_timestamp_issues.json", network = network) as f:
         timestamp_issues = json.load(f)
-        if site in timestamp_issues[network]:
-            timestamp_issues = timestamp_issues[network][site]
+        if site in timestamp_issues[instrument]:
+            timestamp_issues = timestamp_issues[instrument][site]
         else:
             timestamp_issues = {}
 
-    # Path to relevant folder
-    folder = paths.__getattribute__(network.lower())
+    # Path to relevant sub-folder
+    folder = paths.__getattribute__(f"{instrument.lower()}_path")
 
-    pth = folder / f"{site_info[site]['gcwerks_name']}_sio1993.gtar.gz"
-
-    if verbose:
-        print(f"... opening {pth}")
-
-    with tarfile.open(pth, "r:gz") as tar:
+    with open_data_file(f"{site_info[site]['gcwerks_name']}_sio1993.gtar.gz",
+                        network = network,
+                        sub_path = folder,
+                        verbose=True) as tar:
 
         dfs = []
 
@@ -243,7 +247,8 @@ def read_ale_gage(species, site, network,
                 df["TIME"].astype(str).str.zfill(4)
             
             # Check for datetime issues
-            datetime = ale_gage_timestamp_issues(datetime, timestamp_issues)
+            datetime = ale_gage_timestamp_issues(datetime, timestamp_issues,
+                                                 verbose=verbose)
 
             # Convert datetime string
             df.index = pd.to_datetime(datetime, format="%d-%b-%y %H%M")
@@ -257,7 +262,7 @@ def read_ale_gage(species, site, network,
 
             # Timestamps are local time (no daylight savings)
             if utc:
-                df.index = tz_local_to_utc(df.index, site)
+                df.index = tz_local_to_utc(df.index, network, site)
 
             dfs.append(df)
 
@@ -284,7 +289,7 @@ def read_ale_gage(species, site, network,
     df_combined = df_combined[species_info["species_name_gatech"]]
 
     # Estimate of repeatability
-    repeatability = species_info[f"{network.lower()}_repeatability_percent"]/100.
+    repeatability = species_info[f"{instrument.lower()}_repeatability_percent"]/100.
 
     nt = len(df_combined.index)
 
@@ -297,7 +302,7 @@ def read_ale_gage(species, site, network,
                     coords={"time": df_combined.index.copy()})
 
     # Global attributes
-    comment = f"{network} {species} data from {site_info[site]['station_long_name']}. " + \
+    comment = f"{instrument} {species} data from {site_info[site]['station_long_name']}. " + \
         "This data was originally processed by Derek Cunnold, Georgia Institute of Technology, " + \
         "from the original files and has now been reprocessed into netCDF format."
 
@@ -309,11 +314,11 @@ def read_ale_gage(species, site, network,
                 "inlet_latitude": site_info[site]["latitude"],
                 "inlet_longitude": site_info[site]["longitude"],
                 "inlet_comment": "",
-                "network": network,
                 "site_code": site}
 
     ds = format_attributes(ds,
-                        instruments=[{"instrument": f"{network.upper()}_GCMD"}],
+                        instruments=[{"instrument": f"{instrument.upper()}_GCMD"}],
+                        network=network,
                         species=format_species(species),
                         calibration_scale=species_info["scale"],
                         units=species_info["units"])
@@ -324,10 +329,10 @@ def read_ale_gage(species, site, network,
     if data_exclude:
         if not utc:
             raise ValueError("Can't exclude data if time is not UTC")
-        ds = read_data_exclude(ds, format_species(species), site, network)
+        ds = read_data_exclude(ds, format_species(species), site, instrument)
 
     # Check against release schedule
-    rs = read_release_schedule(network,
+    rs = read_release_schedule(network, instrument,
                                species=format_species(species),
                                site=site)
     ds = ds.sel(time=slice(None, rs))
@@ -338,24 +343,25 @@ def read_ale_gage(species, site, network,
     return ds
 
 
-def combine_datasets(species, site, 
+def combine_datasets(network, species, site, 
                     scale = "default",
-                    testing_path = False,
-                    verbose = False):
+                    verbose = True):
     '''Combine ALE/GAGE/AGAGE datasets for a given species and site
 
     Args:
+        network (str): Network
         species (str): Species
         site (str): Site
         scale (str, optional): Calibration scale. Defaults to value in scale_defaults.csv.
             If None, will attempt to leave scale unchanged.
+        verbose (bool, optional): Print verbose output. Defaults to False.
 
     Returns:
         xr.Dataset: Dataset containing data
     '''
 
     # Read instrument dates from CSV files
-    instruments = read_data_combination(format_species(species), site)
+    instruments = read_data_combination(network, format_species(species), site)
 
     instrument_types, instrument_number_str = instrument_type_definition()
 
@@ -372,15 +378,13 @@ def combine_datasets(species, site,
 
         # Read data
         if instrument in ["ALE", "GAGE"]:
-            ds = read_ale_gage(species, site, instrument,
-                               testing_path=testing_path,
+            ds = read_ale_gage(network, species, site, instrument,
                                verbose=verbose,
                                scale=scale)
         else:
-            ds = read_agage(species, site, instrument,
-                            testing_path=testing_path,
-                            verbose=verbose,
-                            scale=scale)
+            ds = read_nc(network, species, site, instrument,
+                        verbose=verbose,
+                        scale=scale)
 
         # Store attributes
         attrs.append(ds.attrs)
@@ -424,8 +428,7 @@ def combine_datasets(species, site,
     ds_combined = ds_combined.sortby("time")
 
     # Add details on instruments to global attributes
-    ds_combined = format_attributes(ds_combined,
-                                instrument_rec)
+    ds_combined = format_attributes(ds_combined, instrument_rec)
 
     # Extend comment attribute describing all datasets
     if len(comments) > 1:
@@ -450,33 +453,37 @@ def combine_datasets(species, site,
     return ds_combined
 
 
-def output_dataset(ds,
-                   network = "AGAGE",
+def output_dataset(ds, network,
                    instrument = "GCMD",
                    end_date = None,
-                   testing_path = False,
-                   output_subpath = None,
+                   output_subpath = "",
                    verbose = False):
     '''Output dataset to netCDF file
 
     Args:
         ds (xr.Dataset): Dataset to output
+        network (str): Network
+        instrument (str, optional): Instrument. Defaults to "GCMD".
         end_date (str, optional): End date to subset to. Defaults to None.
     '''
 
-    paths = Paths(test=testing_path)
+    paths = Paths(network)
 
-    if output_subpath == None:
-        output_path = paths.output
-    else:
-        output_path = paths.output / output_subpath
+    output_path = data_file_path("", network = network, sub_path = paths.output_path)
+
+    # Check if the output path exists
+    if not output_path.exists():
+        raise FileNotFoundError(f"Can't find output path {output_path}")
+    
+    # If output_subpath is specified, add it to the output path (unlike output path, this one will be created if not present)
+    output_path = output_path / output_subpath
 
     # Test if output_path exists and if not create it
     if not output_path.exists():
-        output_path.mkdir(parents=True)
+        output_path.mkdir()
 
     # Create filename
-    filename = f"{network}-{instrument}_{ds.attrs['site_code']}_{format_species(ds.attrs['species'])}.nc"
+    filename = f"{network.upper()}-{instrument}_{ds.attrs['site_code']}_{format_species(ds.attrs['species'])}.nc"
 
     ds_out = ds.copy(deep = True)
 
@@ -487,7 +494,8 @@ def output_dataset(ds,
         del ds_out.time.attrs["calendar"]
 
     if verbose:
-        print(f"... writing {paths.output / filename}")
+        print(f"... writing {output_path / filename}")
 
     # Subset time and write netCDF
-    ds_out.sel(time=slice(None, end_date)).to_netcdf(output_path / filename, mode="w", format="NETCDF4")
+    ds_out.sel(time=slice(None, end_date)).to_netcdf(output_path / filename,
+                                                    mode="w", format="NETCDF4", engine="h5netcdf")
