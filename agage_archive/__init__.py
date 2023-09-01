@@ -10,31 +10,11 @@ __version__ = "0.0.1"
 _ROOT = _Path(__file__).parent
 
 
-def get_path(sub_path=""):
-    """Get path to data files
-
-    Args:
-        sub_path (str, optional): Sub-path. Defaults to "".
-
-    Raises:
-        Exception: If sub-path begins with '/'.
-
-    Returns:
-        pathlib.Path: Path to data files    
-    """
-
-    if sub_path:
-        if sub_path[0] == "/":
-            raise Exception("sub-path can't begin with '/'")
-
-    path = _ROOT / sub_path
-
-    return path
-
-
 class Paths():
 
-    def __init__(self, network = ""):
+    def __init__(self,
+                network = "",
+                root = None):
         """Class to store paths to data folders
         
         Args:
@@ -47,11 +27,14 @@ class Paths():
         """
 
         # Get repository root
-        self.root = get_path().parent
-        self.data = self.root / "data"
+        if root:
+            self.root = root
+        else:
+            self.root = _ROOT
+        self.data = self.root.parent / "data"
 
         # Check if config file exists
-        self.config_file = get_path("config.yaml")
+        self.config_file = self.root / "config.yaml"
         if not self.config_file.exists():
             raise FileNotFoundError(
                 "Config file not found. Try running util.setup first")

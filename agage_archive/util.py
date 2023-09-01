@@ -3,7 +3,10 @@ import json
 import pytz
 import yaml
 
-from agage_archive import get_path, open_data_file
+from agage_archive import Paths, open_data_file
+
+
+paths = Paths()
 
 
 def setup():
@@ -41,7 +44,7 @@ def setup():
         }
     }
 
-    with open(get_path('config.yaml'), 'w') as configfile:
+    with open(paths.root / 'config.yaml', 'w') as configfile:
         # Write header lines
         configfile.write(header)
         # Dump config dictionary as yaml
@@ -49,7 +52,7 @@ def setup():
                   default_flow_style=False,
                   sort_keys=False)
         
-    print(f"Config file written to {get_path('config.yaml')}")
+    print(f"Config file written to {paths.root / 'config.yaml'}")
     print("Config file has been populated with default sub-paths relative to data/network. " + \
           "If you want to move the data elsewhere, manually modify the sub-paths in the config file. " + \
           "If the files need to be outside of the data directory, use symlinks.")
@@ -79,7 +82,7 @@ def lookup_username():
     '''
     
     # Take username from config file if it exists, otherwise try to get it from the system
-    with open(get_path("config.yaml"), "r") as f:
+    with open(paths.root / "config.yaml", "r") as f:
         config = yaml.safe_load(f)
 
     if "User" in config:
