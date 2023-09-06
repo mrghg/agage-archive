@@ -13,8 +13,7 @@ _ROOT = _Path(__file__).parent
 class Paths():
 
     def __init__(self,
-                network = "",
-                root = None):
+                network = ""):
         """Class to store paths to data folders
         
         Args:
@@ -27,10 +26,26 @@ class Paths():
         """
 
         # Get repository root
-        if root:
-            self.root = root
+        # Do this by finding the location of the .git folder in the working directory
+        # and then going up one level
+        working_directory = _Path.cwd()
+        while True:
+            if (working_directory / ".git").exists():
+                break
+            else:
+                working_directory = working_directory.parent
+                if working_directory == _Path("/"):
+                    raise FileNotFoundError("Can't find repository root")
+
+        # Within working directory find package folder 
+        # by looking for folder name with "_archive" in it, and __init__.py
+        for pth in working_directory.glob("*_archive"):
+            if (pth / "__init__.py").exists():
+                self.root = pth
+                break
         else:
-            self.root = _ROOT
+            raise FileNotFoundError("Can't find package folder. Make sure your package has '_archive' in the folder name and __init__.py")
+
         self.data = self.root.parent / "data"
 
         # Check if config file exists
