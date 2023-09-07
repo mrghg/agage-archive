@@ -54,11 +54,11 @@ def read_nc(network, species, site, instrument,
 
     for gcmd_instrument in gcmd_instruments:
         if gcmd_instrument in instrument:
-            sub_path = paths.agage_md_path
+            sub_path = paths.md_path
             break
     for gcms_instrument in gcms_instruments:
         if gcms_instrument in instrument:
-            sub_path = paths.agage_gcms_path
+            sub_path = paths.gcms_path
             break
     
     if sub_path == None:

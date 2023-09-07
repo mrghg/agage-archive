@@ -7,17 +7,19 @@ from fnmatch import fnmatch
 
 __version__ = "0.0.1"
 
-_ROOT = _Path(__file__).parent
-
 
 class Paths():
 
     def __init__(self,
-                network = ""):
+                network = "",
+                this_repo = False):
         """Class to store paths to data folders
         
         Args:
             network (str, optional): Network name. Defaults to "".
+            this_repo (bool, optional): If True, look for the root and data folder within this repository (no config).
+                If False, will look for the root and data folders and config file in the working directory.
+                Defaults to False.
 
         Raises:
             FileNotFoundError: If config file doesn't exist
@@ -28,14 +30,17 @@ class Paths():
         # Get repository root
         # Do this by finding the location of the .git folder in the working directory
         # and then going up one level
-        working_directory = _Path.cwd()
-        while True:
-            if (working_directory / ".git").exists():
-                break
-            else:
-                working_directory = working_directory.parent
-                if working_directory == _Path("/"):
-                    raise FileNotFoundError("Can't find repository root")
+        if not this_repo:
+            working_directory = _Path.cwd()
+            while True:
+                if (working_directory / ".git").exists():
+                    break
+                else:
+                    working_directory = working_directory.parent
+                    if working_directory == _Path("/"):
+                        raise FileNotFoundError("Can't find repository root")
+        else:
+            working_directory = _Path(__file__).parent.parent
 
         # Within working directory find package folder 
         # by looking for folder name with "_archive" in it, and __init__.py
@@ -47,6 +52,10 @@ class Paths():
             raise FileNotFoundError("Can't find package folder. Make sure your package has '_archive' in the folder name and __init__.py")
 
         self.data = self.root.parent / "data"
+
+        # If this_repo is set, exit, to avoid config file confusion
+        if this_repo:
+            return
 
         # Check if config file exists
         self.config_file = self.root / "config.yaml"
@@ -117,14 +126,17 @@ def data_file_list(network = "",
 
 def data_file_path(filename,
                    network = "",
-                   sub_path = ""):
+                   sub_path = "",
+                   this_repo = False):
     """Get path to data file. Structure is data/network/sub_path
     sub_path can be a zip archive, in which case the path to the zip archive is returned
 
     Args:
         filename (str): Filename
         network (str, optional): Network. Defaults to "".
-        sub_path (str, optional): Sub-path. Defaults to "".
+        sub_path (str, optional): Sub-path. Defaults to ""
+        this_repo (bool, optional): If True, look for the root and data folder within this repository (no config).
+            If False, will look for the root and data folders and config file in the working directory.
 
     Raises:
         FileNotFoundError: Can't find file
@@ -133,7 +145,7 @@ def data_file_path(filename,
         pathlib.Path: Path to file
     """
 
-    paths = Paths(network)
+    paths = Paths(network, this_repo=this_repo)
 
     if network:
         pth = paths.data / network
@@ -163,7 +175,8 @@ def data_file_path(filename,
 def open_data_file(filename,
                    network = "",
                    sub_path = "",
-                   verbose = False):
+                   verbose = False,
+                   this_repo = False):
     """Open data file. Structure is data/network/sub_path
     sub_path can be a zip archive
 
@@ -172,6 +185,8 @@ def open_data_file(filename,
         network (str, optional): Network. Defaults to "".
         sub_path (str, optional): Sub-path. Defaults to "". Can be a zip archive or directory
         verbose (bool, optional): Print verbose output. Defaults to False.
+        this_repo (bool, optional): If True, look for the root and data folder within this repository (no config).
+            If False, will look for the root and data folders and config file in the working directory.
 
     Raises:
         FileNotFoundError: Can't find file
@@ -180,7 +195,7 @@ def open_data_file(filename,
         file: File object
     """
 
-    pth = data_file_path("", network=network, sub_path=sub_path)
+    pth = data_file_path("", network=network, sub_path=sub_path, this_repo=this_repo)
     
     if verbose:
         print(f"... opening {pth / filename}")
