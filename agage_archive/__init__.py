@@ -120,8 +120,17 @@ def data_file_list(network = "",
                     files.append(f.filename)
             return network, return_sub_path(pth), files
     else:
-        files = [f.name for f in pth.glob(pattern) if not (ignore_hidden and f.name.startswith("."))]
+        files = []
+        # This is written this way to give the same output as the zip archive
+        for f in pth.glob("**/*"):
+            if fnmatch(str(f), "*" + pattern) and not (ignore_hidden and f.name.startswith(".")):
+                # Append everything in file path after pth
+                if f.is_dir():
+                    files.append(str(f.relative_to(pth)) + "/")
+                else:
+                    files.append(str(f.relative_to(pth)))
         return network, return_sub_path(pth), files
+
     
 
 def data_file_path(filename,
