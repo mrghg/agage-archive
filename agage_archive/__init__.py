@@ -12,7 +12,8 @@ class Paths():
 
     def __init__(self,
                 network = "",
-                this_repo = False):
+                this_repo = False,
+                errors = "raise"):
         """Class to store paths to data folders
         
         Args:
@@ -20,6 +21,7 @@ class Paths():
             this_repo (bool, optional): If True, look for the root and data folder within this repository (no config).
                 If False, will look for the root and data folders and config file in the working directory.
                 Defaults to False.
+            errors (str, optional): If "raise", raise FileNotFoundError if file not found. If "ignore", return path
 
         Raises:
             FileNotFoundError: If config file doesn't exist
@@ -78,17 +80,18 @@ class Paths():
             self.__setattr__(key, value)
             # Test that path exists
             full_path = self.data / network / value
-            if not (full_path).exists():
+            if not (full_path).exists() and errors == "raise":
                 raise FileNotFoundError(f"Folder or zip archive {full_path} doesn't exist")
             # Test that path is either a folder or a zip archive
-            if not (full_path.is_dir() or full_path.suffix == ".zip"):
+            if not (full_path.is_dir() or full_path.suffix == ".zip") and errors == "raise":
                 raise FileNotFoundError(f"{full_path} is not a folder or zip archive")
 
 
 def data_file_list(network = "",
                    sub_path = "",
                    pattern = "*",
-                   ignore_hidden = True):
+                   ignore_hidden = True,
+                   errors="raise"):
     """List files in data directory. Structure is data/network/sub_path
     sub_path can be a zip archive
 
@@ -110,9 +113,14 @@ def data_file_list(network = "",
                 pth = p + "/" + pth
         return pth
 
-    pth = data_file_path("", network=network, sub_path=sub_path)
+    pth = data_file_path("", network=network, sub_path=sub_path, errors=errors)
 
     if pth.suffix == ".zip":
+        
+        # If zip archive doesn't exist, return empty list
+        if not pth.exists() and errors == "ignore":
+            return network, return_sub_path(pth), []
+        
         with ZipFile(pth, "r") as z:
             files = []
             for f in z.filelist:
@@ -136,7 +144,8 @@ def data_file_list(network = "",
 def data_file_path(filename,
                    network = "",
                    sub_path = "",
-                   this_repo = False):
+                   this_repo = False,
+                   errors = "raise"):
     """Get path to data file. Structure is data/network/sub_path
     sub_path can be a zip archive, in which case the path to the zip archive is returned
 
@@ -146,6 +155,7 @@ def data_file_path(filename,
         sub_path (str, optional): Sub-path. Defaults to ""
         this_repo (bool, optional): If True, look for the root and data folder within this repository (no config).
             If False, will look for the root and data folders and config file in the working directory.
+        errors (str, optional): If "raise", raise FileNotFoundError if file not found. If "ignore", return path
 
     Raises:
         FileNotFoundError: Can't find file
@@ -154,7 +164,7 @@ def data_file_path(filename,
         pathlib.Path: Path to file
     """
 
-    paths = Paths(network, this_repo=this_repo)
+    paths = Paths(network, this_repo=this_repo, errors=errors)
 
     if network:
         pth = paths.data / network
@@ -164,7 +174,7 @@ def data_file_path(filename,
     if sub_path:
         pth = pth / sub_path
     
-    if not pth.exists():
+    if not pth.exists() and errors == "raise":
         raise FileNotFoundError(f"Can't find path {pth}")
 
     if pth.suffix == ".zip":
