@@ -1,13 +1,11 @@
 import xarray as xr
 from IPython.display import clear_output
 
-from agage_archive import Paths
+from agage_archive import Paths, data_file_list, open_data_file
 from agage_archive.visualise import plot_datasets
 
-paths = Paths()
 
-
-def file_search_species(species):
+def file_search_species(network, species):
     """ Search for files containing species
     
     Args:
@@ -16,12 +14,17 @@ def file_search_species(species):
     Returns:
         list: List of files containing species        
     """
-    species_path = paths.output / species
-    files = species_path.glob('*.nc')
-    return list(files)
+    
+    paths = Paths(network)
+
+    files = data_file_list(network,
+                           sub_path=paths.output_path,
+                           pattern = f"{species}/*.nc")[2]
+
+    return sorted(files)
 
 
-def networks_sites(files):
+def instruments_sites(files):
     """ Get networks and sites from files
 
     Args:
@@ -31,31 +34,42 @@ def networks_sites(files):
         tuple: Tuple of lists containing networks and sites
     """
 
-    networks = []
+    instruments = []
     sites = []
+    individual = []
+
     for file in files:
-        networks.append(file.stem.split('_')[0])
-        sites.append(file.stem.split('_')[1])
-    return networks, sites
+        if "individual" in file:
+            individual = "*"
+        else:
+            individual = ""
+        filename = file.split('/')[-1]
+        instruments.append(individual + filename.split('_')[0])
+        sites.append(filename.split('_')[1])
+
+    return instruments, sites
 
 
-def update_network_site(change, network_site_dropdown):
-    """ Update network and site dropdown
+def update_instrument_site(change, network, instrument_site_dropdown):
+    """ Update instrument and site dropdown
 
     Args:
-        change (dict): Change dictionary
+        change (dict): Widget change dictionary
+        network (str): Network
         network_site_dropdown (ipywidgets.Dropdown): Dropdown widget
     """
 
-    files = file_search_species(change["new"])
-    networks, sites = networks_sites(files)
-    options = sorted([f"{s}, {n}" for (s, n) in zip(sites, networks)])
-    if network_site_dropdown:
-        network_site_dropdown.options = options
+    files = file_search_species(network, change["new"])
+    instruments, sites = instruments_sites(files)
+    options = sorted([f"{s}, {i}" for (s, i) in zip(sites, instruments) if "*" not in i])
+    options += sorted([f"{s}, {i}" for (s, i) in zip(sites, instruments) if "*" in i])
+    if instrument_site_dropdown:
+        instrument_site_dropdown.options = options
     else:
         return options
 
-def get_filenames(species, network_sites):
+
+def get_filenames(species, instrument_sites):
     """ Get filenames from species and network/site
     
     Args:
@@ -67,14 +81,17 @@ def get_filenames(species, network_sites):
     """
 
     filenames = []
-    for network_site in network_sites:
-        site, network = network_site.split(', ')
-        filenames.append(f"{species}/{network}_{site}_{species}.nc")
+    for instrument_site in instrument_sites:
+        site, instrument = instrument_site.split(', ')
+        if "*" in instrument:
+            filenames.append(f"{species}/individual/{instrument.split('*')[-1]}_{site}_{species}.nc")
+        else:
+            filenames.append(f"{species}/{instrument}_{site}_{species}.nc")
 
     return filenames
 
 
-def load_datasets(filenames):
+def load_datasets(network, filenames):
     """ Load datasets from filenames
 
     Args:
@@ -84,14 +101,20 @@ def load_datasets(filenames):
         list: List of datasets
     """
 
+    paths = Paths(network)
+
     datasets = []
     for filename in filenames:
-        datasets.append(xr.open_dataset(paths.output / filename))
+        with open_data_file(filename, network, paths.output_path) as f:
+            with xr.open_dataset(f) as ds:
+                ds_species = ds.load()
+
+        datasets.append(ds_species)
 
     return datasets
 
 
-def plot_to_output(sender, species, network_site, output_widget):
+def plot_to_output(sender, network, species, network_site, output_widget):
     """ Plot to output widget
 
     Args:
@@ -105,10 +128,9 @@ def plot_to_output(sender, species, network_site, output_widget):
         with output_widget:
             clear_output(True)
             print("Please select a network and site") 
-            #display(output_widget)
 
     filenames = get_filenames(species, network_site)
-    datasets = load_datasets(filenames)
+    datasets = load_datasets(network, filenames)
 
     with output_widget:
         clear_output()

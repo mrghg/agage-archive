@@ -1,8 +1,9 @@
 import pandas as pd
 import xarray as xr
 import numpy as np
+import json
 
-from agage_archive import Paths, open_data_file
+from agage_archive import Paths, open_data_file, data_file_path, data_file_list
 from agage_archive.convert import scale_convert
 from agage_archive.io import read_ale_gage, combine_datasets
 
@@ -118,16 +119,58 @@ def test_combine_datasets():
         scale_conversion.loc[species, "SIO-98/SIO-93"] * scale_conversion.loc[species, "SIO-05/SIO-98"], rtol=0.00001)
 
 
-# def test_open_data_file():
+def test_data_file_path():
 
-#     #TODO: FINISH THIS
+    assert data_file_path("test.txt", "agage_test", "path_test_files").exists()
 
-#     # Open a global data file
-#     file_contents = open_data_file("attributes.json")
+    # This should just return the zip file path, but checks for the existance of the file internally
+    assert data_file_path("test_top_level.txt", "agage_test", "path_test_files/A.zip").exists()
 
-#     # Open a network specific file
-#     file_contents = open_data_file("data-gcms-nc/AGAGE-GCMS-Medusa_CGO_ch3ccl3.nc",
-#                                    network = "agage_test")
+    # This should just return the zip file path, but checks for the existance of the file internally
+    assert data_file_path("B/C.txt", "agage_test", "path_test_files/A.zip").exists()
 
-#     # Open a zipped file
-#     file_contents = open_data_file("...")
+    # Test that we can find a required file in this repo
+    assert data_file_path("attributes.json", this_repo=True).exists()
+
+
+def test_open_data_file():
+
+    # Test that the attributes json is openned correctly
+    with open_data_file("attributes.json", this_repo=True) as f:
+        attributes = json.load(f)
+    assert "calibration_scale" in attributes.keys()
+    assert attributes["species"] == ""
+
+    # Test that we can open a file within the A.zip file
+    with open_data_file("B/C.txt", "agage_test", "path_test_files/A.zip") as f:
+        assert f.read().decode("utf-8") == "test"
+
+
+def test_data_file_list():
+
+    # Test that we can list files in a folder
+    network, sub_path, files = data_file_list("agage_test", "path_test_files")
+    assert network == "agage_test"
+    assert sub_path == "path_test_files/"
+    assert "test.txt" in files
+
+    # Test that we can list files in a zip archive
+    files = data_file_list("agage_test", "path_test_files/A.zip")[2]
+    assert "test_top_level.txt" in files
+    assert "B/C.txt" in files
+
+    # Test that we can list files in a zip archive with pattern
+    files = data_file_list("agage_test", "path_test_files/A.zip", pattern="*.txt")[2]
+    assert "test_top_level.txt" in files
+    assert "B/C.txt" in files
+
+    # Test that we can list files within a subdirectory of a zip archive
+    files_zip = data_file_list("agage_test", "path_test_files/A.zip", pattern="B/*.txt")[2]
+    assert "test_top_level.txt" not in files_zip
+    assert "B/C.txt" in files_zip
+
+    # Test that we get the same output but from an unzipped directory
+    files = data_file_list("agage_test", "path_test_files/A", "B/*.txt")[2]
+    assert "test_top_level.txt" not in files
+    assert "B/C.txt" in files
+

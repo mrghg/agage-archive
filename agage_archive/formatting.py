@@ -189,7 +189,7 @@ def format_variables(ds,
 
     '''
 
-    with open_data_file("variables.json") as f:
+    with open_data_file("variables.json", this_repo=True) as f:
         variables = json.load(f)
 
     attrs = ds.attrs.copy()
@@ -262,7 +262,7 @@ def format_attributes(ds, instruments = [],
         xr.Dataset: Dataset with formatted attributes
     '''
 
-    with open_data_file("attributes.json") as f:
+    with open_data_file("attributes.json", this_repo=True) as f:
         attributes_default = json.load(f)
 
     attrs = {}

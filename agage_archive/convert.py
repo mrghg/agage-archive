@@ -17,7 +17,7 @@ def scale_graph(species):
         nx.Graph: Undirected graph
     """
 
-    with open_data_file("scale_convert.csv") as f:
+    with open_data_file("scale_convert.csv", this_repo=True) as f:
         data = pd.read_csv(f)
 
     # Check if species is in the data

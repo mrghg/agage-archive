@@ -1,5 +1,6 @@
 import pandas as pd
 from shutil import rmtree
+from zipfile import ZipFile
 
 from agage_archive import Paths, open_data_file, data_file_list, data_file_path
 from agage_archive.data_selection import read_release_schedule, read_data_combination
@@ -106,26 +107,41 @@ def run_all(network,
     if not network:
         raise ValueError("Must specify network")
 
-    path = Paths(network)
+    path = Paths(network, errors="ignore")
+
+    out_pth = data_file_path("", network=network, sub_path=path.output_path, errors="ignore")
 
     if delete:
         # Clear output directory, removing all files and subdirectories
-        network, sub_path, files = data_file_list(network=network, sub_path=path.output_path)
+        network, sub_path, files = data_file_list(network=network,
+                                                  sub_path=path.output_path,
+                                                  errors="ignore")
         
-        print(f'Deleting all files in {data_file_path("", network=network, sub_path=sub_path)}')
-        
-        for f in files:
+        print(f'Deleting all files in {out_pth}')
 
-            pth = data_file_path("", network=network, sub_path=sub_path) / f
+        if out_pth.suffix == ".zip" and out_pth.exists():
 
-            # Make sure pth is in data/network directory (for safety)
-            if pth.parents[2] == path.data and pth.parents[1].name == network:
-                if pth.is_file():
-                    pth.unlink()
-                elif pth.is_dir():
-                    rmtree(pth)
-            else:
-                print(f"Warning: {pth} must be in a data/network directory")
+            out_pth.unlink()
+
+        else:
+
+            for f in files:
+
+                pth = out_pth / f
+
+                # Make sure pth is in data/network directory (for safety)
+                if pth.parents[2] == path.data and pth.parents[1].name == network:
+                    if pth.is_file():
+                        pth.unlink()
+                    elif pth.is_dir():
+                        rmtree(pth)
+                else:
+                    print(f"Warning: {pth} must be in a data/network directory")
+
+    # If out_pth is a zip file that doesn't exist, create it
+    if out_pth.suffix == ".zip" and not out_pth.exists():
+        with ZipFile(out_pth, "w") as f:
+            pass
 
     # Must run combined instruments first
     if combined:

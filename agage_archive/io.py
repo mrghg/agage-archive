@@ -2,6 +2,7 @@ import xarray as xr
 import json
 import pandas as pd
 import numpy as np
+from zipfile import ZipFile
 
 from agage_archive import Paths, open_data_file, data_file_list, data_file_path
 from agage_archive.convert import scale_convert
@@ -54,11 +55,11 @@ def read_nc(network, species, site, instrument,
 
     for gcmd_instrument in gcmd_instruments:
         if gcmd_instrument in instrument:
-            sub_path = paths.agage_md_path
+            sub_path = paths.md_path
             break
     for gcms_instrument in gcms_instruments:
         if gcms_instrument in instrument:
-            sub_path = paths.agage_gcms_path
+            sub_path = paths.gcms_path
             break
     
     if sub_path == None:
@@ -475,13 +476,6 @@ def output_dataset(ds, network,
     if not output_path.exists():
         raise FileNotFoundError(f"Can't find output path {output_path}")
     
-    # If output_subpath is specified, add it to the output path (unlike output path, this one will be created if not present)
-    output_path = output_path / output_subpath
-
-    # Test if output_path exists and if not create it
-    if not output_path.exists():
-        output_path.mkdir()
-
     # Create filename
     filename = f"{network.upper()}-{instrument}_{ds.attrs['site_code']}_{format_species(ds.attrs['species'])}.nc"
 
@@ -493,9 +487,22 @@ def output_dataset(ds, network,
     if "calendar" in ds_out.time.attrs:
         del ds_out.time.attrs["calendar"]
 
-    if verbose:
-        print(f"... writing {output_path / filename}")
+    # Select time slice
+    ds_out = ds_out.sel(time=slice(None, end_date))
 
-    # Subset time and write netCDF
-    ds_out.sel(time=slice(None, end_date)).to_netcdf(output_path / filename,
-                                                    mode="w", format="NETCDF4", engine="h5netcdf")
+    if verbose:
+        print(f"... writing {str(output_path) + '/' + output_subpath + '/' + filename}")
+
+    # Write file
+    if output_path.suffix == ".zip":
+        with ZipFile(output_path, mode="a") as zip:
+            zip.writestr(output_subpath + "/" + filename, ds_out.to_netcdf())
+                
+    else:
+        # Test if output_path exists and if not create it
+        if not (output_path / output_subpath).exists():
+            (output_path / output_subpath).mkdir()
+
+        with open(output_path / output_subpath / filename, mode="wb") as f:
+            # ds_out.to_netcdf(f, mode="w", format="NETCDF4", engine="h5netcdf")
+            ds_out.to_netcdf(f, mode="w")
