@@ -21,7 +21,10 @@ class Paths():
             this_repo (bool, optional): If True, look for the root and data folder within this repository (no config).
                 If False, will look for the root and data folders and config file in the working directory.
                 Defaults to False.
-            errors (str, optional): If "raise", raise FileNotFoundError if file not found. If "ignore", return path
+            errors (str, optional): If "raise", raise FileNotFoundError if file not found. 
+                If "ignore", return path.
+                If "ignore_inputs", ignore errors in input paths. 
+                Defaults to "raise".
 
         Raises:
             FileNotFoundError: If config file doesn't exist
@@ -80,11 +83,28 @@ class Paths():
             self.__setattr__(key, value)
             # Test that path exists
             full_path = self.data / network / value
-            if not (full_path).exists() and errors == "raise":
-                raise FileNotFoundError(f"Folder or zip archive {full_path} doesn't exist")
+            if not (full_path).exists():
+                if errors == "ignore":
+                    continue
+                elif errors == "ignore_inputs":
+                    if value == "output_path":
+                        raise FileNotFoundError(f"Folder or zip archive {full_path} doesn't exist")
+                    else:
+                        continue
+                elif errors == "raise":
+                    raise FileNotFoundError(f"Folder or zip archive {full_path} doesn't exist")
+            
             # Test that path is either a folder or a zip archive
-            if not (full_path.is_dir() or full_path.suffix == ".zip") and errors == "raise":
-                raise FileNotFoundError(f"{full_path} is not a folder or zip archive")
+            if not (full_path.is_dir() or full_path.suffix == ".zip"):
+                if errors == "ignore":
+                    continue
+                elif errors == "ignore_inputs":
+                    if value == "output_path":
+                        raise FileNotFoundError(f"{full_path} is not a folder or zip archive")
+                    else:
+                        continue
+                elif errors == "raise":
+                    raise FileNotFoundError(f"{full_path} is not a folder or zip archive")
 
 
 def data_file_list(network = "",
@@ -99,6 +119,8 @@ def data_file_list(network = "",
         network (str, optional): Network. Defaults to "".
         sub_path (str, optional): Sub-path. Defaults to "".
         pattern (str, optional): Pattern to match. Defaults to "*".
+        ignore_hidden (bool, optional): Ignore hidden files. Defaults to True.
+        errors (str, optional): See options in Paths class. Defaults to "raise".
 
     Returns:
         tuple: Tuple containing network, sub-path and list of files
@@ -118,7 +140,7 @@ def data_file_list(network = "",
     if pth.suffix == ".zip":
         
         # If zip archive doesn't exist, return empty list
-        if not pth.exists() and errors == "ignore":
+        if not pth.exists() and "ignore" in errors:
             return network, return_sub_path(pth), []
         
         with ZipFile(pth, "r") as z:
@@ -195,7 +217,8 @@ def open_data_file(filename,
                    network = "",
                    sub_path = "",
                    verbose = False,
-                   this_repo = False):
+                   this_repo = False,
+                   errors = "raise"):
     """Open data file. Structure is data/network/sub_path
     sub_path can be a zip archive
 
@@ -214,7 +237,10 @@ def open_data_file(filename,
         file: File object
     """
 
-    pth = data_file_path("", network=network, sub_path=sub_path, this_repo=this_repo)
+    pth = data_file_path("", network=network,
+                         sub_path=sub_path,
+                         this_repo=this_repo,
+                         errors=errors)
     
     if verbose:
         print(f"... opening {pth / filename}")

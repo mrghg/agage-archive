@@ -3,5 +3,10 @@ xarray
 tzwhere
 netcdf4
 matplotlib
+ipywidgets
+plotly
+scipy
+nbformat
+h5netcdf
 dvc
 dvc-gdrive

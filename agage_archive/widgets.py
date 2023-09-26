@@ -15,11 +15,12 @@ def file_search_species(network, species):
         list: List of files containing species        
     """
     
-    paths = Paths(network)
+    paths = Paths(network, errors="ignore_inputs")
 
     files = data_file_list(network,
                            sub_path=paths.output_path,
-                           pattern = f"{species}/*.nc")[2]
+                           pattern=f"{species}/*.nc",
+                           errors="ignore_inputs")[2]
 
     return sorted(files)
 
@@ -101,11 +102,11 @@ def load_datasets(network, filenames):
         list: List of datasets
     """
 
-    paths = Paths(network)
+    paths = Paths(network, errors="ignore_inputs")
 
     datasets = []
     for filename in filenames:
-        with open_data_file(filename, network, paths.output_path) as f:
+        with open_data_file(filename, network, paths.output_path, errors="ignore_inputs") as f:
             with xr.open_dataset(f) as ds:
                 ds_species = ds.load()
 
