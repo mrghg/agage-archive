@@ -3,5 +3,3 @@
     autostage = true
 ['remote "myremote"']
     url = gdrive://1eRk1mhVRMuJWbfM45UCv_sK_rlHac5b_
-    gdrive_client_id = 978405862315-ij2dd6gd7r0obavcs2i4ldls66uegpmh.apps.googleusercontent.com
-    gdrive_client_secret = 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
