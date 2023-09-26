@@ -22,7 +22,7 @@ def setup():
     config = {}
 
     # User name
-    usr = input("Name (press enter for system ID):") or None
+    usr = input("Name (press enter for system ID):") or ""
     config["user"] = {"name": usr}
 
     config["paths"] = {
@@ -40,7 +40,7 @@ def setup():
                 "agage_gcms_path": "data-gcms-nc.zip",
                 "ale_path": "ale_gage_sio1993/ale",
                 "gage_path": "ale_gage_sio1993/gage",
-                "output_path": "output"
+                "output_path": "agage-public-archive.zip"
         }
     }
 
@@ -85,8 +85,8 @@ def lookup_username():
     with open(paths.root / "config.yaml", "r") as f:
         config = yaml.safe_load(f)
 
-    if "User" in config:
-        return config["User"]["name"]
+    if config["user"]["name"] != "":
+        return config["user"]["name"]
     else:
         try:
             return os.environ["USER"]
