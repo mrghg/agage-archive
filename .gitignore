@@ -129,7 +129,7 @@ dmypy.json
 .pyre/
 
 # User defined
-config.ini
+config.yaml
 .vscode
 .DS_store
 ~$*

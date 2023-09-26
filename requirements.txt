@@ -1,4 +1,5 @@
 pandas
+openpyxl
 xarray
 tzwhere
 netcdf4

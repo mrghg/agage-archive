@@ -6,14 +6,14 @@ user:
   name: Matt Rigby, University of Bristol
 paths:
   agage_test:
-    agage_md_path: data-nc
-    agage_gcms_path: data-gcms-nc
+    md_path: data-nc
+    gcms_path: data-gcms-nc
     ale_path: ale
     gage_path: gage
     output_path: output
   agage:
-    agage_md_path: data-nc.zip
-    agage_gcms_path: data-gcms-nc.zip
+    md_path: data-nc.zip
+    gcms_path: data-gcms-nc.zip
     ale_path: ale_gage_sio1993/ale
     gage_path: ale_gage_sio1993/gage
     output_path: agage-public-archive.zip
