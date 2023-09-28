@@ -36,7 +36,13 @@ Run the following commands from a terminal in the repository directory:
 
 Note that the ```--local``` flag is extremely important here. It adds a file ```.dvc/config.local``` containing the authentication credentials, which is excluded from the git repository. If it is not used, these credentials are added to ```.dvc/config```, which is included in the git repo, and can then potentially be visible to other users. **Please ensure that you do not accidentally commit these details to ```.dvc/config```**.
 
-The first time that you do ```dvc pull``` or similar interaction with the remote repository, you will be taken to a Google drive authentication screen on your browser. Follow the instructions, and you should be granted access.
+The first time that you do ```dvc pull``` or similar interaction with the remote repository, you will be taken to a Google drive authentication screen on your browser. Follow the instructions. If you are working on a machine with a web browser, you should now have access. However, if you are working on a remote machine, e.g., with only ssh access, there's an extra few steps you need to take:
+- Navigate to the URL printed to the terminal in the web browser on your *local* machine
+- A Google OAuth credentials json file should have been created on your *local* machine in one of the locations under the **gdrive_user_credentials_file** section of [this DVC Gdrive page](https://dvc.org/doc/user-guide/data-management/remote-storage/google-drive#configuration-parameters)
+- Copy the json to somewhere on the remote machine, e.g., ```~/.gdrive/mycredentials.json```
+- On the *remote* machine, type: 
+```dvc remote modify --local myremote gdrive_user_credentials_file ~/.gdrive/mycredentials.json```
+Again, **ensure you include the --local flag**.
 
 ### Note to admin
 
