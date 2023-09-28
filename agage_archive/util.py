@@ -83,6 +83,8 @@ def lookup_username():
         str: Username
     '''
     
+    paths = Paths()
+
     # Take username from config file if it exists, otherwise try to get it from the system
     with open(paths.root / "config.yaml", "r") as f:
         config = yaml.safe_load(f)
