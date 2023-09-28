@@ -6,12 +6,14 @@ import yaml
 from agage_archive import Paths, open_data_file
 
 
-paths = Paths()
-
-
 def setup():
     """ Setup the config.yml file for the agage_archive package.
     """
+
+    #TODO: this_repo could cause confusion in the case that someone uses this script
+    # to set up a config file in another repository
+    # However, setting it for now, so that it doesn't look for config file before it's created
+    paths = Paths(this_repo=True)
 
     header = '''# Use this file to store configuration settings
 # All paths are relative to the network subfolder in the data directory
