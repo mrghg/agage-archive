@@ -26,27 +26,25 @@ data/agage/agage-public-archive.zip.dvc:
                 not in cache:       data/agage/agage-public-archive.zip
 ```
 
-The first time you use DVC, you will need to provide some credentials for the remote file hosting. We are using Google Drive for this. You will need to set up a `client_id` and `client_secret` to access the remote storage. You will need to contact Matt Rigby and provide a Google Drive account name to access these. **These credentials must not be shared outside of the AGAGE team.**
+The first time you use DVC, you will need to provide some credentials for the remote file hosting. We are using Google Drive for this. We are using a Google Drive service account.  **These credentials must not be shared outside of the AGAGE team. Please ensure that the authentication file is NOT committed to the repository or shared online.**
 
-Run the following commands from a terminal in the repository directory:
+You will need to contact Matt Rigby for the authentication json file. Put this file somewhere on your local machine. You can put it in the repository folder if you like, where it will be ignored by the version control (assuming that you don't change the name).
 
-```dvc remote modify --local myremote gdrive_client_id 'CLIENT_ID_FROM_MATT'```
+Run the following commands from a terminal in the repository directory, replacing ```/path/to``` with the path to the location of the json file:
 
-```dvc remote modify --local myremote gdrive_client_secret 'CLIENT_SECRET_FROM_MATT'```
+```dvc remote modify myremote gdrive_use_service_account true```
 
-Note that the ```--local``` flag is extremely important here. It adds a file ```.dvc/config.local``` containing the authentication credentials, which is excluded from the git repository. If it is not used, these credentials are added to ```.dvc/config```, which is included in the git repo, and can then potentially be visible to other users. **Please ensure that you do not accidentally commit these details to ```.dvc/config```**.
+```dvc remote modify myremote --local gdrive_service_account_json_file_path /path/to/agage-gdrive.json```
 
-The first time that you do ```dvc pull``` or similar interaction with the remote repository, you will be taken to a Google drive authentication screen on your browser. Follow the instructions. If you are working on a machine with a web browser, you should now have access. However, if you are working on a remote machine, e.g., with only ssh access, there's an extra few steps you need to take:
-- Navigate to the URL printed to the terminal in the web browser on your *local* machine
-- A Google OAuth credentials json file should have been created on your *local* machine in one of the locations under the **gdrive_user_credentials_file** section of [this DVC Gdrive page](https://dvc.org/doc/user-guide/data-management/remote-storage/google-drive#configuration-parameters)
-- Copy the json to somewhere on the remote machine, e.g., ```~/.gdrive/mycredentials.json```
-- On the *remote* machine, type: 
-```dvc remote modify --local myremote gdrive_user_credentials_file ~/.gdrive/mycredentials.json```
-Again, **ensure you include the --local flag**.
+Note that the ```--local``` flag is extremely important here. It adds a file ```.dvc/config.local``` containing the location of the authentication file. This local config file is excluded from the repository.
+
+**If the ```agage-gdrive.json``` file is accidentally pushed to the repository or shared outside of the AGAGE team, please contact Matt Rigby immediately.**
+
+You will find out whether the authentication has worked the first time you do ```dvc pull```.
 
 ### Note to admin
 
-User will need to be added as a test user under OAuth Consent Screen on the [Google Drive API](https://console.developers.google.com/) console, **and** they will needed to be granted access to the Google drive folder.
+Authentication settings are through the [Google Drive API](https://console.developers.google.com/). See instructions on authentication and service accounts on the [DVC gdrive docs](https://dvc.org/doc/user-guide/data-management/remote-storage/google-drive).
 
 ## Usage
 
