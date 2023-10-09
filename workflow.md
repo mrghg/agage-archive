@@ -30,9 +30,7 @@ The first time you use DVC, you will need to provide some credentials for the re
 
 You will need to contact Matt Rigby for the authentication json file. Put this file somewhere on your local machine. You can put it in the repository folder if you like, where it will be ignored by the version control (assuming that you don't change the name).
 
-Run the following commands from a terminal in the repository directory, replacing ```/path/to``` with the path to the location of the json file:
-
-```dvc remote modify myremote gdrive_use_service_account true```
+Run the following command from a terminal in the repository directory, replacing ```/path/to``` with the path to the location of the json file:
 
 ```dvc remote modify myremote --local gdrive_service_account_json_file_path /path/to/agage-gdrive.json```
 
@@ -45,6 +43,12 @@ You will find out whether the authentication has worked the first time you do ``
 ### Note to admin
 
 Authentication settings are through the [Google Drive API](https://console.developers.google.com/). See instructions on authentication and service accounts on the [DVC gdrive docs](https://dvc.org/doc/user-guide/data-management/remote-storage/google-drive).
+
+Need to set:
+
+```dvc remote modify myremote gdrive_use_service_account true```
+
+Which should then be in .dvc/config
 
 ## Usage
 
