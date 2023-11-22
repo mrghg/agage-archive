@@ -5,7 +5,7 @@ import json
 
 from agage_archive import Paths, open_data_file, data_file_path, data_file_list
 from agage_archive.convert import scale_convert
-from agage_archive.io import read_ale_gage, combine_datasets
+from agage_archive.io import read_ale_gage, combine_datasets, read_nc_path, read_nc, read_nc_baseline
 
 
 paths = Paths("agage_test")
@@ -174,3 +174,35 @@ def test_data_file_list():
     assert "test_top_level.txt" not in files
     assert "B/C.txt" in files
 
+
+def test_read_nc_path():
+
+    nc_file, sub_path = read_nc_path("agage_test", "CH3CCl3", "CGO", "GCMS-Medusa")
+    assert nc_file == "AGAGE-GCMS-Medusa_CGO_ch3ccl3.nc"
+    assert sub_path == "data-gcms-nc"
+
+    nc_file, sub_path = read_nc_path("agage_test", "NF3", "MHD", "GCMS-Medusa")
+    assert nc_file == "AGAGE-GCMS-Medusa_MHD_nf3.nc"
+    assert sub_path == "data-gcms-nc"
+
+    nc_file, sub_path = read_nc_path("agage_test", "CH3CCl3", "CGO", "GCMD")
+    assert nc_file == "AGAGE-GCMD_CGO_ch3ccl3.nc"
+    assert sub_path == "data-nc"
+
+
+def test_read_nc_baseline():
+
+    ds_baseline = read_nc_baseline("agage_test",
+        "CH3CCl3", "CGO", "GCMS-Medusa")
+
+    # Check baseline flags exist and has integer values
+    assert "baseline" in ds_baseline.data_vars.keys()
+    assert 1 in ds_baseline.baseline.values
+    assert ds_baseline.baseline.values.max() == 1
+
+    # Check some attributes
+    assert ds_baseline.attrs["species"] == "ch3ccl3"
+    assert ds_baseline.attrs["instrument"] == "GCMS-Medusa"
+    assert ds_baseline.attrs["site_code"] == "CGO"
+
+    assert ds_baseline.time.attrs["long_name"] == "time"

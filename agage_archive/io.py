@@ -17,30 +17,25 @@ from agage_archive.util import tz_local_to_utc
 gcwerks_species = {"c2f6": "pfc-116",
                    "c3f8": "pfc-218",
                    "c4f8": "pfc-318"}
-    
 
-def read_nc(network, species, site, instrument,
-            verbose = False,
-            data_exclude = True,
-            scale = "default"):
-    """Read GCWerks netCDF files
+
+def read_nc_path(network, species, site, instrument):
+    """Find path to netCDF file
 
     Args:
-        network (str): Network, e.g., "agage"
+        network (str): Network
         species (str): Species
-        site (str): Site code
+        site (str): Site
         instrument (str): Instrument
-        verbose (bool, optional): Print verbose output. Defaults to False.
-        data_exclude (bool, optional): Exclude data based on data_exclude.xlsx. Defaults to True.
-        scale (str, optional): Scale to convert to. Defaults to "default". If None, will keep original scale.
 
     Raises:
-        FileNotFoundError: Can't find netCDF file
+        ValueError: Instrument must be one of GCMD, GCECD, Picarro, LGR, GCMS-ADS, GCMS-Medusa, GCMS-MteCimone
 
     Returns:
-        xarray.Dataset: Contents of netCDF file
+        str: Path to netCDF file
+        str: Sub-path within data directory
     """
-
+    
     paths = Paths(network)
 
     species_search = format_species(species)
@@ -74,6 +69,33 @@ def read_nc(network, species, site, instrument,
         raise FileNotFoundError(f"Found more than one file matching *-{instrument}*_{site}_{species_search}.nc in data/{network}/{sub_path}")
     else:
         nc_file = nc_files[0]
+
+    return nc_file, sub_path
+
+
+def read_nc(network, species, site, instrument,
+            verbose = False,
+            data_exclude = True,
+            scale = "default"):
+    """Read GCWerks netCDF files
+
+    Args:
+        network (str): Network, e.g., "agage"
+        species (str): Species
+        site (str): Site code
+        instrument (str): Instrument
+        verbose (bool, optional): Print verbose output. Defaults to False.
+        data_exclude (bool, optional): Exclude data based on data_exclude.xlsx. Defaults to True.
+        scale (str, optional): Scale to convert to. Defaults to "default". If None, will keep original scale.
+
+    Raises:
+        FileNotFoundError: Can't find netCDF file
+
+    Returns:
+        xarray.Dataset: Contents of netCDF file
+    """
+
+    nc_file, sub_path = read_nc_path(network, species, site, instrument)
 
     if verbose:
         print(f"... reading {nc_file}")
@@ -130,6 +152,83 @@ def read_nc(network, species, site, instrument,
     ds = scale_convert(ds, scale)
 
     return ds
+
+
+def read_nc_baseline(network, species, site, instrument,
+                     flag_name = "git_pollution_flag",
+                     verbose = False):
+    """Read GCWerks netCDF files
+
+    Args:
+        network (str): Network, e.g., "agage"
+        species (str): Species
+        site (str): Site code
+        instrument (str): Instrument
+        flag_name (str, optional): Name of baseline flag variable. Defaults to "git_pollution_flag".
+        verbose (bool, optional): Print verbose output. Defaults to False.
+
+    Raises:
+        FileNotFoundError: Can't find netCDF file
+
+    Returns:
+        xarray.Dataset: Contents of netCDF file
+    """
+
+    nc_file, sub_path = read_nc_path(network, species, site, instrument)
+
+    if verbose:
+        print(f"... reading {nc_file}")
+
+    # Read netCDF file
+    with open_data_file(nc_file, network, sub_path=sub_path, verbose=True) as f:
+        with xr.open_dataset(f, engine="h5netcdf") as ds_file:
+            ds = ds_file.load()
+
+    attrs = {"git_pollution_flag":{
+                "comment": "Baseline flag from the Georgia Tech statistical filtering algorithm.",
+                "citation": "O'Doherty et al. (2001)",
+                "contact": "Ray Wang, Georgia Tech",
+                "contact_email": "raywang@eas.gatech.edu"
+                },
+            "met_office_pollution_flag":{
+                "comment": "Baseline flag from the Met Office using the NAME model.",
+                "citation": "",
+                "contact": "Alistair Manning, Met Office",
+                "contact_email": "alistair.manning@metoffice.gov.uk"
+                },
+            }
+
+    ds_out = ds[flag_name].copy(deep=True).to_dataset(name="baseline")
+
+    # Turn flag into integer and change to byte
+    # When ASCII value is "B" (66), flag is 1, otherwise 0
+    ds_out.baseline.values = ds_out.baseline == 66
+    ds_out = ds_out.astype(np.int8)
+
+    # Add attributes
+    ds_out.baseline.attrs = {
+        "long_name": "baseline_flag",
+        "flag_values": "0, 1",
+        "flag_meanings": "not_baseline, baseline"
+        }
+
+    # Remove "sampling_time_seconds" from time attributes, if it exists
+    if "sampling_time_seconds" in ds_out.time.attrs:
+        del ds_out.time.attrs["sampling_time_seconds"]
+
+    # Add global attributes
+    ds_out.attrs = attrs[flag_name]
+
+    # Add site code
+    ds_out.attrs["site_code"] = site.upper()
+
+    # Add species
+    ds_out.attrs["species"] = format_species(species)
+
+    # Add instrument
+    ds_out.attrs["instrument"] = instrument
+
+    return ds_out
 
 
 def ale_gage_timestamp_issues(datetime, timestamp_issues,
@@ -506,3 +605,8 @@ def output_dataset(ds, network,
         with open(output_path / output_subpath / filename, mode="wb") as f:
             # ds_out.to_netcdf(f, mode="w", format="NETCDF4", engine="h5netcdf")
             ds_out.to_netcdf(f, mode="w")
+
+
+def output_baselines(ds):
+
+    pass
