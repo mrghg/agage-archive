@@ -204,5 +204,7 @@ def test_read_nc_baseline():
     assert ds_baseline.attrs["species"] == "ch3ccl3"
     assert ds_baseline.attrs["instrument"] == "GCMS-Medusa"
     assert ds_baseline.attrs["site_code"] == "CGO"
+    assert "Georgia Tech" in ds_baseline.attrs["comment"]
+    assert "citation" in ds_baseline.attrs.keys()
 
     assert ds_baseline.time.attrs["long_name"] == "time"
