@@ -190,7 +190,7 @@ def read_nc_baseline(network, species, site, instrument,
                 "contact": "Ray Wang, Georgia Tech",
                 "contact_email": "raywang@eas.gatech.edu"
                 },
-            "met_office_pollution_flag":{
+            "met_office_baseline_flag":{
                 "comment": "Baseline flag from the Met Office using the NAME model.",
                 "citation": "",
                 "contact": "Alistair Manning, Met Office",

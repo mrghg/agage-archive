@@ -192,19 +192,27 @@ def test_read_nc_path():
 
 def test_read_nc_baseline():
 
-    ds_baseline = read_nc_baseline("agage_test",
-        "CH3CCl3", "CGO", "GCMS-Medusa")
+    for flag_name in ["met_office_baseline_flag", "git_pollution_flag"]:
 
-    # Check baseline flags exist and has integer values
-    assert "baseline" in ds_baseline.data_vars.keys()
-    assert 1 in ds_baseline.baseline.values
-    assert ds_baseline.baseline.values.max() == 1
+        ds_baseline = read_nc_baseline("agage_test",
+            "CH3CCl3", "CGO", "GCMS-Medusa",
+            flag_name = flag_name)
 
-    # Check some attributes
-    assert ds_baseline.attrs["species"] == "ch3ccl3"
-    assert ds_baseline.attrs["instrument"] == "GCMS-Medusa"
-    assert ds_baseline.attrs["site_code"] == "CGO"
-    assert "Georgia Tech" in ds_baseline.attrs["comment"]
-    assert "citation" in ds_baseline.attrs.keys()
+        # Check baseline flags exist and has integer values
+        assert "baseline" in ds_baseline.data_vars.keys()
+        assert 1 in ds_baseline.baseline.values
+        assert ds_baseline.baseline.values.max() == 1
 
-    assert ds_baseline.time.attrs["long_name"] == "time"
+        # Check some attributes
+        assert ds_baseline.attrs["species"] == "ch3ccl3"
+        assert ds_baseline.attrs["instrument"] == "GCMS-Medusa"
+        assert ds_baseline.attrs["site_code"] == "CGO"
+        assert "citation" in ds_baseline.attrs.keys()
+
+        assert ds_baseline.time.attrs["long_name"] == "time"
+
+        # Check that the right baseline flag has been extracted
+        if flag_name == "met_office_baseline_flag":
+            assert "Met Office" in ds_baseline.attrs["comment"]
+        elif flag_name == "git_pollution_flag":
+            assert "Georgia Tech" in ds_baseline.attrs["comment"]
