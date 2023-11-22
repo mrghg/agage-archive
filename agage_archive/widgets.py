@@ -139,3 +139,23 @@ def plot_to_output(sender, network, species, network_site, output_widget):
         clear_output(True)
         fig = plot_datasets(datasets)
         fig.show(renderer="notebook")
+
+
+def show_netcdf_info(sender, network, species, network_site, output_widget):
+
+    if not network_site:
+        with output_widget:
+            clear_output(True)
+            print("Please select a network and site") 
+
+    filenames = get_filenames(species, network_site)
+    datasets = load_datasets(network, filenames)
+
+    with output_widget:
+        clear_output()
+        for filename, dataset in zip(filenames, datasets):
+            print(filename)
+            print(dataset)
+            print("-----------------------------------------")
+            print("")
+
