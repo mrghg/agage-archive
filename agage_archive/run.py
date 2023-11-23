@@ -4,7 +4,7 @@ from zipfile import ZipFile
 
 from agage_archive import Paths, open_data_file, data_file_list, data_file_path
 from agage_archive.data_selection import read_release_schedule, read_data_combination
-from agage_archive.io import combine_datasets, read_nc, read_ale_gage, output_dataset
+from agage_archive.io import combine_datasets, read_nc, read_nc_baseline, read_ale_gage, output_dataset, output_baselines
 
 
 def run_individual_instrument(network, instrument,
@@ -22,9 +22,11 @@ def run_individual_instrument(network, instrument,
 
     if instrument.upper() == "ALE" or instrument.upper() == "GAGE":
         read_function = read_ale_gage
+        read_baseline_function = read_ale_gage_baseline
         instrument_out = instrument.upper() + "-GCMD"
     else:
         read_function = read_nc
+        read_baseline_function = read_nc_baseline
         instrument_out = instrument.upper()
 
     # Process for all species and sites
@@ -34,6 +36,9 @@ def run_individual_instrument(network, instrument,
 
                 ds = read_function(network, species, site, instrument,
                                 verbose=verbose)
+
+                ds_baseline = read_baseline_function(network, species, site, instrument,
+                                            verbose=verbose)
 
                 # If multiple instruments, store individual file in subdirectory
                 instrument_dates = read_data_combination(network, species, site,
@@ -47,7 +52,12 @@ def run_individual_instrument(network, instrument,
                                output_subpath=output_subpath,
                                end_date=rs.loc[species, site],
                                verbose=verbose)
-                
+
+                output_baselines(ds, network, instrument=instrument_out,
+                               output_subpath="baselines" + output_subpath,
+                               end_date=rs.loc[species, site],
+                               verbose=verbose)
+
 
 def run_combined_instruments(network,
                              verbose = False):

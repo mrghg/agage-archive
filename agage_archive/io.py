@@ -555,6 +555,22 @@ def combine_datasets(network, species, site,
 
 def output_path(network, species, site, instrument,
                 extra = ""):
+    '''Determine output path and filename
+
+    Args:
+        network (str): Network
+        species (str): Species
+        site (str): Site
+        instrument (str): Instrument
+        extra (str, optional): Extra string to add to filename. Defaults to "".
+
+    Raises:
+        FileNotFoundError: Can't find output path
+
+    Returns:
+        pathlib.Path: Path to output directory
+        str: Filename
+    '''
 
     paths = Paths(network)
 
@@ -587,11 +603,17 @@ def output_write(ds, out_path, filename,
     if verbose:
         print(f"... writing {str(out_path) + '/' + output_subpath + '/' + filename}")
 
+    # Can't have some time attributes
+    if "units" in ds.time.attrs:
+        del ds.time.attrs["units"]
+    if "calendar" in ds.time.attrs:
+        del ds.time.attrs["calendar"]
+
     # Write file
     if out_path.suffix == ".zip":
         with ZipFile(out_path, mode="a") as zip:
             zip.writestr(output_subpath + "/" + filename, ds.to_netcdf())
-                
+    
     else:
         # Test if output_path exists and if not create it
         if not (out_path / output_subpath).exists():
@@ -619,16 +641,9 @@ def output_dataset(ds, network,
         verbose (bool, optional): Print verbose output. Defaults to False.
     '''
 
-    out_path, filename = output_path(network, ds.attrs["species"], ds.attrs["site_code"], instrument,
-                                     output_subpath=output_subpath)
+    out_path, filename = output_path(network, ds.attrs["species"], ds.attrs["site_code"], instrument)
 
     ds_out = ds.copy(deep = True)
-
-    # Can't have some time attributes
-    if "units" in ds_out.time.attrs:
-        del ds_out.time.attrs["units"]
-    if "calendar" in ds_out.time.attrs:
-        del ds_out.time.attrs["calendar"]
 
     # Select time slice
     ds_out = ds_out.sel(time=slice(None, end_date))
@@ -641,6 +656,28 @@ def output_baselines(ds, network,
                     instrument = "GCMD",
                     end_date = None,
                     output_subpath = "",
+                    baseline_label = "_git-baseline",
                     verbose = False):
+    '''Output baseline flag to netCDF file
 
-    pass
+    Args:
+        ds (xr.Dataset): Dataset to output
+        network (str): Network
+        instrument (str, optional): Instrument. Defaults to "GCMD".
+        end_date (str, optional): End date to subset to. Defaults to None.
+        output_subpath (str, optional): Sub-path within output directory. Defaults to "".
+            Used to put species in sub-directories.
+        baseline_label (str, optional): Label to add to filename. Defaults to "_git-baseline".
+        verbose (bool, optional): Print verbose output. Defaults to False.
+    '''
+
+    out_path, filename = output_path(network, ds.attrs["species"], ds.attrs["site_code"], instrument,
+                                    extra=baseline_label)
+
+    ds_out = ds.copy(deep = True)
+
+    # Select time slice
+    ds_out = ds_out.sel(time=slice(None, end_date))
+
+    output_write(ds_out, out_path, filename,
+                output_subpath=output_subpath, verbose=verbose)
