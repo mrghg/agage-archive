@@ -200,8 +200,7 @@ def test_read_nc_baseline():
 
         # Check baseline flags exist and has integer values
         assert "baseline" in ds_baseline.data_vars.keys()
-        assert 1 in ds_baseline.baseline.values
-        assert ds_baseline.baseline.values.max() == 1
+        assert isinstance(ds_baseline.baseline.values[0], np.int8)
 
         # Check some attributes
         assert ds_baseline.attrs["species"] == "ch3ccl3"

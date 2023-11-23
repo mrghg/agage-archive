@@ -553,6 +553,55 @@ def combine_datasets(network, species, site,
     return ds_combined
 
 
+def output_path(network, species, site, instrument,
+                extra = ""):
+
+    paths = Paths(network)
+
+    output_path = data_file_path("", network = network, sub_path = paths.output_path)
+
+    # Check if the output path exists
+    if not output_path.exists():
+        raise FileNotFoundError(f"Can't find output path {output_path}")
+    
+    # Create filename
+    filename = f"{network.upper()}-{instrument}_{site}_{format_species(species)}{extra}.nc"
+
+    return output_path, filename
+
+
+def output_write(ds, out_path, filename,
+                output_subpath = "",
+                verbose = False):
+    '''Write dataset to netCDF file
+
+    Args:
+        ds (xr.Dataset): Dataset to output
+        out_path (str): Path to output directory
+        filename (str): Filename
+        output_subpath (str, optional): Sub-path within output directory. Defaults to "".
+            Used to put species in sub-directories.
+        verbose (bool, optional): Print verbose output. Defaults to False.
+    '''
+
+    if verbose:
+        print(f"... writing {str(out_path) + '/' + output_subpath + '/' + filename}")
+
+    # Write file
+    if out_path.suffix == ".zip":
+        with ZipFile(out_path, mode="a") as zip:
+            zip.writestr(output_subpath + "/" + filename, ds.to_netcdf())
+                
+    else:
+        # Test if output_path exists and if not create it
+        if not (out_path / output_subpath).exists():
+            (out_path / output_subpath).mkdir()
+
+        with open(out_path / output_subpath / filename, mode="wb") as f:
+            # ds_out.to_netcdf(f, mode="w", format="NETCDF4", engine="h5netcdf")
+            ds.to_netcdf(f, mode="w")
+
+
 def output_dataset(ds, network,
                    instrument = "GCMD",
                    end_date = None,
@@ -565,18 +614,13 @@ def output_dataset(ds, network,
         network (str): Network
         instrument (str, optional): Instrument. Defaults to "GCMD".
         end_date (str, optional): End date to subset to. Defaults to None.
+        output_subpath (str, optional): Sub-path within output directory. Defaults to "".
+            Used to put species in sub-directories.
+        verbose (bool, optional): Print verbose output. Defaults to False.
     '''
 
-    paths = Paths(network)
-
-    output_path = data_file_path("", network = network, sub_path = paths.output_path)
-
-    # Check if the output path exists
-    if not output_path.exists():
-        raise FileNotFoundError(f"Can't find output path {output_path}")
-    
-    # Create filename
-    filename = f"{network.upper()}-{instrument}_{ds.attrs['site_code']}_{format_species(ds.attrs['species'])}.nc"
+    out_path, filename = output_path(network, ds.attrs["species"], ds.attrs["site_code"], instrument,
+                                     output_subpath=output_subpath)
 
     ds_out = ds.copy(deep = True)
 
@@ -589,24 +633,14 @@ def output_dataset(ds, network,
     # Select time slice
     ds_out = ds_out.sel(time=slice(None, end_date))
 
-    if verbose:
-        print(f"... writing {str(output_path) + '/' + output_subpath + '/' + filename}")
-
-    # Write file
-    if output_path.suffix == ".zip":
-        with ZipFile(output_path, mode="a") as zip:
-            zip.writestr(output_subpath + "/" + filename, ds_out.to_netcdf())
-                
-    else:
-        # Test if output_path exists and if not create it
-        if not (output_path / output_subpath).exists():
-            (output_path / output_subpath).mkdir()
-
-        with open(output_path / output_subpath / filename, mode="wb") as f:
-            # ds_out.to_netcdf(f, mode="w", format="NETCDF4", engine="h5netcdf")
-            ds_out.to_netcdf(f, mode="w")
+    output_write(ds_out, out_path, filename,
+                 output_subpath=output_subpath, verbose=verbose)
 
 
-def output_baselines(ds):
+def output_baselines(ds, network,
+                    instrument = "GCMD",
+                    end_date = None,
+                    output_subpath = "",
+                    verbose = False):
 
     pass
