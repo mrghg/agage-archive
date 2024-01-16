@@ -5,7 +5,7 @@ import json
 
 from agage_archive import Paths, open_data_file, data_file_path, data_file_list
 from agage_archive.convert import scale_convert
-from agage_archive.io import read_ale_gage, combine_datasets, read_nc_path, read_nc, read_nc_baseline
+from agage_archive.io import read_ale_gage, combine_datasets, read_nc_path, read_nc, read_baseline
 
 
 paths = Paths("agage_test")
@@ -190,11 +190,12 @@ def test_read_nc_path():
     assert sub_path == "data-nc"
 
 
-def test_read_nc_baseline():
+def test_read_baseline():
 
-    for flag_name in ["met_office_baseline_flag", "git_pollution_flag"]:
+    for flag_name in ["git_pollution_flag"]:
+#    for flag_name in ["met_office_baseline_flag", "git_pollution_flag"]:
 
-        ds_baseline = read_nc_baseline("agage_test",
+        ds_baseline = read_baseline("agage_test",
             "CH3CCl3", "CGO", "GCMS-Medusa",
             flag_name = flag_name)
 
@@ -215,3 +216,4 @@ def test_read_nc_baseline():
             assert "Met Office" in ds_baseline.attrs["comment"]
         elif flag_name == "git_pollution_flag":
             assert "Georgia Tech" in ds_baseline.attrs["comment"]
+

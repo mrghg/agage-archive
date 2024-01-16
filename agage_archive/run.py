@@ -4,7 +4,8 @@ from zipfile import ZipFile
 
 from agage_archive import Paths, open_data_file, data_file_list, data_file_path
 from agage_archive.data_selection import read_release_schedule, read_data_combination
-from agage_archive.io import combine_datasets, read_nc, read_nc_baseline, read_ale_gage, output_dataset, output_baselines
+from agage_archive.io import combine_datasets, read_nc, read_nc_baseline, read_ale_gage, \
+    read_ale_gage_baseline, output_dataset, output_baselines
 
 
 def run_individual_instrument(network, instrument,

@@ -3,6 +3,7 @@ import json
 import pandas as pd
 import numpy as np
 from zipfile import ZipFile
+from io import StringIO
 
 from agage_archive import Paths, open_data_file, data_file_list, data_file_path
 from agage_archive.convert import scale_convert
@@ -17,6 +18,20 @@ from agage_archive.util import tz_local_to_utc
 gcwerks_species = {"c2f6": "pfc-116",
                    "c3f8": "pfc-218",
                    "c4f8": "pfc-318"}
+
+baseline_attrs = {"git_pollution_flag":{
+                    "comment": "Baseline flag from the Georgia Tech statistical filtering algorithm.",
+                    "citation": "O'Doherty et al. (2001)",
+                    "contact": "Ray Wang, Georgia Tech",
+                    "contact_email": "raywang@eas.gatech.edu"
+                    },
+                "met_office_baseline_flag":{
+                    "comment": "Baseline flag from the Met Office using the NAME model.",
+                    "citation": "",
+                    "contact": "Alistair Manning, Met Office",
+                    "contact_email": "alistair.manning@metoffice.gov.uk"
+                    },
+                }
 
 
 def read_nc_path(network, species, site, instrument):
@@ -154,9 +169,9 @@ def read_nc(network, species, site, instrument,
     return ds
 
 
-def read_nc_baseline(network, species, site, instrument,
-                     flag_name = "git_pollution_flag",
-                     verbose = False):
+def read_baseline(network, species, site, instrument,
+                flag_name = "git_pollution_flag",
+                verbose = False):
     """Read GCWerks netCDF files
 
     Args:
@@ -174,36 +189,33 @@ def read_nc_baseline(network, species, site, instrument,
         xarray.Dataset: Contents of netCDF file
     """
 
-    nc_file, sub_path = read_nc_path(network, species, site, instrument)
+    if not instrument.lower() in ["ale", "gage"]:
 
-    if verbose:
-        print(f"... reading {nc_file}")
+        nc_file, sub_path = read_nc_path(network, species, site, instrument)
 
-    # Read netCDF file
-    with open_data_file(nc_file, network, sub_path=sub_path, verbose=True) as f:
-        with xr.open_dataset(f, engine="h5netcdf") as ds_file:
-            ds = ds_file.load()
+        if verbose:
+            print(f"... reading {nc_file}")
 
-    attrs = {"git_pollution_flag":{
-                "comment": "Baseline flag from the Georgia Tech statistical filtering algorithm.",
-                "citation": "O'Doherty et al. (2001)",
-                "contact": "Ray Wang, Georgia Tech",
-                "contact_email": "raywang@eas.gatech.edu"
-                },
-            "met_office_baseline_flag":{
-                "comment": "Baseline flag from the Met Office using the NAME model.",
-                "citation": "",
-                "contact": "Alistair Manning, Met Office",
-                "contact_email": "alistair.manning@metoffice.gov.uk"
-                },
-            }
+        # Read netCDF file
+        with open_data_file(nc_file, network, sub_path=sub_path, verbose=True) as f:
+            with xr.open_dataset(f, engine="h5netcdf") as ds_file:
+                ds = ds_file.load()
 
-    ds_out = ds[flag_name].copy(deep=True).to_dataset(name="baseline")
+        ds_out = ds[flag_name].copy(deep=True).to_dataset(name="baseline")
 
-    # Turn flag into integer and change to byte
-    # When ASCII value is "B" (66), flag is 1, otherwise 0
-    ds_out.baseline.values = ds_out.baseline == 66
-    ds_out = ds_out.astype(np.int8)
+        # Turn flag into integer and change to byte
+        # When ASCII value is "B" (66), flag is 1, otherwise 0
+        ds_out.baseline.values = ds_out.baseline == 66
+        ds_out = ds_out.astype(np.int8)
+
+    else:
+
+        if flag_name != "git_pollution_flag":
+            raise ValueError("Only git_pollution_flag is available for ALE/GAGE data")
+
+        ds_out = read_ale_gage(network, species, site, instrument,
+                           baseline = True,
+                           verbose=verbose)
 
     # Add attributes
     ds_out.baseline.attrs = {
@@ -217,7 +229,7 @@ def read_nc_baseline(network, species, site, instrument,
         del ds_out.time.attrs["sampling_time_seconds"]
 
     # Add global attributes
-    ds_out.attrs = attrs[flag_name]
+    ds_out.attrs = baseline_attrs[flag_name]
 
     # Add site code
     ds_out.attrs["site_code"] = site.upper()
@@ -260,7 +272,8 @@ def read_ale_gage(network, species, site, instrument,
                   verbose = True,
                   utc = True,
                   data_exclude = True,
-                  scale = "default"):
+                  scale = "default",
+                  baseline = False):
     """Read GA Tech ALE/GAGE files, process and clean
 
     Args:
@@ -274,6 +287,7 @@ def read_ale_gage(network, species, site, instrument,
             utc must also be true, as timestamps are in UTC.
         scale (str, optional): Calibration scale. Defaults to None, which means no conversion is attempted.
             Set to "default" to use value in scale_defaults.csv.
+        baseline (bool, optional): Return baseline dataset. Defaults to False.
 
     Returns:
         pd.DataFrame: Pandas dataframe containing file contents
@@ -330,8 +344,10 @@ def read_ale_gage(network, species, site, instrument,
 
             # Define column widths
             colspec = [3, 5, 7]
+            coldtypes = [int, int, int]
             for sp in header[3:]:
                 colspec += [7, 1]
+                coldtypes += [np.float32, str]
                 columns += [str(sp).replace("'", ""),
                             f"{sp}_pollution"]
 
@@ -385,6 +401,9 @@ def read_ale_gage(network, species, site, instrument,
         duplicated_indices = df_combined.index[df_combined.index.duplicated(keep=False)]
         raise ValueError(f"Duplicate indices found. Check timestamp issues: {duplicated_indices}")
 
+    # Store pollution flag
+    da_baseline = (df_combined[f"{species_info['species_name_gatech']}_pollution"] != "P").astype(np.int8)
+
     # Output one species
     df_combined = df_combined[species_info["species_name_gatech"]]
 
@@ -425,6 +444,9 @@ def read_ale_gage(network, species, site, instrument,
 
     ds = format_variables(ds)
 
+    # Add pollution flag back in temporarily with dimension time
+    ds["baseline"] = xr.DataArray(da_baseline.values, dims="time")
+
     # Remove any excluded data. Only do this if time is UTC, otherwise it won't be in the file
     if data_exclude:
         if not utc:
@@ -437,10 +459,22 @@ def read_ale_gage(network, species, site, instrument,
                                site=site)
     ds = ds.sel(time=slice(None, rs))
 
+    # Remove pollution flag
+    ds_baseline = ds.baseline.copy(deep=True).to_dataset(name="baseline")
+    ds = ds.drop_vars("baseline")
+
+    # Raise error if baseline dataset is different length to main dataset
+    if len(ds_baseline.time) != len(ds.time):
+        raise ValueError("Baseline dataset is different length to main dataset. " + \
+                         "Check timestamp issues.")
+
     # Convert scale, if needed
     ds = scale_convert(ds, scale)
 
-    return ds
+    if baseline:
+        return ds_baseline
+    else:
+        return ds
 
 
 def combine_datasets(network, species, site, 
