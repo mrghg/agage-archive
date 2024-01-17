@@ -5,7 +5,7 @@ import json
 
 from agage_archive import Paths, open_data_file, data_file_path, data_file_list
 from agage_archive.convert import scale_convert
-from agage_archive.io import read_ale_gage, combine_datasets, read_nc_path, read_nc, read_baseline
+from agage_archive.io import read_ale_gage, combine_datasets, read_nc_path, read_nc, read_baseline, combine_baseline
 
 
 paths = Paths("agage_test")
@@ -217,3 +217,22 @@ def test_read_baseline():
         elif flag_name == "git_pollution_flag":
             assert "Georgia Tech" in ds_baseline.attrs["comment"]
 
+
+def test_combine_baseline():
+
+    ds_baseline = combine_baseline("agage_test", "CH3CCl3", "CGO")
+
+    # Check baseline flags exist and has integer values
+    assert "baseline" in ds_baseline.data_vars.keys()
+    assert isinstance(ds_baseline.baseline.values[0], np.int8)
+
+    # Check some attributes
+    assert ds_baseline.attrs["species"] == "ch3ccl3"
+    assert ds_baseline.attrs["site_code"] == "CGO"
+    assert "citation" in ds_baseline.attrs.keys()
+
+    assert ds_baseline.time.attrs["long_name"] == "time"
+
+    # Check that ds_baseline has the same timestamps as the output of combine_datasets
+    ds = combine_datasets("agage_test", "CH3CCl3", "CGO", verbose=False)
+    assert (ds_baseline.time.values == ds.time.values).all()

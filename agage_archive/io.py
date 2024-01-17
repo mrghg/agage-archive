@@ -91,6 +91,7 @@ def read_nc_path(network, species, site, instrument):
 def read_nc(network, species, site, instrument,
             verbose = False,
             data_exclude = True,
+            baseline = None,
             scale = "default"):
     """Read GCWerks netCDF files
 
@@ -116,7 +117,7 @@ def read_nc(network, species, site, instrument,
         print(f"... reading {nc_file}")
 
     # Read netCDF file
-    with open_data_file(nc_file, network, sub_path=sub_path, verbose=True) as f:
+    with open_data_file(nc_file, network, sub_path=sub_path, verbose=verbose) as f:
         with xr.open_dataset(f, engine="h5netcdf") as ds_file:
             ds = ds_file.load()
 
@@ -131,6 +132,15 @@ def read_nc(network, species, site, instrument,
     # Add sampling time to variables
     ds["sampling_period"] = xr.DataArray(np.ones(len(ds.time)).astype(np.int16)*sampling_period,
                                         coords={"time": ds.time})
+
+    # Baseline flags
+    if baseline:
+        ds_baseline = ds[baseline].copy(deep=True).to_dataset(name="baseline")
+
+        # Convert to integer
+        # When ASCII value is "B" (66), flag is 1, otherwise 0
+        ds_baseline.baseline.values = ds_baseline.baseline == 66
+        ds_baseline = ds_baseline.astype(np.int8)
 
     # Everything should have been flagged in the AGAGE files already, but just in case...
     flagged = ds.data_flag != 0
@@ -152,6 +162,10 @@ def read_nc(network, species, site, instrument,
                         network=network,
                         species=species)
 
+    # Temporarily add baseline flag back in
+    if baseline:
+        ds["baseline"] = xr.DataArray(ds_baseline.baseline.values, dims="time")
+
     # Remove any excluded data
     if data_exclude:
         ds = read_data_exclude(ds, format_species(species), site, instrument)
@@ -162,6 +176,10 @@ def read_nc(network, species, site, instrument,
                                species=format_species(species),
                                site=site)
     ds = ds.sel(time=slice(None, rs))
+
+    # If baseline is True, return baseline dataset
+    if baseline:
+        return ds["baseline"].copy(deep=True).to_dataset(name="baseline")
 
     # Convert scale, if needed
     ds = scale_convert(ds, scale)
@@ -191,22 +209,9 @@ def read_baseline(network, species, site, instrument,
 
     if not instrument.lower() in ["ale", "gage"]:
 
-        nc_file, sub_path = read_nc_path(network, species, site, instrument)
-
-        if verbose:
-            print(f"... reading {nc_file}")
-
-        # Read netCDF file
-        with open_data_file(nc_file, network, sub_path=sub_path, verbose=True) as f:
-            with xr.open_dataset(f, engine="h5netcdf") as ds_file:
-                ds = ds_file.load()
-
-        ds_out = ds[flag_name].copy(deep=True).to_dataset(name="baseline")
-
-        # Turn flag into integer and change to byte
-        # When ASCII value is "B" (66), flag is 1, otherwise 0
-        ds_out.baseline.values = ds_out.baseline == 66
-        ds_out = ds_out.astype(np.int8)
+        ds_out = read_nc(network, species, site, instrument,
+                        verbose=verbose,
+                        baseline = flag_name)
 
     else:
 
@@ -302,15 +307,15 @@ def read_ale_gage(network, species, site, instrument,
     paths = Paths(network)
 
     # Get data on ALE/GAGE sites
-    with open_data_file("ale_gage_sites.json", network = network) as f:
+    with open_data_file("ale_gage_sites.json", network = network, verbose=verbose) as f:
         site_info = json.load(f)
 
     # Get species info
-    with open_data_file("ale_gage_species.json", network = network) as f:
+    with open_data_file("ale_gage_species.json", network = network, verbose=verbose) as f:
         species_info = json.load(f)[format_species(species)]
 
     # Get Datetime issues list
-    with open_data_file("ale_gage_timestamp_issues.json", network = network) as f:
+    with open_data_file("ale_gage_timestamp_issues.json", network = network, verbose=verbose) as f:
         timestamp_issues = json.load(f)
         if site in timestamp_issues[instrument]:
             timestamp_issues = timestamp_issues[instrument][site]
@@ -323,7 +328,7 @@ def read_ale_gage(network, species, site, instrument,
     with open_data_file(f"{site_info[site]['gcwerks_name']}_sio1993.gtar.gz",
                         network = network,
                         sub_path = folder,
-                        verbose=True) as tar:
+                        verbose=verbose) as tar:
 
         dfs = []
 
@@ -583,6 +588,49 @@ def combine_datasets(network, species, site,
 
     # Update network attribute
     ds_combined.attrs["network"] = "/".join(set(networks))
+
+    return ds_combined
+
+
+def combine_baseline(network, species, site,
+                     verbose = True):
+    '''Combine ALE/GAGE/AGAGE baseline datasets for a given species and site
+
+    Args:
+        network (str): Network
+        species (str): Species
+        site (str): Site
+        verbose (bool, optional): Print verbose output. Defaults to False.
+
+    Returns:
+        xr.Dataset: Dataset containing data
+    '''
+
+    # Read instrument dates from CSV files
+    instruments = read_data_combination(network, format_species(species), site)
+
+    # Combine datasets    
+    dss = []
+
+    for instrument, date in instruments.items():
+
+        # Read baseline. Only git_pollution_flag is available for ALE/GAGE data
+        ds = read_baseline(network, species, site, instrument,
+                           verbose=verbose, flag_name="git_pollution_flag")
+
+        # Subset date
+        ds = ds.sel(time=slice(*date))
+
+        if len(ds.time) == 0:
+            raise ValueError(f"No data retained for {species} {site} {instrument}. " + \
+                             "Check dates in data_combination or omit this instrument.")
+
+        dss.append(ds)
+
+    ds_combined = xr.concat(dss, dim="time")
+
+    # Sort by time
+    ds_combined = ds_combined.sortby("time")
 
     return ds_combined
 
