@@ -92,7 +92,7 @@ def read_release_schedule(network, instrument,
         df = pd.read_excel(f, sheet_name=instrument, skiprows=idx+2)
 
     # Remove whitespace
-    df = df.applymap(lambda x: x.strip() if isinstance(x, str) else x)
+    df = df.map(lambda x: x.strip() if isinstance(x, str) else x)
 
     # If NaN in df, replace with general end date
     df = df.fillna(general_end_date)
@@ -125,7 +125,7 @@ def calibration_scale_default(network, species):
     with open_data_file("scale_defaults.csv", network=network) as f:
         scale_defaults = pd.read_csv(f, index_col="Species")
     
-    scale_defaults = scale_defaults.applymap(lambda x: x.strip() if isinstance(x, str) else x)
+    scale_defaults = scale_defaults.map(lambda x: x.strip() if isinstance(x, str) else x)
 
     if format_species(species) not in scale_defaults.index.str.lower():
         raise ValueError(f"No default calibration scale found for {species}")
@@ -158,7 +158,7 @@ def read_data_exclude(ds, species, site, instrument):
                                     sheet_name=site.upper())
     
     # Remove whitespace from strings
-    data_exclude = data_exclude.applymap(lambda x: x.strip() if isinstance(x, str) else x)
+    data_exclude = data_exclude.map(lambda x: x.strip() if isinstance(x, str) else x)
 
     # columns are Species, Instrument, Start, End
     # Find rows that match species and instrument and then extract start and end dates

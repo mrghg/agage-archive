@@ -37,7 +37,7 @@ def test_calibration_scale_default():
         df = pd.read_csv(f, index_col="Species")
     
     # Remove whitespace
-    df = df.applymap(lambda x: x.strip() if isinstance(x, str) else x)
+    df = df.map(lambda x: x.strip() if isinstance(x, str) else x)
 
     # Test species name
     assert calibration_scale_default("agage_test", "CH4") == df.loc["ch4", "calibration_scale"]
