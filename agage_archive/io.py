@@ -236,6 +236,9 @@ def read_baseline(network, species, site, instrument,
     # Add global attributes
     ds_out.attrs = baseline_attrs[flag_name]
 
+    # Add baseline flag as attribute
+    ds_out.attrs["baseline_flag"] = flag_name
+
     # Add site code
     ds_out.attrs["site_code"] = site.upper()
 
@@ -427,7 +430,7 @@ def read_ale_gage(network, species, site, instrument,
 
     # Global attributes
     comment = f"{instrument} {species} data from {site_info[site]['station_long_name']}. " + \
-        "This data was originally processed by Derek Cunnold, Georgia Institute of Technology, " + \
+        "This data was originally processed by Georgia Institute of Technology, " + \
         "from the original files and has now been reprocessed into netCDF format."
 
     ds.attrs = {"comment": comment,

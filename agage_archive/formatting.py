@@ -400,3 +400,37 @@ def lookup_locals_and_attrs(v, local, attrs):
     else:
         # If set, format it
         return eval(f"format_{v}('{local[v]}')")
+
+
+def monthly_baseline(ds, ds_baseline):
+    '''Calculate monthly baseline mole fractions
+
+    Args:
+        ds (xr.Dataset): Dataset
+        ds_baseline (xr.Dataset): Baseline dataset
+
+    Returns:
+        xr.Dataset: Dataset with monthly baseline mole fractions
+    '''
+
+    # Select baseline points
+    ds_baseline_points = ds.where(ds_baseline.baseline == 1, drop=True)
+
+    # Calculate monthly mean
+    ds_monthly = ds_baseline_points.resample(time="1MS").mean()
+    
+    # Calculate monthly standard deviation
+    variability_name = "mf_variability"
+    ds_monthly[variability_name] = ds_baseline_points.mf.resample(time="1MS").std()
+    ds_monthly[variability_name].attrs["long_name"] = "Monthly standard deviation of baseline mole fractions"
+    ds_monthly[variability_name].attrs["units"] = ds.mf.attrs["units"]
+    
+    # Calculate standard error in mean
+    ds_monthly["mf_repeatability"] = ds_monthly["mf_repeatability"] / np.sqrt(ds_baseline_points.mf.resample(time = "1MS").count())
+    ds_monthly["mf_repeatability"].attrs["long_name"] = "Monthly standard error in mean of baseline mole fractions"
+    ds_monthly["mf_repeatability"].attrs["units"] = ds.mf.attrs["units"]
+
+    # Add baseline flag
+    ds_monthly.attrs["baseline_flag"] = ds_baseline.attrs["baseline_flag"]
+
+    return ds_monthly

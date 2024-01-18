@@ -7,11 +7,14 @@ from agage_archive.data_selection import read_release_schedule, read_data_combin
 from agage_archive.io import combine_datasets, combine_baseline, \
     read_nc, read_baseline, read_ale_gage, \
     output_dataset
+from agage_archive.formatting import monthly_baseline
 
 
 def run_individual_instrument(network, instrument,
                               verbose = False,
-                              baseline = ""):
+                              baseline = "",
+                              monthly = False,
+                              nspecies = -1):
     """Process individual data files for a given instrument.
     Reads the release schedule for the instrument
 
@@ -20,6 +23,8 @@ def run_individual_instrument(network, instrument,
             "AGAGE", "ALE", "GAGE", "GCMD", ...
         verbose (bool): Print progress to screen
         baseline (str): Baseline flag to use. If empty, don't process baselines
+        monthly (bool): Produce monthly baseline files
+        nspecies (int): Number of species to process. If -1, process all species. Useful for testing
     """
 
     rs = read_release_schedule(network, instrument)
@@ -34,7 +39,7 @@ def run_individual_instrument(network, instrument,
         instrument_out = instrument.upper()
 
     # Process for all species and sites
-    for species in rs.index:
+    for species in rs.index[0:nspecies]:
         for site in rs.columns:
             if rs.loc[species, site].lower() != "x":
 
@@ -50,9 +55,9 @@ def run_individual_instrument(network, instrument,
                 instrument_dates = read_data_combination(network, species, site,
                                                         verbose=False)
                 if len(instrument_dates) > 1:
-                    output_subpath = f"{species}/individual"
+                    output_subpath = f"event/{species}/individual"
                 else:
-                    output_subpath = species
+                    output_subpath = f"event/{species}"
 
                 output_dataset(ds, network, instrument=instrument_out,
                                output_subpath=output_subpath,
@@ -67,18 +72,34 @@ def run_individual_instrument(network, instrument,
                                end_date=rs.loc[species, site],
                                extra="-git-baseline",
                                verbose=verbose)
+                    
+                    if monthly:
+                        ds_baseline_monthly = monthly_baseline(ds, ds_baseline)
+                        output_dataset(ds_baseline_monthly, network, instrument=instrument_out,
+                               output_subpath=output_subpath.replace("event", "monthly"),
+                               end_date=rs.loc[species, site],
+                               extra="-monthly",
+                               verbose=verbose)
+
+                else:
+                    if monthly:
+                        raise NotImplementedError("Monthly baseline files can only be produced if baseline flag is specified")
 
 
 def run_combined_instruments(network,
                              baseline = False,
-                             verbose = False):
+                             monthly = False,
+                             verbose = False,
+                             nspecies = -1):
     """Process combined data files for a given network.
     Reads the data selection file to determine which sites to process
 
     Args:
         network (str): Network for output filenames
         baseline (bool): Process baselines. Boolean as only one baseline flag is available (GIT)
+        monthly (bool): Produce monthly baseline files
         verbose (bool): Print progress to screen
+        nspecies (int): Number of species to process. If -1, process all species. Useful for testing
     """
 
     with open_data_file("data_combination.xlsx", network=network) as data_selection_path:
@@ -96,7 +117,7 @@ def run_combined_instruments(network,
                             index_col="Species")
 
         # Loop through species in index
-        for species in df.index:
+        for species in df.index[0:nspecies]:
 
             # Produce combined dataset
             if verbose:
@@ -110,10 +131,12 @@ def run_combined_instruments(network,
                 ds_baseline = combine_baseline(network, species, site,
                                             verbose=verbose)
 
+            output_subpath = f"event/{species}"
+
             if verbose:
                 print(f"... outputting combined dataset for {species} at {site}")
             output_dataset(ds, network,
-                           output_subpath=species,
+                           output_subpath=output_subpath,
                            instrument="combined",
                            verbose=verbose)
             
@@ -121,18 +144,32 @@ def run_combined_instruments(network,
                 if verbose:
                     print(f"... outputting combined baseline for {species} at {site}")
                 output_dataset(ds_baseline, network,
-                               output_subpath=species + "/baseline_flags",
+                               output_subpath=output_subpath + "/baseline_flags",
                                instrument="combined",
                                extra="-git-baseline",
                                verbose=verbose)
+
+                if monthly:
+                    ds_baseline_monthly = monthly_baseline(ds, ds_baseline)
+                    output_dataset(ds_baseline_monthly, network,
+                               output_subpath=output_subpath.replace("event", "monthly"),
+                               instrument="combined",
+                               extra="-monthly",
+                               verbose=verbose)
+
+            else:
+                if monthly:
+                    raise NotImplementedError("Monthly baseline files can only be produced if baseline flag is specified")
 
 
 def run_all(network,
             delete = True,
             combined = True,
             baseline = True,
+            monthly = True,
             include = [],
-            exclude = ["GCPDD"]):
+            exclude = ["GCPDD"],
+            nspecies = -1):
     """Process data files for multiple instruments. Reads the release schedule to determine which
     instruments to process
 
@@ -141,6 +178,10 @@ def run_all(network,
         combined (bool): Process combined data files
         include (list): List of instruments to process. If empty, process all instruments
         exclude (list): List of instruments to exclude from processing
+        baseline (bool): Process baselines. Boolean as only one baseline flag is available (GIT)
+        monthly (bool): Produce monthly baseline files
+        verbose (bool): Print progress to screen
+        nspecies (int): Number of species to process. If -1, process all species. Useful for testing
     """
 
     if not network:
@@ -184,7 +225,9 @@ def run_all(network,
 
     # Must run combined instruments first
     if combined:
-        run_combined_instruments(network, baseline=baseline, verbose=True)
+        run_combined_instruments(network,
+                                baseline=baseline, verbose=True,
+                                monthly=monthly, nspecies=nspecies)
 
     # If include is empty, process all instruments in release schedule
     if len(include) == 0:
@@ -198,9 +241,10 @@ def run_all(network,
         if instrument not in exclude:
             baseline_flag = {True: "git_pollution_flag", False: ""}[baseline]
             run_individual_instrument(network, instrument, 
-                                    baseline=baseline_flag, verbose=True)
+                                    baseline=baseline_flag, verbose=True,
+                                    monthly=monthly, nspecies=nspecies)
 
 
 if __name__ == "__main__":
 
-    run_all("agage")
+    run_all("agage", nspecies=1)
