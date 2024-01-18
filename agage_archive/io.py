@@ -736,33 +736,3 @@ def output_dataset(ds, network,
     output_write(ds_out, out_path, filename,
                  output_subpath=output_subpath, verbose=verbose)
 
-
-def output_baselines(ds, network,
-                    instrument = "GCMD",
-                    end_date = None,
-                    output_subpath = "",
-                    baseline_label = "_git-baseline",
-                    verbose = False):
-    '''Output baseline flag to netCDF file
-
-    Args:
-        ds (xr.Dataset): Dataset to output
-        network (str): Network
-        instrument (str, optional): Instrument. Defaults to "GCMD".
-        end_date (str, optional): End date to subset to. Defaults to None.
-        output_subpath (str, optional): Sub-path within output directory. Defaults to "".
-            Used to put species in sub-directories.
-        baseline_label (str, optional): Label to add to filename. Defaults to "_git-baseline".
-        verbose (bool, optional): Print verbose output. Defaults to False.
-    '''
-
-    out_path, filename = output_path(network, ds.attrs["species"], ds.attrs["site_code"], instrument,
-                                    extra=baseline_label)
-
-    ds_out = ds.copy(deep = True)
-
-    # Select time slice
-    ds_out = ds_out.sel(time=slice(None, end_date))
-
-    output_write(ds_out, out_path, filename,
-                output_subpath=output_subpath, verbose=verbose)

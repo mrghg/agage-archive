@@ -6,7 +6,7 @@ from agage_archive import Paths, open_data_file, data_file_list, data_file_path
 from agage_archive.data_selection import read_release_schedule, read_data_combination
 from agage_archive.io import combine_datasets, combine_baseline, \
     read_nc, read_baseline, read_ale_gage, \
-    output_dataset, output_baselines
+    output_dataset
 
 
 def run_individual_instrument(network, instrument,
