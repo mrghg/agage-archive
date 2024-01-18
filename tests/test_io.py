@@ -5,7 +5,8 @@ import json
 
 from agage_archive import Paths, open_data_file, data_file_path, data_file_list
 from agage_archive.convert import scale_convert
-from agage_archive.io import read_ale_gage, combine_datasets, read_nc_path, read_nc, read_baseline, combine_baseline
+from agage_archive.io import read_ale_gage, combine_datasets, read_nc_path, read_nc, \
+    read_baseline, combine_baseline, output_dataset
 
 
 paths = Paths("agage_test")
@@ -217,6 +218,12 @@ def test_read_baseline():
         elif flag_name == "git_pollution_flag":
             assert "Georgia Tech" in ds_baseline.attrs["comment"]
 
+        # Test outputting baseline dataset
+        output_dataset(ds_baseline, "agage_test", instrument="GCMS-Medusa",
+            output_subpath="baselines/",
+            extra = "-git-baseline",
+            verbose=False)
+        
 
 def test_combine_baseline():
 

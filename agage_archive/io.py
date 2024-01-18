@@ -710,6 +710,7 @@ def output_dataset(ds, network,
                    instrument = "GCMD",
                    end_date = None,
                    output_subpath = "",
+                   extra = "",
                    verbose = False):
     '''Output dataset to netCDF file
 
@@ -720,10 +721,12 @@ def output_dataset(ds, network,
         end_date (str, optional): End date to subset to. Defaults to None.
         output_subpath (str, optional): Sub-path within output directory. Defaults to "".
             Used to put species in sub-directories.
+        extra (str, optional): Extra string to add to filename. Defaults to "".
         verbose (bool, optional): Print verbose output. Defaults to False.
     '''
 
-    out_path, filename = output_path(network, ds.attrs["species"], ds.attrs["site_code"], instrument)
+    out_path, filename = output_path(network, ds.attrs["species"], ds.attrs["site_code"], instrument,
+                                     extra=extra)
 
     ds_out = ds.copy(deep = True)
 

@@ -4,12 +4,14 @@ from zipfile import ZipFile
 
 from agage_archive import Paths, open_data_file, data_file_list, data_file_path
 from agage_archive.data_selection import read_release_schedule, read_data_combination
-from agage_archive.io import combine_datasets, read_nc, read_nc_baseline, read_ale_gage, \
-    read_ale_gage_baseline, output_dataset, output_baselines
+from agage_archive.io import combine_datasets, combine_baseline, \
+    read_nc, read_baseline, read_ale_gage, \
+    output_dataset, output_baselines
 
 
 def run_individual_instrument(network, instrument,
-                              verbose=False):
+                              verbose = False,
+                              baseline = ""):
     """Process individual data files for a given instrument.
     Reads the release schedule for the instrument
 
@@ -17,17 +19,18 @@ def run_individual_instrument(network, instrument,
         instrument (str): Instrument to process. Must match sheet names in release schedule, e.g.:
             "AGAGE", "ALE", "GAGE", "GCMD", ...
         verbose (bool): Print progress to screen
+        baseline (str): Baseline flag to use. If empty, don't process baselines
     """
 
     rs = read_release_schedule(network, instrument)
 
     if instrument.upper() == "ALE" or instrument.upper() == "GAGE":
         read_function = read_ale_gage
-        read_baseline_function = read_ale_gage_baseline
+        read_baseline_function = read_baseline
         instrument_out = instrument.upper() + "-GCMD"
     else:
         read_function = read_nc
-        read_baseline_function = read_nc_baseline
+        read_baseline_function = read_baseline
         instrument_out = instrument.upper()
 
     # Process for all species and sites
@@ -38,8 +41,10 @@ def run_individual_instrument(network, instrument,
                 ds = read_function(network, species, site, instrument,
                                 verbose=verbose)
 
-                ds_baseline = read_baseline_function(network, species, site, instrument,
-                                            verbose=verbose)
+                if baseline:
+                    ds_baseline = read_baseline_function(network, species, site, instrument,
+                                                flag_name = baseline,
+                                                verbose = verbose)
 
                 # If multiple instruments, store individual file in subdirectory
                 instrument_dates = read_data_combination(network, species, site,
@@ -54,19 +59,25 @@ def run_individual_instrument(network, instrument,
                                end_date=rs.loc[species, site],
                                verbose=verbose)
 
-                output_baselines(ds, network, instrument=instrument_out,
-                               output_subpath="baselines" + output_subpath,
+                if baseline:
+                    if (ds_baseline.time != ds.time).any():
+                        raise ValueError(f"Baseline and data files for {species} at {site} have different timestamps")
+                    output_dataset(ds_baseline, network, instrument=instrument_out,
+                               output_subpath="baselines/" + output_subpath,
                                end_date=rs.loc[species, site],
+                               extra="-git-baseline",
                                verbose=verbose)
 
 
 def run_combined_instruments(network,
+                             baseline = False,
                              verbose = False):
     """Process combined data files for a given network.
     Reads the data selection file to determine which sites to process
 
     Args:
         network (str): Network for output filenames
+        baseline (bool): Process baselines. Boolean as only one baseline flag is available (GIT)
         verbose (bool): Print progress to screen
     """
 
@@ -92,17 +103,34 @@ def run_combined_instruments(network,
                 print(f"... combining datasets for {species} at {site}")
             ds = combine_datasets(network, species, site, verbose=verbose)
 
+            if baseline:
+                if verbose:
+                    print(f"... combining baselines for {species} at {site}")
+                # Note that GIT baselines is hard-wired here because Met Office not available for ALE/GAGE
+                ds_baseline = combine_baseline(network, species, site,
+                                            verbose=verbose)
+
             if verbose:
                 print(f"... outputting combined dataset for {species} at {site}")
             output_dataset(ds, network,
                            output_subpath=species,
                            instrument="combined",
                            verbose=verbose)
+            
+            if baseline:
+                if verbose:
+                    print(f"... outputting combined baseline for {species} at {site}")
+                output_dataset(ds_baseline, network,
+                               output_subpath="baselines/" + species,
+                               instrument="combined",
+                               extra="-git-baseline",
+                               verbose=verbose)
 
 
 def run_all(network,
             delete = True,
             combined = True,
+            baseline = True,
             include = [],
             exclude = ["GCPDD"]):
     """Process data files for multiple instruments. Reads the release schedule to determine which
@@ -156,7 +184,7 @@ def run_all(network,
 
     # Must run combined instruments first
     if combined:
-        run_combined_instruments(network, verbose=True)
+        run_combined_instruments(network, baseline=baseline, verbose=True)
 
     # If include is empty, process all instruments in release schedule
     if len(include) == 0:
@@ -168,7 +196,9 @@ def run_all(network,
     # Processing
     for instrument in instruments:
         if instrument not in exclude:
-            run_individual_instrument(network, instrument, verbose=True)
+            baseline_flag = {True: "git_pollution_flag", False: ""}[baseline]
+            run_individual_instrument(network, instrument, 
+                                    baseline=baseline_flag, verbose=True)
 
 
 if __name__ == "__main__":
