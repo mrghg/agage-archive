@@ -63,7 +63,7 @@ def run_individual_instrument(network, instrument,
                     if (ds_baseline.time != ds.time).any():
                         raise ValueError(f"Baseline and data files for {species} at {site} have different timestamps")
                     output_dataset(ds_baseline, network, instrument=instrument_out,
-                               output_subpath="baselines/" + output_subpath,
+                               output_subpath=output_subpath + "/baseline_flags",
                                end_date=rs.loc[species, site],
                                extra="-git-baseline",
                                verbose=verbose)
@@ -121,7 +121,7 @@ def run_combined_instruments(network,
                 if verbose:
                     print(f"... outputting combined baseline for {species} at {site}")
                 output_dataset(ds_baseline, network,
-                               output_subpath="baselines/" + species,
+                               output_subpath=species + "/baseline_flags",
                                instrument="combined",
                                extra="-git-baseline",
                                verbose=verbose)
