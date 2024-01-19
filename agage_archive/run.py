@@ -247,4 +247,4 @@ def run_all(network,
 
 if __name__ == "__main__":
 
-    run_all("agage", nspecies=1)
+    run_all("agage")
