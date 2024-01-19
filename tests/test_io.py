@@ -5,7 +5,8 @@ import json
 
 from agage_archive import Paths, open_data_file, data_file_path, data_file_list
 from agage_archive.convert import scale_convert
-from agage_archive.io import read_ale_gage, combine_datasets
+from agage_archive.io import read_ale_gage, combine_datasets, read_nc_path, read_nc, \
+    read_baseline, combine_baseline, output_dataset
 
 
 paths = Paths("agage_test")
@@ -174,3 +175,71 @@ def test_data_file_list():
     assert "test_top_level.txt" not in files
     assert "B/C.txt" in files
 
+
+def test_read_nc_path():
+
+    nc_file, sub_path = read_nc_path("agage_test", "CH3CCl3", "CGO", "GCMS-Medusa")
+    assert nc_file == "AGAGE-GCMS-Medusa_CGO_ch3ccl3.nc"
+    assert sub_path == "data-gcms-nc"
+
+    nc_file, sub_path = read_nc_path("agage_test", "NF3", "MHD", "GCMS-Medusa")
+    assert nc_file == "AGAGE-GCMS-Medusa_MHD_nf3.nc"
+    assert sub_path == "data-gcms-nc"
+
+    nc_file, sub_path = read_nc_path("agage_test", "CH3CCl3", "CGO", "GCMD")
+    assert nc_file == "AGAGE-GCMD_CGO_ch3ccl3.nc"
+    assert sub_path == "data-nc"
+
+
+def test_read_baseline():
+
+    for flag_name in ["git_pollution_flag"]:
+#    for flag_name in ["met_office_baseline_flag", "git_pollution_flag"]:
+
+        ds_baseline = read_baseline("agage_test",
+            "CH3CCl3", "CGO", "GCMS-Medusa",
+            flag_name = flag_name)
+
+        # Check baseline flags exist and has integer values
+        assert "baseline" in ds_baseline.data_vars.keys()
+        assert isinstance(ds_baseline.baseline.values[0], np.int8)
+
+        # Check some attributes
+        assert ds_baseline.attrs["species"] == "ch3ccl3"
+        assert ds_baseline.attrs["instrument"] == "GCMS-Medusa"
+        assert ds_baseline.attrs["site_code"] == "CGO"
+        assert "citation" in ds_baseline.attrs.keys()
+
+        assert ds_baseline.time.attrs["long_name"] == "time"
+
+        # Check that the right baseline flag has been extracted
+        if flag_name == "met_office_baseline_flag":
+            assert "Met Office" in ds_baseline.attrs["comment"]
+        elif flag_name == "git_pollution_flag":
+            assert "Georgia Tech" in ds_baseline.attrs["comment"]
+
+        # Test outputting baseline dataset
+        output_dataset(ds_baseline, "agage_test", instrument="GCMS-Medusa",
+            output_subpath="baselines/",
+            extra = "-git-baseline",
+            verbose=False)
+        
+
+def test_combine_baseline():
+
+    ds_baseline = combine_baseline("agage_test", "CH3CCl3", "CGO")
+
+    # Check baseline flags exist and has integer values
+    assert "baseline" in ds_baseline.data_vars.keys()
+    assert isinstance(ds_baseline.baseline.values[0], np.int8)
+
+    # Check some attributes
+    assert ds_baseline.attrs["species"] == "ch3ccl3"
+    assert ds_baseline.attrs["site_code"] == "CGO"
+    assert "citation" in ds_baseline.attrs.keys()
+
+    assert ds_baseline.time.attrs["long_name"] == "time"
+
+    # Check that ds_baseline has the same timestamps as the output of combine_datasets
+    ds = combine_datasets("agage_test", "CH3CCl3", "CGO", verbose=False)
+    assert (ds_baseline.time.values == ds.time.values).all()

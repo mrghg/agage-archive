@@ -3,6 +3,7 @@ import json
 import pandas as pd
 import numpy as np
 from zipfile import ZipFile
+from io import StringIO
 
 from agage_archive import Paths, open_data_file, data_file_list, data_file_path
 from agage_archive.convert import scale_convert
@@ -17,30 +18,39 @@ from agage_archive.util import tz_local_to_utc
 gcwerks_species = {"c2f6": "pfc-116",
                    "c3f8": "pfc-218",
                    "c4f8": "pfc-318"}
-    
 
-def read_nc(network, species, site, instrument,
-            verbose = False,
-            data_exclude = True,
-            scale = "default"):
-    """Read GCWerks netCDF files
+baseline_attrs = {"git_pollution_flag":{
+                    "comment": "Baseline flag from the Georgia Tech statistical filtering algorithm.",
+                    "citation": "O'Doherty et al. (2001)",
+                    "contact": "Ray Wang, Georgia Tech",
+                    "contact_email": "raywang@eas.gatech.edu"
+                    },
+                "met_office_baseline_flag":{
+                    "comment": "Baseline flag from the Met Office using the NAME model.",
+                    "citation": "",
+                    "contact": "Alistair Manning, Met Office",
+                    "contact_email": "alistair.manning@metoffice.gov.uk"
+                    },
+                }
+
+
+def read_nc_path(network, species, site, instrument):
+    """Find path to netCDF file
 
     Args:
-        network (str): Network, e.g., "agage"
+        network (str): Network
         species (str): Species
-        site (str): Site code
+        site (str): Site
         instrument (str): Instrument
-        verbose (bool, optional): Print verbose output. Defaults to False.
-        data_exclude (bool, optional): Exclude data based on data_exclude.xlsx. Defaults to True.
-        scale (str, optional): Scale to convert to. Defaults to "default". If None, will keep original scale.
 
     Raises:
-        FileNotFoundError: Can't find netCDF file
+        ValueError: Instrument must be one of GCMD, GCECD, Picarro, LGR, GCMS-ADS, GCMS-Medusa, GCMS-MteCimone
 
     Returns:
-        xarray.Dataset: Contents of netCDF file
+        str: Path to netCDF file
+        str: Sub-path within data directory
     """
-
+    
     paths = Paths(network)
 
     species_search = format_species(species)
@@ -75,11 +85,39 @@ def read_nc(network, species, site, instrument,
     else:
         nc_file = nc_files[0]
 
+    return nc_file, sub_path
+
+
+def read_nc(network, species, site, instrument,
+            verbose = False,
+            data_exclude = True,
+            baseline = None,
+            scale = "default"):
+    """Read GCWerks netCDF files
+
+    Args:
+        network (str): Network, e.g., "agage"
+        species (str): Species
+        site (str): Site code
+        instrument (str): Instrument
+        verbose (bool, optional): Print verbose output. Defaults to False.
+        data_exclude (bool, optional): Exclude data based on data_exclude.xlsx. Defaults to True.
+        scale (str, optional): Scale to convert to. Defaults to "default". If None, will keep original scale.
+
+    Raises:
+        FileNotFoundError: Can't find netCDF file
+
+    Returns:
+        xarray.Dataset: Contents of netCDF file
+    """
+
+    nc_file, sub_path = read_nc_path(network, species, site, instrument)
+
     if verbose:
         print(f"... reading {nc_file}")
 
     # Read netCDF file
-    with open_data_file(nc_file, network, sub_path=sub_path, verbose=True) as f:
+    with open_data_file(nc_file, network, sub_path=sub_path, verbose=verbose) as f:
         with xr.open_dataset(f, engine="h5netcdf") as ds_file:
             ds = ds_file.load()
 
@@ -94,6 +132,15 @@ def read_nc(network, species, site, instrument,
     # Add sampling time to variables
     ds["sampling_period"] = xr.DataArray(np.ones(len(ds.time)).astype(np.int16)*sampling_period,
                                         coords={"time": ds.time})
+
+    # Baseline flags
+    if baseline:
+        ds_baseline = ds[baseline].copy(deep=True).to_dataset(name="baseline")
+
+        # Convert to integer
+        # When ASCII value is "B" (66), flag is 1, otherwise 0
+        ds_baseline.baseline.values = ds_baseline.baseline == 66
+        ds_baseline = ds_baseline.astype(np.int8)
 
     # Everything should have been flagged in the AGAGE files already, but just in case...
     flagged = ds.data_flag != 0
@@ -115,6 +162,10 @@ def read_nc(network, species, site, instrument,
                         network=network,
                         species=species)
 
+    # Temporarily add baseline flag back in
+    if baseline:
+        ds["baseline"] = xr.DataArray(ds_baseline.baseline.values, dims="time")
+
     # Remove any excluded data
     if data_exclude:
         ds = read_data_exclude(ds, format_species(species), site, instrument)
@@ -126,10 +177,78 @@ def read_nc(network, species, site, instrument,
                                site=site)
     ds = ds.sel(time=slice(None, rs))
 
+    # If baseline is True, return baseline dataset
+    if baseline:
+        return ds["baseline"].copy(deep=True).to_dataset(name="baseline")
+
     # Convert scale, if needed
     ds = scale_convert(ds, scale)
 
     return ds
+
+
+def read_baseline(network, species, site, instrument,
+                flag_name = "git_pollution_flag",
+                verbose = False):
+    """Read GCWerks netCDF files
+
+    Args:
+        network (str): Network, e.g., "agage"
+        species (str): Species
+        site (str): Site code
+        instrument (str): Instrument
+        flag_name (str, optional): Name of baseline flag variable. Defaults to "git_pollution_flag".
+        verbose (bool, optional): Print verbose output. Defaults to False.
+
+    Raises:
+        FileNotFoundError: Can't find netCDF file
+
+    Returns:
+        xarray.Dataset: Contents of netCDF file
+    """
+
+    if not instrument.lower() in ["ale", "gage"]:
+
+        ds_out = read_nc(network, species, site, instrument,
+                        verbose=verbose,
+                        baseline = flag_name)
+
+    else:
+
+        if flag_name != "git_pollution_flag":
+            raise ValueError("Only git_pollution_flag is available for ALE/GAGE data")
+
+        ds_out = read_ale_gage(network, species, site, instrument,
+                           baseline = True,
+                           verbose=verbose)
+
+    # Add attributes
+    ds_out.baseline.attrs = {
+        "long_name": "baseline_flag",
+        "flag_values": "0, 1",
+        "flag_meanings": "not_baseline, baseline"
+        }
+
+    # Remove "sampling_time_seconds" from time attributes, if it exists
+    if "sampling_time_seconds" in ds_out.time.attrs:
+        del ds_out.time.attrs["sampling_time_seconds"]
+
+    # Add global attributes
+    ds_out.attrs = baseline_attrs[flag_name]
+
+    # Add baseline flag as attribute
+    ds_out.attrs["baseline_flag"] = flag_name
+
+    # Add site code
+    ds_out.attrs["site_code"] = site.upper()
+
+    # Add species
+    ds_out.attrs["species"] = format_species(species)
+
+    # Add instrument
+    ds_out.attrs["instrument"] = instrument
+
+    return ds_out
 
 
 def ale_gage_timestamp_issues(datetime, timestamp_issues,
@@ -161,7 +280,8 @@ def read_ale_gage(network, species, site, instrument,
                   verbose = True,
                   utc = True,
                   data_exclude = True,
-                  scale = "default"):
+                  scale = "default",
+                  baseline = False):
     """Read GA Tech ALE/GAGE files, process and clean
 
     Args:
@@ -175,6 +295,7 @@ def read_ale_gage(network, species, site, instrument,
             utc must also be true, as timestamps are in UTC.
         scale (str, optional): Calibration scale. Defaults to None, which means no conversion is attempted.
             Set to "default" to use value in scale_defaults.csv.
+        baseline (bool, optional): Return baseline dataset. Defaults to False.
 
     Returns:
         pd.DataFrame: Pandas dataframe containing file contents
@@ -189,15 +310,15 @@ def read_ale_gage(network, species, site, instrument,
     paths = Paths(network)
 
     # Get data on ALE/GAGE sites
-    with open_data_file("ale_gage_sites.json", network = network) as f:
+    with open_data_file("ale_gage_sites.json", network = network, verbose=verbose) as f:
         site_info = json.load(f)
 
     # Get species info
-    with open_data_file("ale_gage_species.json", network = network) as f:
+    with open_data_file("ale_gage_species.json", network = network, verbose=verbose) as f:
         species_info = json.load(f)[format_species(species)]
 
     # Get Datetime issues list
-    with open_data_file("ale_gage_timestamp_issues.json", network = network) as f:
+    with open_data_file("ale_gage_timestamp_issues.json", network = network, verbose=verbose) as f:
         timestamp_issues = json.load(f)
         if site in timestamp_issues[instrument]:
             timestamp_issues = timestamp_issues[instrument][site]
@@ -210,7 +331,7 @@ def read_ale_gage(network, species, site, instrument,
     with open_data_file(f"{site_info[site]['gcwerks_name']}_sio1993.gtar.gz",
                         network = network,
                         sub_path = folder,
-                        verbose=True) as tar:
+                        verbose=verbose) as tar:
 
         dfs = []
 
@@ -231,8 +352,10 @@ def read_ale_gage(network, species, site, instrument,
 
             # Define column widths
             colspec = [3, 5, 7]
+            coldtypes = [int, int, int]
             for sp in header[3:]:
                 colspec += [7, 1]
+                coldtypes += [np.float32, str]
                 columns += [str(sp).replace("'", ""),
                             f"{sp}_pollution"]
 
@@ -286,6 +409,9 @@ def read_ale_gage(network, species, site, instrument,
         duplicated_indices = df_combined.index[df_combined.index.duplicated(keep=False)]
         raise ValueError(f"Duplicate indices found. Check timestamp issues: {duplicated_indices}")
 
+    # Store pollution flag
+    da_baseline = (df_combined[f"{species_info['species_name_gatech']}_pollution"] != "P").astype(np.int8)
+
     # Output one species
     df_combined = df_combined[species_info["species_name_gatech"]]
 
@@ -304,7 +430,7 @@ def read_ale_gage(network, species, site, instrument,
 
     # Global attributes
     comment = f"{instrument} {species} data from {site_info[site]['station_long_name']}. " + \
-        "This data was originally processed by Derek Cunnold, Georgia Institute of Technology, " + \
+        "This data was originally processed by Georgia Institute of Technology, " + \
         "from the original files and has now been reprocessed into netCDF format."
 
     ds.attrs = {"comment": comment,
@@ -326,6 +452,9 @@ def read_ale_gage(network, species, site, instrument,
 
     ds = format_variables(ds)
 
+    # Add pollution flag back in temporarily with dimension time
+    ds["baseline"] = xr.DataArray(da_baseline.values, dims="time")
+
     # Remove any excluded data. Only do this if time is UTC, otherwise it won't be in the file
     if data_exclude:
         if not utc:
@@ -338,10 +467,22 @@ def read_ale_gage(network, species, site, instrument,
                                site=site)
     ds = ds.sel(time=slice(None, rs))
 
+    # Remove pollution flag
+    ds_baseline = ds.baseline.copy(deep=True).to_dataset(name="baseline")
+    ds = ds.drop_vars("baseline")
+
+    # Raise error if baseline dataset is different length to main dataset
+    if len(ds_baseline.time) != len(ds.time):
+        raise ValueError("Baseline dataset is different length to main dataset. " + \
+                         "Check timestamp issues.")
+
     # Convert scale, if needed
     ds = scale_convert(ds, scale)
 
-    return ds
+    if baseline:
+        return ds_baseline
+    else:
+        return ds
 
 
 def combine_datasets(network, species, site, 
@@ -454,18 +595,66 @@ def combine_datasets(network, species, site,
     return ds_combined
 
 
-def output_dataset(ds, network,
-                   instrument = "GCMD",
-                   end_date = None,
-                   output_subpath = "",
-                   verbose = False):
-    '''Output dataset to netCDF file
+def combine_baseline(network, species, site,
+                     verbose = True):
+    '''Combine ALE/GAGE/AGAGE baseline datasets for a given species and site
 
     Args:
-        ds (xr.Dataset): Dataset to output
         network (str): Network
-        instrument (str, optional): Instrument. Defaults to "GCMD".
-        end_date (str, optional): End date to subset to. Defaults to None.
+        species (str): Species
+        site (str): Site
+        verbose (bool, optional): Print verbose output. Defaults to False.
+
+    Returns:
+        xr.Dataset: Dataset containing data
+    '''
+
+    # Read instrument dates from CSV files
+    instruments = read_data_combination(network, format_species(species), site)
+
+    # Combine datasets    
+    dss = []
+
+    for instrument, date in instruments.items():
+
+        # Read baseline. Only git_pollution_flag is available for ALE/GAGE data
+        ds = read_baseline(network, species, site, instrument,
+                           verbose=verbose, flag_name="git_pollution_flag")
+
+        # Subset date
+        ds = ds.sel(time=slice(*date))
+
+        if len(ds.time) == 0:
+            raise ValueError(f"No data retained for {species} {site} {instrument}. " + \
+                             "Check dates in data_combination or omit this instrument.")
+
+        dss.append(ds)
+
+    ds_combined = xr.concat(dss, dim="time")
+
+    # Sort by time
+    ds_combined = ds_combined.sortby("time")
+
+    return ds_combined
+
+
+def output_path(network, species, site, instrument,
+                extra = ""):
+    '''Determine output path and filename
+
+    Args:
+        network (str): Network
+        species (str): Species
+        site (str): Site
+        instrument (str): Instrument
+        extra (str, optional): Extra string to add to filename. Defaults to "".
+
+    Raises:
+        FileNotFoundError: Can't find output path
+
+    Returns:
+        pathlib.Path: Path to output directory
+        str: Filename
     '''
 
     paths = Paths(network)
@@ -477,32 +666,76 @@ def output_dataset(ds, network,
         raise FileNotFoundError(f"Can't find output path {output_path}")
     
     # Create filename
-    filename = f"{network.upper()}-{instrument}_{ds.attrs['site_code']}_{format_species(ds.attrs['species'])}.nc"
+    filename = f"{network.upper()}-{instrument}_{site}_{format_species(species)}{extra}.nc"
 
-    ds_out = ds.copy(deep = True)
+    return output_path, filename
+
+
+def output_write(ds, out_path, filename,
+                output_subpath = "",
+                verbose = False):
+    '''Write dataset to netCDF file
+
+    Args:
+        ds (xr.Dataset): Dataset to output
+        out_path (str): Path to output directory
+        filename (str): Filename
+        output_subpath (str, optional): Sub-path within output directory. Defaults to "".
+            Used to put species in sub-directories.
+        verbose (bool, optional): Print verbose output. Defaults to False.
+    '''
+
+    if verbose:
+        print(f"... writing {str(out_path) + '/' + output_subpath + '/' + filename}")
 
     # Can't have some time attributes
-    if "units" in ds_out.time.attrs:
-        del ds_out.time.attrs["units"]
-    if "calendar" in ds_out.time.attrs:
-        del ds_out.time.attrs["calendar"]
+    if "units" in ds.time.attrs:
+        del ds.time.attrs["units"]
+    if "calendar" in ds.time.attrs:
+        del ds.time.attrs["calendar"]
+
+    # Write file
+    if out_path.suffix == ".zip":
+        with ZipFile(out_path, mode="a") as zip:
+            zip.writestr(output_subpath + "/" + filename, ds.to_netcdf())
+    
+    else:
+        # Test if output_path exists and if not create it
+        if not (out_path / output_subpath).exists():
+            (out_path / output_subpath).mkdir()
+
+        with open(out_path / output_subpath / filename, mode="wb") as f:
+            # ds_out.to_netcdf(f, mode="w", format="NETCDF4", engine="h5netcdf")
+            ds.to_netcdf(f, mode="w")
+
+
+def output_dataset(ds, network,
+                   instrument = "GCMD",
+                   end_date = None,
+                   output_subpath = "",
+                   extra = "",
+                   verbose = False):
+    '''Output dataset to netCDF file
+
+    Args:
+        ds (xr.Dataset): Dataset to output
+        network (str): Network
+        instrument (str, optional): Instrument. Defaults to "GCMD".
+        end_date (str, optional): End date to subset to. Defaults to None.
+        output_subpath (str, optional): Sub-path within output directory. Defaults to "".
+            Used to put species in sub-directories.
+        extra (str, optional): Extra string to add to filename. Defaults to "".
+        verbose (bool, optional): Print verbose output. Defaults to False.
+    '''
+
+    out_path, filename = output_path(network, ds.attrs["species"], ds.attrs["site_code"], instrument,
+                                     extra=extra)
+
+    ds_out = ds.copy(deep = True)
 
     # Select time slice
     ds_out = ds_out.sel(time=slice(None, end_date))
 
-    if verbose:
-        print(f"... writing {str(output_path) + '/' + output_subpath + '/' + filename}")
+    output_write(ds_out, out_path, filename,
+                 output_subpath=output_subpath, verbose=verbose)
 
-    # Write file
-    if output_path.suffix == ".zip":
-        with ZipFile(output_path, mode="a") as zip:
-            zip.writestr(output_subpath + "/" + filename, ds_out.to_netcdf())
-                
-    else:
-        # Test if output_path exists and if not create it
-        if not (output_path / output_subpath).exists():
-            (output_path / output_subpath).mkdir()
-
-        with open(output_path / output_subpath / filename, mode="wb") as f:
-            # ds_out.to_netcdf(f, mode="w", format="NETCDF4", engine="h5netcdf")
-            ds_out.to_netcdf(f, mode="w")
