@@ -445,6 +445,9 @@ def monthly_baseline(ds, ds_baseline):
     ds_monthly["mf_repeatability"].attrs["long_name"] = "Monthly standard error in mean of baseline mole fractions"
     ds_monthly["mf_repeatability"].attrs["units"] = ds.mf.attrs["units"]
 
+    # Copy attributes
+    ds_monthly.attrs = ds.attrs.copy()
+
     # Add baseline flag
     ds_monthly.attrs["baseline_flag"] = ds_baseline.attrs["baseline_flag"]
 

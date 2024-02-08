@@ -4,6 +4,7 @@ import pandas as pd
 import numpy as np
 from zipfile import ZipFile
 from io import StringIO
+import json
 
 from agage_archive import Paths, open_data_file, data_file_list, data_file_path
 from agage_archive.convert import scale_convert
@@ -179,7 +180,9 @@ def read_nc(network, species, site, instrument,
 
     # If baseline is True, return baseline dataset
     if baseline:
-        return ds["baseline"].copy(deep=True).to_dataset(name="baseline")
+        ds_baseline = ds.baseline.copy(deep=True).to_dataset(name="baseline")
+        ds_baseline.attrs = ds.attrs
+        return ds_baseline
 
     # Convert scale, if needed
     ds = scale_convert(ds, scale)
@@ -206,6 +209,9 @@ def read_baseline(network, species, site, instrument,
     Returns:
         xarray.Dataset: Contents of netCDF file
     """
+
+    with open_data_file("attributes.json", this_repo=True) as f:
+        attributes_default = json.load(f)
 
     if not instrument.lower() in ["ale", "gage"]:
 
@@ -236,17 +242,13 @@ def read_baseline(network, species, site, instrument,
     # Add global attributes
     ds_out.attrs = baseline_attrs[flag_name]
 
-    # Add baseline flag as attribute
+    # Add some global attributes
     ds_out.attrs["baseline_flag"] = flag_name
-
-    # Add site code
     ds_out.attrs["site_code"] = site.upper()
-
-    # Add species
     ds_out.attrs["species"] = format_species(species)
-
-    # Add instrument
     ds_out.attrs["instrument"] = instrument
+    ds_out.attrs["network"] = network
+    ds_out.attrs["version"] = attributes_default["version"]
 
     return ds_out
 
@@ -640,7 +642,7 @@ def combine_baseline(network, species, site,
 
 
 def output_path(network, species, site, instrument,
-                extra = ""):
+                extra = "", version=""):
     '''Determine output path and filename
 
     Args:
@@ -649,6 +651,7 @@ def output_path(network, species, site, instrument,
         site (str): Site
         instrument (str): Instrument
         extra (str, optional): Extra string to add to filename. Defaults to "".
+        version (str, optional): Version number. Defaults to "".
 
     Raises:
         FileNotFoundError: Can't find output path
@@ -660,6 +663,8 @@ def output_path(network, species, site, instrument,
 
     paths = Paths(network)
 
+    version_str = f"_{version}" if version else ""
+
     output_path = data_file_path("", network = network, sub_path = paths.output_path)
 
     # Check if the output path exists
@@ -667,7 +672,7 @@ def output_path(network, species, site, instrument,
         raise FileNotFoundError(f"Can't find output path {output_path}")
     
     # Create filename
-    filename = f"{network.upper()}-{instrument}_{site}_{format_species(species)}{extra}.nc"
+    filename = f"{network.upper()}-{instrument}_{site}_{format_species(species)}{extra}{version_str}.nc"
 
     return output_path, filename
 
@@ -715,6 +720,7 @@ def output_dataset(ds, network,
                    end_date = None,
                    output_subpath = "",
                    extra = "",
+                   version = True,
                    verbose = False):
     '''Output dataset to netCDF file
 
@@ -725,12 +731,18 @@ def output_dataset(ds, network,
         end_date (str, optional): End date to subset to. Defaults to None.
         output_subpath (str, optional): Sub-path within output directory. Defaults to "".
             Used to put species in sub-directories.
-        extra (str, optional): Extra string to add to filename. Defaults to "".
+        extra (str, optional): Extra string to add to filename. 
+            Defaults to using the version number from global attributes.
         verbose (bool, optional): Print verbose output. Defaults to False.
     '''
 
+    if version:
+        version_str = f"{ds.attrs['version']}"
+    else:
+        version_str = ""
+
     out_path, filename = output_path(network, ds.attrs["species"], ds.attrs["site_code"], instrument,
-                                     extra=extra)
+                                     extra=extra, version=version_str)
 
     ds_out = ds.copy(deep = True)
 

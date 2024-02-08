@@ -11,6 +11,7 @@ def test_monthly_baseline():
             "mf_repeatability": (["time"], np.random.rand(len(time)))}
     ds = xr.Dataset(coords={"time": time}, data_vars=data)
     ds.mf.attrs["units"] = "1e-12"
+    ds.attrs["version"] = "test"
 
     # Create a sample baseline dataset
     baseline_data = {"baseline": (["time"], np.random.choice([0, 1], size=len(time)))}
@@ -39,3 +40,6 @@ def test_monthly_baseline():
 
     # Check if the baseline flag is added correctly
     assert ds_monthly.attrs["baseline_flag"] == ds_baseline.attrs["baseline_flag"]
+
+    # Check that a version number is present
+    assert "version" in ds_monthly.attrs.keys()
