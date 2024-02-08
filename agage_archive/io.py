@@ -388,7 +388,9 @@ def read_ale_gage(network, species, site, instrument,
             if utc:
                 df.index = tz_local_to_utc(df.index, network, site)
 
-            dfs.append(df)
+            # append data frame if it's not all NaN
+            if not df.empty:
+                dfs.append(df)
 
     # Concatenate monthly dataframes into single dataframe
     df_combined = pd.concat(dfs)
