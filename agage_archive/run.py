@@ -1,5 +1,5 @@
 import pandas as pd
-from shutil import rmtree
+from shutil import rmtree, copy
 from zipfile import ZipFile
 
 from agage_archive import Paths, open_data_file, data_file_list, data_file_path
@@ -267,6 +267,14 @@ def run_all(network,
     if out_pth.suffix == ".zip" and not out_pth.exists():
         with ZipFile(out_pth, "w") as f:
             pass
+
+    # Add the README file to the output .zip directory
+    
+    readme_path = data_file_path(filename='ZIPFILE_README.txt',
+                                 network='agage')
+    
+    copy(readme_path, out_pth)
+    
 
     # Must run combined instruments first
     if combined:
