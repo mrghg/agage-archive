@@ -14,7 +14,7 @@ def run_individual_instrument(network, instrument,
                               verbose = False,
                               baseline = "",
                               monthly = False,
-                              nspecies = -1):
+                              species = []):
     """Process individual data files for a given instrument.
     Reads the release schedule for the instrument
 
@@ -24,7 +24,7 @@ def run_individual_instrument(network, instrument,
         verbose (bool): Print progress to screen
         baseline (str): Baseline flag to use. If empty, don't process baselines
         monthly (bool): Produce monthly baseline files
-        nspecies (int): Number of species to process. If -1, process all species. Useful for testing
+        species (list): List of species to process. If empty, process all species
     """
 
     rs = read_release_schedule(network, instrument)
@@ -38,38 +38,48 @@ def run_individual_instrument(network, instrument,
         read_baseline_function = read_baseline
         instrument_out = instrument.upper()
 
-    # Process for all species and sites
-    for species in rs.index[0:nspecies]:
-        for site in rs.columns:
-            if rs.loc[species, site].lower() != "x":
+    if species:
+        # Process only those species that are in the release schedule
+        species_to_process = [sp for sp in species if sp in rs.index.values]
+        if not species_to_process:
+            print(f"No species to process for {instrument}, skipping...")
+            return
+    else:
+        # Process all species in the release schedule
+        species_to_process = rs.index.values
 
-                ds = read_function(network, species, site, instrument,
+    # Process for all species and sites
+    for sp in species_to_process:
+        for site in rs.columns:
+            if rs.loc[sp, site].lower() != "x":
+
+                ds = read_function(network, sp, site, instrument,
                                 verbose=verbose)
 
                 if baseline:
-                    ds_baseline = read_baseline_function(network, species, site, instrument,
+                    ds_baseline = read_baseline_function(network, sp, site, instrument,
                                                 flag_name = baseline,
                                                 verbose = verbose)
 
                 # If multiple instruments, store individual file in subdirectory
-                instrument_dates = read_data_combination(network, species, site,
+                instrument_dates = read_data_combination(network, sp, site,
                                                         verbose=False)
                 if len(instrument_dates) > 1:
-                    output_subpath = f"event/{species}/individual"
+                    output_subpath = f"event/{sp}/individual"
                 else:
-                    output_subpath = f"event/{species}"
+                    output_subpath = f"event/{sp}"
 
                 output_dataset(ds, network, instrument=instrument_out,
                                output_subpath=output_subpath,
-                               end_date=rs.loc[species, site],
+                               end_date=rs.loc[sp, site],
                                verbose=verbose)
 
                 if baseline:
                     if (ds_baseline.time != ds.time).any():
-                        raise ValueError(f"Baseline and data files for {species} at {site} have different timestamps")
+                        raise ValueError(f"Baseline and data files for {sp} at {site} have different timestamps")
                     output_dataset(ds_baseline, network, instrument=instrument_out,
                                output_subpath=output_subpath + "/baseline_flags",
-                               end_date=rs.loc[species, site],
+                               end_date=rs.loc[sp, site],
                                extra="-git-baseline",
                                verbose=verbose)
                     
@@ -77,7 +87,7 @@ def run_individual_instrument(network, instrument,
                         ds_baseline_monthly = monthly_baseline(ds, ds_baseline)
                         output_dataset(ds_baseline_monthly, network, instrument=instrument_out,
                                output_subpath=output_subpath.replace("event", "monthly"),
-                               end_date=rs.loc[species, site],
+                               end_date=rs.loc[sp, site],
                                extra="-monthly",
                                verbose=verbose)
 
@@ -90,7 +100,7 @@ def run_combined_instruments(network,
                              baseline = False,
                              monthly = False,
                              verbose = False,
-                             nspecies = -1):
+                             species = []):
     """Process combined data files for a given network.
     Reads the data selection file to determine which sites to process
 
@@ -99,7 +109,7 @@ def run_combined_instruments(network,
         baseline (bool): Process baselines. Boolean as only one baseline flag is available (GIT)
         monthly (bool): Produce monthly baseline files
         verbose (bool): Print progress to screen
-        nspecies (int): Number of species to process. If -1, process all species. Useful for testing
+        species (list): List of species to process. If empty, process all species
     """
 
     with open_data_file("data_combination.xlsx", network=network) as data_selection_path:
@@ -116,8 +126,19 @@ def run_combined_instruments(network,
                             sheet_name=site,
                             index_col="Species")
 
+        # Determine species to process
+        if species:
+            # Process only those species that are in the data selection file
+            species_to_process = [sp for sp in species if sp in df.index.values]
+            if not species_to_process:
+                print(f"No species to process for {site}, skipping...")
+                continue
+        else:
+            # Process all species in the data selection file
+            species_to_process = df.index.values
+
         # Loop through species in index
-        for species in df.index[0:nspecies]:
+        for species in species_to_process:
 
             # Produce combined dataset
             if verbose:
@@ -167,9 +188,9 @@ def run_all(network,
             combined = True,
             baseline = True,
             monthly = True,
-            include = [],
-            exclude = ["GCPDD"],
-            nspecies = -1):
+            instrument_include = [],
+            instrument_exclude = ["GCPDD"],
+            species = []):
     """Process data files for multiple instruments. Reads the release schedule to determine which
     instruments to process
 
@@ -181,11 +202,35 @@ def run_all(network,
         baseline (bool): Process baselines. Boolean as only one baseline flag is available (GIT)
         monthly (bool): Produce monthly baseline files
         verbose (bool): Print progress to screen
-        nspecies (int): Number of species to process. If -1, process all species. Useful for testing
+        species (list): List of species to process. If empty, process all species
     """
 
     if not network:
         raise ValueError("Must specify network")
+
+    if not isinstance(network, str):
+        raise TypeError("network must be a string")
+    
+    if not isinstance(delete, bool):
+        raise TypeError("delete must be a boolean")
+    
+    if not isinstance(combined, bool):
+        raise TypeError("combined must be a boolean")
+    
+    if not isinstance(baseline, bool):
+        raise TypeError("baseline must be a boolean")
+    
+    if not isinstance(monthly, bool):
+        raise TypeError("monthly must be a boolean")
+    
+    if not isinstance(instrument_include, list):
+        raise TypeError("instrument_include must be a list")
+    
+    if not isinstance(instrument_exclude, list):
+        raise TypeError("instrument_exclude must be a list")
+    
+    if not isinstance(species, list):
+        raise TypeError("species must be a list")
 
     path = Paths(network, errors="ignore")
 
@@ -227,24 +272,25 @@ def run_all(network,
     if combined:
         run_combined_instruments(network,
                                 baseline=baseline, verbose=True,
-                                monthly=monthly, nspecies=nspecies)
+                                monthly=monthly, species=species)
 
     # If include is empty, process all instruments in release schedule
-    if len(include) == 0:
+    if len(instrument_include) == 0:
         with open_data_file("data_release_schedule.xlsx", network=network) as frs:
             instruments = pd.ExcelFile(frs).sheet_names
     else:
-        instruments = include
+        instruments = instrument_include
 
     # Processing
     for instrument in instruments:
-        if instrument not in exclude:
+        if instrument not in instrument_exclude:
             baseline_flag = {True: "git_pollution_flag", False: ""}[baseline]
             run_individual_instrument(network, instrument, 
                                     baseline=baseline_flag, verbose=True,
-                                    monthly=monthly, nspecies=nspecies)
+                                    monthly=monthly, species=species)
 
 
 if __name__ == "__main__":
 
+#    run_all("agage", species = ["ch4"], delete=False)
     run_all("agage")
