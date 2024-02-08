@@ -4,22 +4,18 @@ Code for producing AGAGE archival files
 ## Installation
 Clone this repository using the address in the green ```<> code``` dropdown at the top of the Github page using:
 
-```git clone ...```
+```git clone <address>```
 
-Make sure that you have all of the required packages installed. Use the ```requirements.txt``` as a guide. It is recommended that you use conda and conda-forge:
+It will be easiest to create a new conda environment, ```conda conda create --name agage_env``` then intall ```pip``` using ```conda install pip```.
 
-```conda install -c conda-forge <package_name(s)>```
+Make sure that you have installed the required dependencies (see ```requirements.txt```), which can be done using ```pip install -r requirements.txt```.
 
-Make sure that this repository is in your path, for example by installing ```conda-build``` and running *from the repo root directory*:
-
-```conda develop .```
+Allow the package to be callable using ```pip install --no-build-isolation --no-deps -e . 
 
 ## Configuration
 Before beginning, run the configuration setup script, which can be accessed as:
 
-```
-python agage_archive/util.py
-```
+```python agage_archive/util.py```
 
 Input a descriptive user name when prompted. This function will create a file ```agage_archive/config.yaml```, which contains the default input and output data paths. Note that these paths will be relative to the data/network directory within this repository.
 
