@@ -10,7 +10,11 @@ The dvc and dvc-gcloud (Google Cloud plugin) are listed in the requirements file
 
 ## Initial setup
 
-Make sure that you have installed the required dependencies (see ```requirements.txt```), and run ```setup.py```, to set the desired input and output paths.
+It will probably be easiest to create a new conda environment, ```conda conda create --name agage_env``` then intall ```pip``` using ```conda install pip```.
+
+Make sure that you have installed the required dependencies (see ```requirements.txt```), which can be done using ```pip install -r requirements.txt```.
+
+Allow the package to be callable using ```pip install --no-build-isolation --no-deps -e . ``` and run ```python -c 'from agage_archive import util; util.setup()'```, to set the desired input and output paths.
 
 ### DVC initial setup
 
