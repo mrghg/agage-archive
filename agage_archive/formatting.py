@@ -416,17 +416,30 @@ def monthly_baseline(ds, ds_baseline):
     # Select baseline points
     ds_baseline_points = ds.where(ds_baseline.baseline == 1, drop=True)
 
+    # Remove any baseline points where the mole fraction is NaN
+    ds_baseline_points = ds_baseline_points.where(~np.isnan(ds_baseline_points.mf), drop=True)
+
     # Calculate monthly mean
-    ds_monthly = ds_baseline_points.resample(time="1MS").mean()
+    # If there are no baseline points, return an empty dataset with same attributes
+    if len(ds_baseline_points.time) == 0:
+        ds_monthly = ds.isel(time=[])
+    else:
+        ds_monthly = ds_baseline_points.resample(time="1MS").mean()
     
     # Calculate monthly standard deviation
     variability_name = "mf_variability"
-    ds_monthly[variability_name] = ds_baseline_points.mf.resample(time="1MS").std()
+    if len(ds_baseline_points.time) == 0:
+        ds_monthly[variability_name] = ds.mf.isel(time=[])
+    else:
+        ds_monthly[variability_name] = ds_baseline_points.mf.resample(time="1MS").std()
     ds_monthly[variability_name].attrs["long_name"] = "Monthly standard deviation of baseline mole fractions"
     ds_monthly[variability_name].attrs["units"] = ds.mf.attrs["units"]
     
     # Calculate standard error in mean
-    ds_monthly["mf_repeatability"] = ds_monthly["mf_repeatability"] / np.sqrt(ds_baseline_points.mf.resample(time = "1MS").count())
+    if len(ds_baseline_points.time) == 0:
+        ds_monthly["mf_repeatability"] = ds.mf.isel(time=[])
+    else:
+        ds_monthly["mf_repeatability"] = ds_monthly["mf_repeatability"] / np.sqrt(ds_baseline_points.mf.resample(time = "1MS").count())
     ds_monthly["mf_repeatability"].attrs["long_name"] = "Monthly standard error in mean of baseline mole fractions"
     ds_monthly["mf_repeatability"].attrs["units"] = ds.mf.attrs["units"]
 
