@@ -292,5 +292,5 @@ def run_all(network,
 
 if __name__ == "__main__":
 
-#    run_all("agage", species = ["ch4"], delete=False)
-    run_all("agage")
+    run_all("agage", species = ["ch4"], delete=False)
+#    run_all("agage")
