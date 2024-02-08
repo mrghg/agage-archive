@@ -36,7 +36,7 @@ class Paths():
         # Do this by finding the location of the .git folder in the working directory
         # and then going up one level
         if not this_repo:
-            working_directory = _Path.cwd()
+            working_directory = _Path(__file__)
             while True:
                 if (working_directory / ".git").exists():
                     break
