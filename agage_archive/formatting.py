@@ -299,6 +299,8 @@ def format_attributes(ds, instruments = [],
                     # e.g., the Å in Ny-Ålesund. This seems to fix it
                     if isinstance(att, str):
                         attrs[attr] = att.encode("utf-8", "surrogateescape").decode("UTF-8")
+                    else:
+                        attrs[attr] = att
 
     # Format certain key attributes, and determine if they have been set as keywords
     for v in ["species", "units", "calibration_scale", "network"]:
