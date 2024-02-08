@@ -3,7 +3,7 @@ import json
 import pytz
 import yaml
 
-from agage_archive import Paths, open_data_file
+from agage_archive.config import Paths, open_data_file
 
 
 def setup():

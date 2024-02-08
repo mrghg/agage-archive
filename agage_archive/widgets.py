@@ -1,7 +1,7 @@
 import xarray as xr
 from IPython.display import clear_output
 
-from agage_archive import Paths, data_file_list, open_data_file
+from agage_archive.config import Paths, data_file_list, open_data_file
 from agage_archive.visualise import plot_datasets
 
 

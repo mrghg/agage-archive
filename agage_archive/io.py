@@ -5,7 +5,7 @@ import numpy as np
 from zipfile import ZipFile
 from io import StringIO
 
-from agage_archive import Paths, open_data_file, data_file_list, data_file_path
+from agage_archive.config import Paths, open_data_file, data_file_list, data_file_path
 from agage_archive.convert import scale_convert
 from agage_archive.formatting import format_species, \
     format_variables, format_attributes

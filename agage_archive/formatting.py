@@ -3,7 +3,7 @@ import numpy as np
 import xarray as xr
 from datetime import datetime
 
-from agage_archive import open_data_file
+from agage_archive.config import open_data_file
 from agage_archive.util import is_number, lookup_username
 from agage_archive.definitions import instrument_type_definition, nc4_types
 
