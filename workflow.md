@@ -83,3 +83,7 @@ git commit -am "COMMENT DESCRIBING THE CHANGE YOU'VE MADE"
 dvc push
 git push
 ```
+
+## Copying relevant input files
+
+You will need to copy over the GCWerks output folders ```data-nc.zip``` and ```data-gcms-nc.zip``` from whereever you pull the data to your local ```data/archive``` folder (and zip the two folders if not zipped already).
