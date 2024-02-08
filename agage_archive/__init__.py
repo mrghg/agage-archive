@@ -36,7 +36,7 @@ class Paths():
         # Do this by finding the location of the .git folder in the working directory
         # and then going up one level
         if not this_repo:
-            working_directory = _Path(__file__)
+            working_directory = _Path.cwd()
             while True:
                 if (working_directory / ".git").exists():
                     break
@@ -45,7 +45,7 @@ class Paths():
                     if working_directory == _Path("/"):
                         raise FileNotFoundError("Can't find repository root")
         else:
-            working_directory = _Path(__file__).parent.parent
+            working_directory = _Path.cwd().parent.parent
 
         # Within working directory find package folder 
         # by looking for folder name with "_archive" in it, and __init__.py

@@ -7,6 +7,7 @@ Clone this repository using the address in the green ```<> code``` dropdown at t
 ```git clone <address>```
 
 It will be easiest to create a new conda environment, ```conda conda create --name agage_env``` then intall ```pip``` using ```conda install pip```.
+Alternatively, if avoiding conda, install a virtual environment using ```python -m venv agage_env``` and activate this using ```source agage_env/bin/activate```.
 
 Make sure that you have installed the required dependencies (see ```requirements.txt```), which can be done using ```pip install -r requirements.txt```.
 
