@@ -62,7 +62,7 @@ class Paths():
         self.config_file = self.root / "config.yaml"
         if not self.config_file.exists():
             raise FileNotFoundError(
-                "Config file not found. Try running util.setup first")
+                "Config file not found. Try running config.setup first")
 
         # Read config file
         with open(self.config_file) as f:
