@@ -191,6 +191,9 @@ def format_variables(ds,
 
     with open_data_file("variables.json", this_repo=True) as f:
         variables = json.load(f)
+    
+    with open_data_file("standard_names.json", this_repo=True) as f:
+        standard_names=json.load(f)
 
     attrs = ds.attrs.copy()
     
@@ -230,12 +233,19 @@ def format_variables(ds,
         ds[var].attrs = variables[var]["attrs"]
         ds[var].encoding = variables[var]["encoding"]
 
-        # for mole fractions, replace % with species name, etc.
+        # for mole fractions, replace % with species name in long_name
         if "mf" in var:
             ds[var].attrs["long_name"] = ds[var].attrs["long_name"].replace("%",
                                                         lookup_locals_and_attrs("species", locals(), attrs))
-            ds[var].attrs["standard_name"] = ds[var].attrs["standard_name"].replace("%",
-                                                        lookup_locals_and_attrs("species", locals(), attrs))
+        # standard names need to found from the standard_names.json for CF compliance. 
+        # if not in there (e.g. trichloroethylene the only example currently), no standard_name attribute assigned. 
+            if species in standard_names.keys():
+                ds[var].attrs["standard_name"]=ds[var].attrs["standard_name"].replace("%", 
+                                                                                      standard_names[lookup_locals_and_attrs("species",
+                                                                                                                             locals(),
+                                                                                                                             attrs)])
+
+
             ds[var].attrs["units"] = lookup_locals_and_attrs("units", locals(), attrs)
             ds[var].attrs["calibration_scale"] = lookup_locals_and_attrs("calibration_scale", locals(), attrs)
 
