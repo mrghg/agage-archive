@@ -2,7 +2,8 @@ from pathlib import Path as _Path
 import tarfile
 from zipfile import ZipFile
 import yaml
-from fnmatch import fnmatch, filter
+from fnmatch import fnmatch
+import psutil
 
 class Paths():
 
@@ -62,7 +63,7 @@ class Paths():
         self.config_file = self.root / "config.yaml"
         if not self.config_file.exists():
             raise FileNotFoundError(
-                "Config file not found. Try running config.setup first")
+                "Config file not found. Try running util.setup first")
 
         # Read config file
         with open(self.config_file) as f:
@@ -296,11 +297,32 @@ def open_data_file(filename,
 
     if pth.suffix == ".zip":
         with ZipFile(pth, "r") as z:
-            return z.open(filter(z.namelist(), filename)[0])
+            return z.open(filename)
     elif "tar.gz" in filename:
         return tarfile.open(pth / filename, "r:gz")
     else:
         return (pth / filename).open("rb")
+
+def is_jupyterlab_session():
+    """Check whether we are in a Jupyter-Lab session.
+    Taken from:
+    https://stackoverflow.com/questions/57173235/how-to-detect-whether-in-jupyter-notebook-or-lab
+    """
+    # inspect parent process for any signs of being a jupyter lab server
+    parent = psutil.Process().parent()
+    if parent.name() == "jupyter-lab":
+        return True
+    keys = (
+        "JUPYTERHUB_API_KEY",
+        "JPY_API_TOKEN",
+        "JUPYTERHUB_API_TOKEN",
+    )
+    env = parent.environ()
+    if any(k in env for k in keys):
+        return "jupyterlab"
+
+    return "notebook"
+
 
 if __name__ == "__main__":
     setup()

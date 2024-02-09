@@ -1,7 +1,7 @@
 import xarray as xr
 from IPython.display import clear_output
 
-from agage_archive.config import Paths, data_file_list, open_data_file
+from agage_archive.config import Paths, data_file_list, open_data_file, is_jupyterlab_session
 from agage_archive.visualise import plot_datasets
 
 
@@ -133,12 +133,13 @@ def plot_to_output(sender, network, species, network_site, output_widget):
     filenames = get_filenames(species, network_site)
     datasets = load_datasets(network, filenames)
 
+    renderer = is_jupyterlab_session()
     with output_widget:
         clear_output()
         print(f"Plotting {species} for {network_site}... please wait...")
         clear_output(True)
         fig = plot_datasets(datasets)
-        fig.show(renderer="notebook")
+        fig.show(renderer=renderer)
 
 
 def show_netcdf_info(sender, network, species, network_site, output_widget):
