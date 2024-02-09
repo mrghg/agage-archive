@@ -5,7 +5,7 @@ import json
 import tarfile
 from fnmatch import fnmatch
 
-from agage_archive import Paths as Pth
+from agage_archive.config import Paths as Pth
 from agage_archive.util import tz_local_to_utc
 
 paths = Pth()
