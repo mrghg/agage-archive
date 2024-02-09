@@ -41,7 +41,7 @@ class Paths():
                     if working_directory == _Path("/"):
                         raise FileNotFoundError("Can't find repository root")
         else:
-            working_directory = _Path(__file__).parent.parent
+            working_directory = _Path.cwd()
 
         # Within working directory find package folder 
         # by looking for folder name with "_archive" in it, and __init__.py

@@ -17,7 +17,7 @@ If using conda, you can use ```conda develop .``` but note that this functionali
 ## Configuration
 Before beginning, run the configuration setup script, which can be accessed as:
 
-```python python config.py```
+```python agage_archive/config.py```
 
 Input a descriptive user name when prompted. This function will create a file ```agage_archive/config.yaml```, which contains the default input and output data paths. Note that these paths will be relative to the data/network directory within this repository.
 
