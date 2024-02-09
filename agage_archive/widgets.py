@@ -1,5 +1,4 @@
 import xarray as xr
-import glob
 from IPython.display import clear_output
 
 from agage_archive.config import Paths, data_file_list, open_data_file
