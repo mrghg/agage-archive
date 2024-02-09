@@ -119,6 +119,10 @@ def test_combine_datasets():
     assert np.isclose(np.nanmean(ds.reindex_like(ds_gage_noscale).mf.values / ds_gage_noscale.mf.values),
         scale_conversion.loc[species, "SIO-98/SIO-93"] * scale_conversion.loc[species, "SIO-05/SIO-98"], rtol=0.00001)
 
+    # Test that a version number has been added
+    assert "version" in ds.attrs.keys()
+    assert ds.attrs["version"] != ""
+
 
 def test_data_file_path():
 
@@ -243,3 +247,8 @@ def test_combine_baseline():
     # Check that ds_baseline has the same timestamps as the output of combine_datasets
     ds = combine_datasets("agage_test", "CH3CCl3", "CGO", verbose=False)
     assert (ds_baseline.time.values == ds.time.values).all()
+
+    # Test that a version number has been added
+    assert "version" in ds_baseline.attrs.keys()
+    assert ds_baseline.attrs["version"] != ""
+

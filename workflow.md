@@ -10,7 +10,13 @@ The dvc and dvc-gcloud (Google Cloud plugin) are listed in the requirements file
 
 ## Initial setup
 
-Make sure that you have installed the required dependencies (see ```requirements.txt```), and run ```setup.py```, to set the desired input and output paths.
+It will probably be easiest to create a new conda environment, ```conda conda create --name agage_env``` then install ```pip``` using ```conda install pip```.
+Alternatively, if avoiding conda, install a virtual environment using ```python -m venv agage_env``` and activate this using ```source agage_env/bin/activate```.
+
+Make sure that you have installed the required dependencies (see ```requirements.txt```), which can be done using ```pip install -r requirements.txt```.
+
+Allow the package to be callable using ```pip install --no-build-isolation --no-deps -e . ``` and run ```python config.py```, to set the desired input and output paths.
+If using conda, you can use ```conda develop .``` but note that this functionality is now depricated.
 
 ### DVC initial setup
 
@@ -79,3 +85,7 @@ git commit -am "COMMENT DESCRIBING THE CHANGE YOU'VE MADE"
 dvc push
 git push
 ```
+
+## Copying relevant input files
+
+You will need to copy over the GCWerks output folders ```data-nc.zip``` and ```data-gcms-nc.zip``` from whereever you pull the data to your local ```data/archive``` folder (and zip the two folders if not zipped already).
