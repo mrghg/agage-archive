@@ -178,7 +178,7 @@ def read_nc(network, species, site, instrument,
     ds = ds.sel(time=slice(None, rs))
 
     # Check that time is monotonic and that there are no duplicate indices
-    if not ds.time.is_monotonic_increasing:
+    if not pd.Index(ds.time).is_monotonic_increasing:
         ds.sortby("time", inplace=True)
     if len(ds.time) != len(ds.time.drop_duplicates()):
         ds.drop_duplicates("time", inplace=True)
