@@ -29,7 +29,7 @@
         "attrs": {
             "long_name": "Mole fraction repeatability of % in dry air",
             "units": "",
-            "standard_name": "mole_fraction_of_%_standard_error",
+            "standard_name": "mole_fraction_of_%_repeatibility",
             "calibration_scale": ""
         },
         "encoding": {
