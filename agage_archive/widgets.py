@@ -1,4 +1,5 @@
 import xarray as xr
+import glob
 from IPython.display import clear_output
 
 from agage_archive.config import Paths, data_file_list, open_data_file
@@ -19,7 +20,7 @@ def file_search_species(network, species):
 
     files = data_file_list(network,
                            sub_path=paths.output_path,
-                           pattern=f"{species}/*.nc",
+                           pattern=f"*/{species}/*.nc",
                            errors="ignore_inputs")[2]
 
     return sorted(files)
@@ -85,9 +86,9 @@ def get_filenames(species, instrument_sites):
     for instrument_site in instrument_sites:
         site, instrument = instrument_site.split(', ')
         if "*" in instrument:
-            filenames.append(f"{species}/individual/{instrument.split('*')[-1]}_{site}_{species}.nc")
+            filenames.append(f"*/{species}/individual/{instrument.split('*')[-1]}_{site}_{species}_*.nc")
         else:
-            filenames.append(f"{species}/{instrument}_{site}_{species}.nc")
+            filenames.append(f"*/{species}/{instrument}_{site}_{species}_*.nc")
 
     return filenames
 

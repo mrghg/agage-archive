@@ -2,7 +2,8 @@ from pathlib import Path as _Path
 import tarfile
 from zipfile import ZipFile
 import yaml
-from fnmatch import fnmatch
+from fnmatch import fnmatch, filter
+import glob
 
 class Paths():
 
@@ -296,11 +297,13 @@ def open_data_file(filename,
 
     if pth.suffix == ".zip":
         with ZipFile(pth, "r") as z:
-            return z.open(filename)
+            return z.open(filter(z.namelist(), filename)[0])
     elif "tar.gz" in filename:
-        return tarfile.open(pth / filename, "r:gz")
+        with tarfile.open(pth, "r:gz") as z:
+            return z.extractfile(filter(z.getmembers(), filename)[0]).read()
     else:
-        return (pth / filename).open("rb")
+        all_files = glob.glob(f"{pth / '*'}") 
+        return (filter(all_files, filename)[0]).open("rb")
 
 if __name__ == "__main__":
     setup()
