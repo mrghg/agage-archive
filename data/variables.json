@@ -23,7 +23,8 @@
         "encoding": {
             "dtype": "f4"
         },
-        "optional": "False"
+        "optional": "False",
+        "resample_method": "mean"
     },
     "mf_repeatability": {
         "attrs": {
@@ -35,7 +36,8 @@
         "encoding": {
             "dtype": "f4"
         },
-        "optional": "False"
+        "optional": "False",
+        "resample_method": "mean"
     },
     "inlet_height": {
         "attrs": {
@@ -46,18 +48,20 @@
         "encoding": {
             "dtype": "i2"
         },
-        "optional": "False"
+        "optional": "False",
+        "resample_method": "median"
     },
     "sampling_period": {
         "attrs": {
             "long_name": "sampling_period",
             "units": "s",
-            "comment": "Time period over which sample was collected"
+            "comment": "Time period over which sample was collected or averaged"
         },
         "encoding": {
             "dtype": "i2"
         },
-        "optional": "True"
+        "optional": "True",
+        "resample_method": ""
     },
     "instrument_type": {
         "attrs": {
@@ -67,6 +71,7 @@
         "encoding": {
             "dtype": "i1"
         },
-        "optional": "True"
+        "optional": "True",
+        "resample_method": ""
     }
 }

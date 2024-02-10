@@ -1,10 +1,104 @@
 import pandas as pd
 import numpy as np
 import networkx as nx
+import json
 
 from agage_archive.config import open_data_file
 from agage_archive.data_selection import calibration_scale_default
 from agage_archive.formatting import format_species
+
+
+def resample(ds,
+            resample_period = 3600,
+            resample_threshold = 600,
+            ):
+    """Resample the dataset to a regular time interval
+    
+    Args:
+        ds (xarray.Dataset): Dataset
+        resample_period (int, optional): Period to resample to, in seconds. Defaults to 3600.
+        resample_threshold (int, optional): Threshold for resampling, in seconds. Defaults to 600.
+            If the median time difference is greater than this threshold, the dataset is not resampled.
+            So, if the threshold is 600s and the resample_period is 3600s and 1-minute data is provided, 
+            the dataset is resampled to houry. If 20-minute data is provided, the dataset is not resampled.
+
+    Returns:
+        xarray.Dataset: Resampled dataset
+    """
+
+    # Read variables.json
+    with open_data_file("variables.json", this_repo=True) as f:
+        variable_defaults = json.load(f)
+
+    # Add some additional variables that can be processed, but don't need to be in variables.json
+    variable_defaults["baseline"] = {"resample_method": ""}
+
+    # check if median time difference is less than minimum_averaging_period
+    if (ds.time.diff("time").median() < np.timedelta64(resample_threshold, "s")):
+
+        df = ds.to_dataframe()
+        df_resample = df.resample(f"{resample_period}S")
+        df_resample_means = df_resample.mean()
+
+        # Create new dataset to store resampled data
+        ds = ds.isel(time=0)
+        ds = ds.expand_dims(time=df_resample_means.index)
+
+        # Create list of variables from dataset, excluding time
+        variables = list(ds.variables)
+        variables.remove("time")
+
+        # Update variables with resampled data
+        for var in variables:
+            if variable_defaults[var]["resample_method"] == "mean":
+                ds[var].values = df_resample_means[var].values
+            elif variable_defaults[var]["resample_method"] == "median":
+                ds[var].values = df_resample[var].median().values
+            elif variable_defaults[var]["resample_method"] == "sum":
+                ds[var].values = df_resample[var].sum().values
+            else:
+                if var == "baseline":
+                    # If any value in a resampled period is not 1, set baseline to 0
+                    ds[var].values = np.where(df_resample[var].prod() != 1, 0, 1)
+                elif var == "sampling_period":
+                    # Set sampling period to 10 minutes
+                    ds[var].values = np.ones_like(ds.time.values).astype(float) * resample_period
+                elif var == "time":
+                    pass
+                else:
+                    raise ValueError(f"Resample method not defined for {var}")
+
+    else:
+        return ds
+
+
+def test_resample():
+    """Test resample function"""
+
+    # Create test dataset
+    time = pd.date_range(start="2021-01-01", end="2021-01-02", freq="1min")
+    data = np.random.rand(len(time))
+    ds = xr.Dataset({"time": time, 
+                    "mf": ("time", data),
+                    "mf_repeatability": ("time", data * 0.1),
+                    "sampling_period": ("time", np.ones(len(time)) * 60),
+                    "baseline": ("time", np.ones(len(time)))})
+
+    # Test resample function
+    ds_resample = resample(ds, resample_period=3600, resample_threshold=600)
+
+    # Check that the dataset has been resampled to hourly
+    assert ds_resample.time.diff("time").median() == np.timedelta64(3600, "s")
+
+    # Check that the resampled dataset has the same number of time points as the original
+    assert len(ds_resample.time) == len(ds.time) / 60
+
+    # Check that the baseline variable has been resampled correctly
+    #TODO: Improve this test
+    assert np.all(ds_resample.baseline.values == 1)
+
+    # Check that the sampling_period variable has been resampled correctly
+    assert np.all(ds_resample.sampling_period.values == 3600)
 
 
 def scale_graph(species):
