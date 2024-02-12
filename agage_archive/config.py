@@ -138,7 +138,8 @@ def setup():
                 "gcms_path": "data-gcms-nc.zip",
                 "ale_path": "ale_gage_sio1993/ale",
                 "gage_path": "ale_gage_sio1993/gage",
-                "output_path": "agage-public-archive.zip"
+                "output_path": "agage-public-archive.zip",
+                "output_path_private" : "agage-private-archive.zip"
         }
     }
 
