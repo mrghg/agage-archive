@@ -311,7 +311,7 @@ def is_jupyterlab_session():
     # inspect parent process for any signs of being a jupyter lab server
     parent = psutil.Process().parent()
     if parent.name() == "jupyter-lab":
-        return True
+        return "jupyterlab"
     keys = (
         "JUPYTERHUB_API_KEY",
         "JPY_API_TOKEN",
