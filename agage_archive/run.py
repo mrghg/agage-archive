@@ -317,10 +317,10 @@ def run_all(network,
 
 if __name__ == "__main__":
 
-    # print("####################################")
-    # print("#####Processing public archive######")
-    # print("####################################")
-    # run_all("agage", species = ["ch4"])
+    print("####################################")
+    print("#####Processing public archive######")
+    print("####################################")
+    run_all("agage", species = ["ch4"])
     print("####################################")
     print("#####Processing private archive#####")
     print("####################################")
