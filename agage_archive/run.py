@@ -29,9 +29,7 @@ def run_individual_instrument(network, instrument,
         public (bool, optional): Whether the dataset is for public release. Default to True.
     """
     
-    rs = read_release_schedule(network, instrument)
-    if not public:
-        rs = rs.where(rs.values == "x", "2100-01-01 00:00")
+    rs = read_release_schedule(network, instrument, public=public)
 
     if instrument.upper() == "ALE" or instrument.upper() == "GAGE":
         read_function = read_ale_gage
@@ -319,5 +317,11 @@ def run_all(network,
 
 if __name__ == "__main__":
 
-    run_all("agage", species = ["ch4"])
+    # print("####################################")
+    # print("#####Processing public archive######")
+    # print("####################################")
+    # run_all("agage", species = ["ch4"])
+    print("####################################")
+    print("#####Processing private archive#####")
+    print("####################################")
     run_all("agage", species = ["ch4"], public=False)

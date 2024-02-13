@@ -106,7 +106,7 @@ def read_nc(network, species, site, instrument,
         data_exclude (bool, optional): Exclude data based on data_exclude.xlsx. Defaults to True.
         scale (str, optional): Scale to convert to. Defaults to "default". If None, will keep original scale.
         public (bool, optional): Whether the dataset is for public release. Default to True.
-
+        
     Raises:
         FileNotFoundError: Can't find netCDF file
 
@@ -173,13 +173,13 @@ def read_nc(network, species, site, instrument,
     if data_exclude:
         ds = read_data_exclude(ds, format_species(species), site, instrument)
 
-    # Check against release schedule if for public release. 
-    if public:
-        rs = read_release_schedule(network, 
-                                instrument,
-                                species=format_species(species),
-                                site=site)
-        ds = ds.sel(time=slice(None, rs))
+    # Check against release schedule  
+    rs = read_release_schedule(network, 
+                            instrument,
+                            species=format_species(species),
+                            site=site,
+                            public=public)
+    ds = ds.sel(time=slice(None, rs))
 
     # If baseline is True, return baseline dataset
     if baseline:
@@ -287,7 +287,7 @@ def read_ale_gage(network, species, site, instrument,
                   data_exclude = True,
                   scale = "default",
                   baseline = False,
-                  public = True):
+                  public=True):
     """Read GA Tech ALE/GAGE files, process and clean
 
     Args:
@@ -470,12 +470,12 @@ def read_ale_gage(network, species, site, instrument,
         ds = read_data_exclude(ds, format_species(species), site, instrument)
 
     # Check against release schedule if for public release. 
-    if public:
-        rs = read_release_schedule(network, 
-                                instrument,
-                                species=format_species(species),
-                                site=site)
-        ds = ds.sel(time=slice(None, rs))
+    rs = read_release_schedule(network, 
+                            instrument,
+                            species=format_species(species),
+                            site=site,
+                            public=public)
+    ds = ds.sel(time=slice(None, rs))
 
     # Remove pollution flag
     ds_baseline = ds.baseline.copy(deep=True).to_dataset(name="baseline")
