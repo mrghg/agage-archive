@@ -2,7 +2,7 @@ from pathlib import Path as _Path
 import tarfile
 from zipfile import ZipFile
 import yaml
-from fnmatch import fnmatch
+from fnmatch import fnmatch, filter
 import psutil
 
 class Paths():
@@ -63,7 +63,7 @@ class Paths():
         self.config_file = self.root / "config.yaml"
         if not self.config_file.exists():
             raise FileNotFoundError(
-                "Config file not found. Try running util.setup first")
+                "Config file not found. Try running config.setup first")
 
         # Read config file
         with open(self.config_file) as f:
@@ -297,7 +297,7 @@ def open_data_file(filename,
 
     if pth.suffix == ".zip":
         with ZipFile(pth, "r") as z:
-            return z.open(filename)
+            return z.open(filter(z.namelist(), filename)[0])
     elif "tar.gz" in filename:
         return tarfile.open(pth / filename, "r:gz")
     else:
