@@ -59,15 +59,27 @@ def update_instrument_site(change, network, instrument_site_dropdown):
         network (str): Network
         network_site_dropdown (ipywidgets.Dropdown): Dropdown widget
     """
+    def filter_list(input_list):
+        
+        """Filter list to keep only first duplicate"""
+        seen_set = set()
+        result_list = []
+
+        for item in input_list:
+            if item not in seen_set:
+                seen_set.add(item)
+                result_list.append(item)
+
+        return result_list
 
     files = file_search_species(network, change["new"])
     instruments, sites = instruments_sites(files)
     options = sorted([f"{s}, {i}" for (s, i) in zip(sites, instruments) if "*" not in i])
     options += sorted([f"{s}, {i}" for (s, i) in zip(sites, instruments) if "*" in i])
     if instrument_site_dropdown:
-        instrument_site_dropdown.options = options
+        instrument_site_dropdown.options = filter_list(options)
     else:
-        return options
+        return filter_list(options)
 
 
 def get_filenames(species, instrument_sites):
