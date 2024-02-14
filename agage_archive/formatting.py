@@ -3,7 +3,7 @@ import numpy as np
 import xarray as xr
 from datetime import datetime
 
-from agage_archive import open_data_file
+from agage_archive.config import open_data_file
 from agage_archive.util import is_number, lookup_username
 from agage_archive.definitions import instrument_type_definition, nc4_types
 
@@ -454,6 +454,9 @@ def monthly_baseline(ds, ds_baseline):
         ds_monthly["mf_repeatability"] = ds_monthly["mf_repeatability"] / np.sqrt(ds_baseline_points.mf.resample(time = "1MS").count())
     ds_monthly["mf_repeatability"].attrs["long_name"] = "Monthly standard error in mean of baseline mole fractions"
     ds_monthly["mf_repeatability"].attrs["units"] = ds.mf.attrs["units"]
+
+    # Copy attributes
+    ds_monthly.attrs = ds.attrs.copy()
 
     # Add baseline flag
     ds_monthly.attrs["baseline_flag"] = ds_baseline.attrs["baseline_flag"]

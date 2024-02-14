@@ -1,4 +1,4 @@
-from agage_archive import Paths, open_data_file
+from agage_archive.config import Paths, open_data_file
 from agage_archive.formatting import lookup_locals_and_attrs, \
     format_species, format_units, format_calibration_scale
 from agage_archive.data_selection import calibration_scale_default

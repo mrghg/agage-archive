@@ -16,6 +16,7 @@ def test_monthly_baseline():
             "mf_repeatability": (["time"], np.random.rand(len(time)))}
     ds = xr.Dataset(coords={"time": time}, data_vars=data)
     ds.mf.attrs["units"] = "1e-12"
+    ds.attrs["version"] = "test"
 
     # Create a sample baseline dataset
     baseline_data = {"baseline": (["time"], np.random.choice([0, 1], size=len(time)))}
@@ -46,8 +47,7 @@ def test_monthly_baseline():
     assert ds_monthly.attrs["baseline_flag"] == ds_baseline.attrs["baseline_flag"]
 
     # Check that a version number is present
-    assert "version" in ds_monthly.attrs.keys()
-
+    assert "version" in ds_monthly.attrs.keys(
 
 def check_cf_compliance(dataset):
     """Tests the CF compliance of a dataset when written to netCDF format.

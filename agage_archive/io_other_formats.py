@@ -5,7 +5,7 @@ import json
 import tarfile
 from fnmatch import fnmatch
 
-from agage_archive import Paths as Pth
+from agage_archive.config import Paths as Pth
 from agage_archive.util import tz_local_to_utc
 
 paths = Pth()
@@ -80,13 +80,14 @@ def read_wang_file(file):
     return complete_data
 
 
-def read_wang(species, site, network, utc = False):
+def read_wang(species, site, network, instrument, utc = False):
     """ Read data from Ray Wang's files, concatinating individual years
 
     Args:
         species (str): Species name
         site (str): Site name
         network (str): Network name
+        instrument (str): Instrument name
         utc (bool): Convert to UTC
 
     Returns:
@@ -94,25 +95,25 @@ def read_wang(species, site, network, utc = False):
     """
 
     # Read ale_gage_sites.json
-    with open(paths.root / "data/ale_gage_sites.json", "r") as file:
+    with open(paths.root.parent / f"data/{network}/ale_gage_sites.json", "r") as file:
         site_info = json.load(file)
 
     # Read species_info.json
-    with open(paths.root / "data/ale_gage_species.json", "r") as file:
+    with open(paths.root.parent / f"data/{network}/ale_gage_species.json", "r") as file:
         species_info = json.load(file)[species]
 
     site_name = site_info[site]["gcwerks_name"]
     site_code = sites_wang[site]
 
     # Open tar file for network
-    tar_file = paths.root / f"data/ancilliary/wang_{network.lower()}.tar.gz"
+    tar_file = paths.root.parent / f"data/ancilliary/wang_{instrument.lower()}.tar.gz"
 
     with tarfile.open(tar_file, "r:gz") as tar:
         files = []
 
         # Determine which matching files are in the tar file
         for tarinfo in tar:
-            search_str = f"*{site_name}/{site_code}-{network.lower()}*.dap"
+            search_str = f"*/*{site_name}/{site_code}-{instrument.lower()}*.dap"
             if fnmatch(tarinfo.name, search_str):
                 files.append(tarinfo.name)
 
@@ -141,6 +142,6 @@ def read_wang(species, site, network, utc = False):
 
     # Convert to UTC, if needed
     if utc:
-        df.index = tz_local_to_utc(df.index, site)
+        df.index = tz_local_to_utc(df.index, network, site)
 
     return df

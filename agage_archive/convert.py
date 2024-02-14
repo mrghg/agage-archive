@@ -2,7 +2,7 @@ import pandas as pd
 import numpy as np
 import networkx as nx
 
-from agage_archive import open_data_file
+from agage_archive.config import open_data_file
 from agage_archive.data_selection import calibration_scale_default
 from agage_archive.formatting import format_species
 
