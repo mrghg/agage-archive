@@ -270,7 +270,7 @@ def run_all(network,
 
     # Add the README file to the output .zip directory
     
-    readme_path = data_file_path(filename='ZIPFILE_README.txt',
+    readme_path = data_file_path(filename='agage-data_README.md',
                                  network='agage')
     
     copy(readme_path, out_pth)

@@ -45,6 +45,9 @@ def test_monthly_baseline():
     # Check if the baseline flag is added correctly
     assert ds_monthly.attrs["baseline_flag"] == ds_baseline.attrs["baseline_flag"]
 
+    # Check that a version number is present
+    assert "version" in ds_monthly.attrs.keys()
+
 
 def check_cf_compliance(dataset):
     """Tests the CF compliance of a dataset when written to netCDF format.
