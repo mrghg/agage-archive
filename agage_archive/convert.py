@@ -37,7 +37,7 @@ def resample(ds,
     if (ds.time.diff("time").median() < np.timedelta64(resample_threshold, "s")):
 
         df = ds.to_dataframe()
-        df_resample = df.resample(f"{resample_period}S")
+        df_resample = df.resample(f"{resample_period}s")
         df_resample_means = df_resample.mean()
 
         # Create new dataset to store resampled data
@@ -68,7 +68,10 @@ def resample(ds,
                 else:
                     raise ValueError(f"Resample method not defined for {var}")
 
+        return ds
+
     else:
+
         return ds
 
 
