@@ -14,7 +14,8 @@ def run_individual_instrument(network, instrument,
                               verbose = False,
                               baseline = "",
                               monthly = False,
-                              species = []):
+                              species = [],
+                              public=True):
     """Process individual data files for a given instrument.
     Reads the release schedule for the instrument
 
@@ -25,9 +26,10 @@ def run_individual_instrument(network, instrument,
         baseline (str): Baseline flag to use. If empty, don't process baselines
         monthly (bool): Produce monthly baseline files
         species (list): List of species to process. If empty, process all species
+        public (bool, optional): Whether the dataset is for public release. Default to True.
     """
-
-    rs = read_release_schedule(network, instrument)
+    
+    rs = read_release_schedule(network, instrument, public=public)
 
     if instrument.upper() == "ALE" or instrument.upper() == "GAGE":
         read_function = read_ale_gage
@@ -54,12 +56,17 @@ def run_individual_instrument(network, instrument,
             if rs.loc[sp, site].lower() != "x":
 
                 ds = read_function(network, sp, site, instrument,
-                                verbose=verbose)
+                                   public = public, verbose=verbose)
 
                 if baseline:
                     ds_baseline = read_baseline_function(network, sp, site, instrument,
                                                 flag_name = baseline,
                                                 verbose = verbose)
+                    
+                # Non QCed data can sometimes have duplicate values
+                if not public:
+                    ds = ds.drop_duplicates("time")
+                    ds_baseline = ds_baseline.drop_duplicates("time")
 
                 # If multiple instruments, store individual file in subdirectory
                 instrument_dates = read_data_combination(network, sp, site,
@@ -72,6 +79,7 @@ def run_individual_instrument(network, instrument,
                 output_dataset(ds, network, instrument=instrument_out,
                                output_subpath=output_subpath,
                                end_date=rs.loc[sp, site],
+                               public=public,
                                verbose=verbose)
 
                 if baseline:
@@ -81,6 +89,7 @@ def run_individual_instrument(network, instrument,
                                output_subpath=output_subpath + "/baseline_flags",
                                end_date=rs.loc[sp, site],
                                extra="-git-baseline",
+                               public=public,
                                verbose=verbose)
                     
                     if monthly:
@@ -89,6 +98,7 @@ def run_individual_instrument(network, instrument,
                                output_subpath=output_subpath.replace("event", "monthly"),
                                end_date=rs.loc[sp, site],
                                extra="-monthly",
+                               public=public,
                                verbose=verbose)
 
                 else:
@@ -100,7 +110,8 @@ def run_combined_instruments(network,
                              baseline = False,
                              monthly = False,
                              verbose = False,
-                             species = []):
+                             species = [],
+                             public = True):
     """Process combined data files for a given network.
     Reads the data selection file to determine which sites to process
 
@@ -110,6 +121,7 @@ def run_combined_instruments(network,
         monthly (bool): Produce monthly baseline files
         verbose (bool): Print progress to screen
         species (list): List of species to process. If empty, process all species
+        public (bool, optional): Whether the dataset is for public release. Default to True.
     """
 
     with open_data_file("data_combination.xlsx", network=network) as data_selection_path:
@@ -159,6 +171,7 @@ def run_combined_instruments(network,
             output_dataset(ds, network,
                            output_subpath=output_subpath,
                            instrument="combined",
+                           public=public,
                            verbose=verbose)
             
             if baseline:
@@ -168,6 +181,7 @@ def run_combined_instruments(network,
                                output_subpath=output_subpath + "/baseline_flags",
                                instrument="combined",
                                extra="-git-baseline",
+                               public=public,
                                verbose=verbose)
 
                 if monthly:
@@ -176,6 +190,7 @@ def run_combined_instruments(network,
                                output_subpath=output_subpath.replace("event", "monthly"),
                                instrument="combined",
                                extra="-monthly",
+                               public=public,
                                verbose=verbose)
 
             else:
@@ -190,7 +205,8 @@ def run_all(network,
             monthly = True,
             instrument_include = [],
             instrument_exclude = ["GCPDD"],
-            species = []):
+            species = [],
+            public = True):
     """Process data files for multiple instruments. Reads the release schedule to determine which
     instruments to process
 
@@ -203,6 +219,8 @@ def run_all(network,
         monthly (bool): Produce monthly baseline files
         verbose (bool): Print progress to screen
         species (list): List of species to process. If empty, process all species
+        public (bool, optional): Whether the dataset is for public release. Default to True.
+        
     """
 
     if not network:
@@ -234,14 +252,19 @@ def run_all(network,
 
     path = Paths(network, errors="ignore")
 
-    out_pth = data_file_path("", network=network, sub_path=path.output_path, errors="ignore")
+    if public:
+        sub_path = path.output_path
+    else:
+        sub_path = path.output_path_private
+        
+    out_pth = data_file_path("", network=network, sub_path=sub_path, errors="ignore")
 
     if delete:
         # Clear output directory, removing all files and subdirectories
         network, sub_path, files = data_file_list(network=network,
-                                                  sub_path=path.output_path,
+                                                  sub_path=sub_path,
                                                   errors="ignore")
-        
+
         print(f'Deleting all files in {out_pth}')
 
         if out_pth.suffix == ".zip" and out_pth.exists():
@@ -272,7 +295,8 @@ def run_all(network,
     if combined:
         run_combined_instruments(network,
                                 baseline=baseline, verbose=True,
-                                monthly=monthly, species=species)
+                                monthly=monthly, species=species,
+                                public=public)
 
     # If include is empty, process all instruments in release schedule
     if len(instrument_include) == 0:
@@ -287,10 +311,17 @@ def run_all(network,
             baseline_flag = {True: "git_pollution_flag", False: ""}[baseline]
             run_individual_instrument(network, instrument, 
                                     baseline=baseline_flag, verbose=True,
-                                    monthly=monthly, species=species)
+                                    monthly=monthly, species=species,
+                                    public=public)
 
 
 if __name__ == "__main__":
 
+    print("####################################")
+    print("#####Processing public archive######")
+    print("####################################")
     run_all("agage", species = ["ch4"])
-#    run_all("agage")
+    print("####################################")
+    print("#####Processing private archive#####")
+    print("####################################")
+    run_all("agage", species = ["ch4"], public=False)
