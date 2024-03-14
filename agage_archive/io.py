@@ -7,7 +7,7 @@ from io import StringIO
 import json
 
 from agage_archive.config import Paths, open_data_file, data_file_list, data_file_path
-from agage_archive.convert import scale_convert
+from agage_archive.convert import scale_convert, resample
 from agage_archive.formatting import format_species, \
     format_variables, format_attributes
 from agage_archive.data_selection import read_release_schedule, read_data_exclude, \
@@ -177,6 +177,9 @@ def read_nc(network, species, site, instrument,
                                species=format_species(species),
                                site=site)
     ds = ds.sel(time=slice(None, rs))
+
+    # Resample dataset, if needed
+    ds = resample(ds)
 
     # If baseline is True, return baseline dataset
     if baseline:

@@ -21,9 +21,11 @@
             "calibration_scale": ""
         },
         "encoding": {
-            "dtype": "f4"
+            "dtype": "f4",
+            "_FillValue": -9999
         },
-        "optional": "False"
+        "optional": "False",
+        "resample_method": "mean"
     },
     "mf_repeatability": {
         "attrs": {
@@ -33,9 +35,25 @@
             "calibration_scale": ""
         },
         "encoding": {
-            "dtype": "f4"
+            "dtype": "f4",
+            "_FillValue": -9999
         },
-        "optional": "False"
+        "optional": "False",
+        "resample_method": "mean"
+    },
+    "mf_variability": {
+        "attrs": {
+            "long_name": "Mole fraction variability of % in dry air",
+            "units": "",
+            "standard_name": "mole_fraction_of_%_variability",
+            "calibration_scale": ""
+        },
+        "encoding": {
+            "dtype": "f4",
+            "_FillValue": -9999
+        },
+        "optional": "True",
+        "resample_method": ""
     },
     "inlet_height": {
         "attrs": {
@@ -44,20 +62,24 @@
             "comment": "Height of inlet above inlet_base_elevation_masl"
         },
         "encoding": {
-            "dtype": "i2"
+            "dtype": "i2",
+            "_FillValue": -99
         },
-        "optional": "False"
+        "optional": "False",
+        "resample_method": "median"
     },
     "sampling_period": {
         "attrs": {
             "long_name": "sampling_period",
             "units": "s",
-            "comment": "Time period over which sample was collected"
+            "comment": "Time period over which sample was collected or averaged"
         },
         "encoding": {
-            "dtype": "i2"
+            "dtype": "i2",
+            "_FillValue": -99
         },
-        "optional": "True"
+        "optional": "True",
+        "resample_method": ""
     },
     "instrument_type": {
         "attrs": {
@@ -67,6 +89,7 @@
         "encoding": {
             "dtype": "i1"
         },
-        "optional": "True"
+        "optional": "True",
+        "resample_method": ""
     }
 }

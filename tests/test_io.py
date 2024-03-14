@@ -251,4 +251,3 @@ def test_combine_baseline():
     # Test that a version number has been added
     assert "version" in ds_baseline.attrs.keys()
     assert ds_baseline.attrs["version"] != ""
-
