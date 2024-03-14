@@ -61,10 +61,8 @@ def resample(ds,
                     # If any value in a resampled period is not 1, set baseline to 0
                     ds[var].values = np.where(df_resample[var].prod() != 1, 0, 1)
                 elif var == "sampling_period":
-                    # Set sampling period to 10 minutes
+                    # Set sampling period to resample_period
                     ds[var].values = np.ones_like(ds.time.values).astype(float) * resample_period
-                elif var == "time":
-                    pass
                 else:
                     raise ValueError(f"Resample method not defined for {var}")
 

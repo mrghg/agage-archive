@@ -16,18 +16,22 @@ def test_resample():
                     "sampling_period": ("time", np.ones(len(time)) * 60),
                     "baseline": ("time", np.ones(len(time)))})
 
+    # Set the baseline variable to 0 once every two hours
+    ds.baseline.values[::120] = 0
+
     # Test resample function
     ds_resample = resample(ds, resample_period=3600, resample_threshold=600)
 
     # Check that the dataset has been resampled to hourly
     assert ds_resample.time.diff("time").median() == np.timedelta64(3600, "s")
 
-    # Check that the resampled dataset has the same number of time points as the original
-    assert len(ds_resample.time) == len(ds.time) / 60
-
     # Check that the baseline variable has been resampled correctly
-    #TODO: Improve this test
-    assert np.all(ds_resample.baseline.values == 1)
+    assert np.all(ds_resample.baseline.values[::2] == 0)
+    assert np.all(ds_resample.baseline.values[1::2] == 1)
 
     # Check that the sampling_period variable has been resampled correctly
     assert np.all(ds_resample.sampling_period.values == 3600)
+
+    # Check that mf is the mean of the original data
+    assert np.all(ds_resample.mf.values[0] == data[:60].mean())
+
