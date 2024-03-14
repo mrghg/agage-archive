@@ -178,6 +178,12 @@ def read_nc(network, species, site, instrument,
                                site=site)
     ds = ds.sel(time=slice(None, rs))
 
+    # Check that time is monotonic and that there are no duplicate indices
+    if not pd.Index(ds.time).is_monotonic_increasing:
+        ds.sortby("time", inplace=True)
+    if len(ds.time) != len(ds.time.drop_duplicates(dim="time")):
+        ds.drop_duplicates(dim="time", inplace=True)
+
     # If baseline is True, return baseline dataset
     if baseline:
         ds_baseline = ds.baseline.copy(deep=True).to_dataset(name="baseline")

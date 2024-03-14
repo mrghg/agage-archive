@@ -252,3 +252,4 @@ def test_combine_baseline():
     assert "version" in ds_baseline.attrs.keys()
     assert ds_baseline.attrs["version"] != ""
 
+test_combine_datasets()
