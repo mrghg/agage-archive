@@ -3,10 +3,12 @@ import xarray as xr
 import pandas as pd
 import warnings
 from tempfile import NamedTemporaryFile
+import json
+
 from agage_archive.formatting import monthly_baseline
-from agage_archive import open_data_file
-from agage_archive.data_selection import read_release_schedule, read_data_combination
-from agage_archive.io import read_nc, read_baseline, read_ale_gage, output_dataset
+from agage_archive.config import open_data_file, data_file_path
+from agage_archive.run import run_individual_instrument
+
 
 def test_monthly_baseline():
     
@@ -49,6 +51,7 @@ def test_monthly_baseline():
     # Check that a version number is present
     assert "version" in ds_monthly.attrs.keys()
 
+
 def check_cf_compliance(dataset):
     """Tests the CF compliance of a dataset when written to netCDF format.
     Taken from openghg/tests/helpers/cfchecking.py module
@@ -82,93 +85,8 @@ def check_cf_compliance(dataset):
             else:
                 return True
 
-def run_single_site(network, instrument, site,
-                              verbose = False,
-                              baseline = "",
-                              monthly = False,
-                              species = [],
-                              ):
-    """Process individual data files for a given instrument at a single site.
-    Reads the release schedule for the instrument
 
-    Args:
-        instrument (str): Instrument to process. Must match sheet names in release schedule, e.g.:
-            "AGAGE", "ALE", "GAGE", "GCMD", ...
-        verbose (bool): Print progress to screen
-        baseline (str): Baseline flag to use. If empty, don't process baselines
-        monthly (bool): Produce monthly baseline files
-        species (list): List of species to process. If empty, process all species
-    """
-
-    rs = read_release_schedule(network, instrument)
-
-    if instrument.upper() == "ALE" or instrument.upper() == "GAGE":
-        read_function = read_ale_gage
-        read_baseline_function = read_baseline
-        instrument_out = instrument.upper() + "-GCMD"
-    else:
-        read_function = read_nc
-        read_baseline_function = read_baseline
-        instrument_out = instrument.upper()
-
-    if species:
-        # Process only those species that are in the release schedule
-        species_to_process = [sp for sp in species if sp in rs.index.values]
-        if not species_to_process:
-            print(f"No species to process for {instrument}, skipping...")
-            return
-    else:
-        # Process all species in the release schedule
-        species_to_process = rs.index.values
-
-    # Process for all species and sites
-    for sp in species_to_process:
-        
-        if rs.loc[sp, site].lower() != "x":
-
-            ds = read_function(network, sp, site, instrument,
-                            verbose=verbose)
-
-            if baseline:
-                ds_baseline = read_baseline_function(network, sp, site, instrument,
-                                            flag_name = baseline,
-                                            verbose = verbose)
-
-            # If multiple instruments, store individual file in subdirectory
-            instrument_dates = read_data_combination(network, sp, site,
-                                                    verbose=False)
-            if len(instrument_dates) > 1:
-                output_subpath = f"event/{sp}/individual"
-            else:
-                output_subpath = f"event/{sp}"
-
-            output_dataset(ds, network, instrument=instrument_out,
-                            output_subpath=output_subpath,
-                            end_date=rs.loc[sp, site],
-                            verbose=verbose)
-
-            if baseline:
-                if (ds_baseline.time != ds.time).any():
-                    raise ValueError(f"Baseline and data files for {sp} at {site} have different timestamps")
-                output_dataset(ds_baseline, network, instrument=instrument_out,
-                            output_subpath=output_subpath + "/baseline_flags",
-                            end_date=rs.loc[sp, site],
-                            extra="-git-baseline",
-                            verbose=verbose)
-                
-                if monthly:
-                    ds_baseline_monthly = monthly_baseline(ds, ds_baseline)
-                    output_dataset(ds_baseline_monthly, network, instrument=instrument_out,
-                            output_subpath=output_subpath.replace("event", "monthly"),
-                            end_date=rs.loc[sp, site],
-                            extra="-monthly",
-                            verbose=verbose)
-
-            else:
-                if monthly:
-                    raise NotImplementedError("Monthly baseline files can only be produced if baseline flag is specified")   
-
-def test_cf_compliance_MHD_NF3():
+def test_cf_compliance():
     """Test CF compliance of the NF3 MHD dataset, which is generated by the run_single_site function on the agage-test data
     
     Args:
@@ -176,14 +94,37 @@ def test_cf_compliance_MHD_NF3():
     
     """
     
-    run_single_site(network='agage_test',
-                    instrument='GCMS-Medusa',
-                    site='MHD',
-                    species=['nf3]'])
+    network = 'agage_test'
+    sub_path = 'output/event'
+    instrument = "GCMS-Medusa"
+    site = "MHD" # data_release_schedule modified so that this is the only site
+    species = "nf3"
+
+    # Get current version number from attributes.json
+    with open_data_file("attributes.json", this_repo=True) as f:
+        attributes = json.load(f)
+    version = attributes["version"]
+
+    pth = data_file_path("",
+                         network=network,
+                         sub_path=sub_path)
+
+    # Delete any files in pth
+    for f in pth.rglob("*"):
+        if f.is_file():
+            f.unlink()
+
+    run_individual_instrument(network=network,
+                    instrument=instrument,
+                    species=[species],
+                    monthly=False,
+                    verbose=False)
     
-    with open_data_file(filename='AGAGE_TEST-GCMS-MEDUSA_MHD_nf3.nc',
-                        network='agage_test',
-                        sub_path='output/event/nf3'
+    with open_data_file(filename=f'{network.upper()}-{instrument.upper()}_{site}_{species}_{version}.nc',
+                        network=network,
+                        sub_path=sub_path + '/nf3',
                         ) as f:
         ds = xr.load_dataset(f)
     assert check_cf_compliance(dataset=ds)
+
+

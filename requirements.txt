@@ -13,6 +13,6 @@ dvc
 dvc-gdrive
 
 # for testing
-
 cfchecker @ git+https://github.com/openghg/cf-checker@master#egg=cf-checker
 udunits # available only on conda
+cfunits

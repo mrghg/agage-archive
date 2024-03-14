@@ -237,13 +237,14 @@ def format_variables(ds,
         if "mf" in var:
             ds[var].attrs["long_name"] = ds[var].attrs["long_name"].replace("%",
                                                         lookup_locals_and_attrs("species", locals(), attrs))
-        # standard names need to found from the standard_names.json for CF compliance. 
-        # if not in there (e.g. trichloroethylene the only example currently), no standard_name attribute assigned. 
-            if species in standard_names.keys():
+        
+            # standard names need to found from the standard_names.json for CF compliance. 
+            # if not in there (e.g. trichloroethylene the only example currently), no standard_name attribute assigned. 
+            if lookup_locals_and_attrs("species", locals(), attrs) in standard_names.keys():
                 ds[var].attrs["standard_name"]=ds[var].attrs["standard_name"].replace("%", 
-                                                                                      standard_names[lookup_locals_and_attrs("species",
-                                                                                                                             locals(),
-                                                                                                                             attrs)])
+                                                                    standard_names[lookup_locals_and_attrs("species",
+                                                                                                            locals(),
+                                                                                                            attrs)])
 
 
             ds[var].attrs["units"] = lookup_locals_and_attrs("units", locals(), attrs)
