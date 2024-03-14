@@ -48,5 +48,3 @@ def test_resample():
     assert ds_resample.mf_variability.attrs["units"] == ds_resample.mf.attrs["units"]
     assert ds_resample.mf_variability.attrs["calibration_scale"] == ds_resample.mf.attrs["calibration_scale"]
     assert ds_resample.mf_repeatability.attrs["units"] == ds_resample.mf.attrs["units"]
-
-test_resample()
