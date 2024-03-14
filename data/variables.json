@@ -21,7 +21,8 @@
             "calibration_scale": ""
         },
         "encoding": {
-            "dtype": "f4"
+            "dtype": "f4",
+            "_FillValue": -9999
         },
         "optional": "False",
         "resample_method": "mean"
@@ -34,7 +35,8 @@
             "calibration_scale": ""
         },
         "encoding": {
-            "dtype": "f4"
+            "dtype": "f4",
+            "_FillValue": -9999
         },
         "optional": "False",
         "resample_method": "mean"
@@ -47,7 +49,8 @@
             "calibration_scale": ""
         },
         "encoding": {
-            "dtype": "f4"
+            "dtype": "f4",
+            "_FillValue": -9999
         },
         "optional": "True",
         "resample_method": ""
@@ -59,7 +62,8 @@
             "comment": "Height of inlet above inlet_base_elevation_masl"
         },
         "encoding": {
-            "dtype": "i2"
+            "dtype": "i2",
+            "_FillValue": -99
         },
         "optional": "False",
         "resample_method": "median"
@@ -71,7 +75,8 @@
             "comment": "Time period over which sample was collected or averaged"
         },
         "encoding": {
-            "dtype": "i2"
+            "dtype": "i2",
+            "_FillValue": -99
         },
         "optional": "True",
         "resample_method": ""
