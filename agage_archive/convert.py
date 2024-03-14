@@ -1,6 +1,7 @@
 import pandas as pd
 import numpy as np
 import networkx as nx
+import xarray as xr
 import json
 
 from agage_archive.config import open_data_file
@@ -36,9 +37,11 @@ def resample(ds,
     # check if median time difference is less than minimum_averaging_period
     if (ds.time.diff("time").median() < np.timedelta64(resample_threshold, "s")):
 
+        # Pandas does resampling more efficiently, for some reason
         df = ds.to_dataframe()
-        df_resample = df.resample(f"{resample_period}s")
+        df_resample = df.resample(f"{resample_period}s", closed="left", label="left")
         df_resample_means = df_resample.mean()
+        df_resample_std = df_resample.std()
 
         # Create new dataset to store resampled data
         ds = ds.isel(time=0)
@@ -65,6 +68,13 @@ def resample(ds,
                     ds[var].values = np.ones_like(ds.time.values).astype(float) * resample_period
                 else:
                     raise ValueError(f"Resample method not defined for {var}")
+
+        # Add in mole fraction standard deviation variable
+        ds["mf_variability"] = xr.DataArray(df_resample_std["mf"].values, dims=["time"],
+                                            coords={"time": ds.time})
+        ds["mf_variability"].attrs = variable_defaults["mf_variability"]["attrs"].copy()
+        ds["mf_variability"].attrs["units"] = ds["mf"].attrs["units"]
+        ds["mf_variability"].attrs["calibration_scale"] = ds["mf"].attrs["calibration_scale"]
 
         return ds
 

@@ -16,6 +16,12 @@ def test_resample():
                     "sampling_period": ("time", np.ones(len(time)) * 60),
                     "baseline": ("time", np.ones(len(time)))})
 
+    ds["mf"].attrs["units"] = "1e-9"
+    ds["mf"].attrs["calibration_scale"] = "TU-87"
+
+    ds["mf_repeatability"].attrs["units"] = "1e-9"
+    ds["mf_repeatability"].attrs["calibration_scale"] = "TU-87"
+
     # Set the baseline variable to 0 once every two hours
     ds.baseline.values[::120] = 0
 
@@ -33,5 +39,14 @@ def test_resample():
     assert np.all(ds_resample.sampling_period.values == 3600)
 
     # Check that mf is the mean of the original data
-    assert np.all(ds_resample.mf.values[0] == data[:60].mean())
+    assert np.isclose(ds_resample.mf.values[0], data[:60].mean())
 
+    # Check variability has been calculated correctly
+    assert np.isclose(ds_resample.mf_variability.values[0], np.std(data[:60], ddof=1))
+
+    # Check that units are consistent
+    assert ds_resample.mf_variability.attrs["units"] == ds_resample.mf.attrs["units"]
+    assert ds_resample.mf_variability.attrs["calibration_scale"] == ds_resample.mf.attrs["calibration_scale"]
+    assert ds_resample.mf_repeatability.attrs["units"] == ds_resample.mf.attrs["units"]
+
+test_resample()

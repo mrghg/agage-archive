@@ -39,6 +39,19 @@
         "optional": "False",
         "resample_method": "mean"
     },
+    "mf_variability": {
+        "attrs": {
+            "long_name": "Mole fraction variability of % in dry air",
+            "units": "",
+            "standard_name": "mole_fraction_of_%_variability",
+            "calibration_scale": ""
+        },
+        "encoding": {
+            "dtype": "f4"
+        },
+        "optional": "True",
+        "resample_method": ""
+    },
     "inlet_height": {
         "attrs": {
             "long_name": "inlet_height",
