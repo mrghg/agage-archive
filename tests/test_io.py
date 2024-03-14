@@ -261,11 +261,11 @@ def test_picarro():
     with open_data_file(test_file, network = "agage_test", sub_path = test_subpath) as f:
         ds_test = xr.open_dataset(f)
 
-    # Resample to hourly. mf should take the mean,
-    # a new variable mf_variability should be created, which is the standard deviation
-    # the variable mf_mean_N should be summed
-    # the time coordinate should be the middle of the hour
-    ds_test_hourly = ds_test.resample(time="H").mean()
+        # Resample to hourly. mf should take the mean,
+        # a new variable mf_variability should be created, which is the standard deviation
+        # the variable mf_mean_N should be summed
+        # the time coordinate should be the middle of the hour
+        ds_test_hourly = ds_test.resample(time="H").mean()
 
     # Check that the time coordinate is the middle of the hour
     assert (ds_test_hourly.time - ds_test.time[0].values + pd.Timedelta("30min")).all()
