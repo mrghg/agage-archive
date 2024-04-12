@@ -55,6 +55,19 @@
         "optional": "True",
         "resample_method": ""
     },
+    "mf_N": {
+        "attrs": {
+            "long_name": "Number of data points in mean",
+            "units": "",
+            "calibration_scale": ""
+        },
+        "encoding": {
+            "dtype": "i2",
+            "_FillValue": -99
+        },
+        "optional": "True",
+        "resample_method": "sum"
+    },
     "inlet_height": {
         "attrs": {
             "long_name": "inlet_height",

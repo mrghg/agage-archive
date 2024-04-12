@@ -150,8 +150,6 @@ def read_nc(network, species, site, instrument,
 
     ds.attrs["site_code"] = site.upper()
 
-    ds = format_variables(ds)
-
     # If no instrument attributes are present, add them using format_attributes
     if "instrument" not in ds.attrs:
         instruments = [{"instrument": instrument}]
@@ -186,6 +184,9 @@ def read_nc(network, species, site, instrument,
         ds_baseline = ds.baseline.copy(deep=True).to_dataset(name="baseline")
         ds_baseline.attrs = ds.attrs
         return ds_baseline
+
+    # Apply standard variable formatting and return only variables in variable.json
+    ds = format_variables(ds)
 
     # Convert scale, if needed
     ds = scale_convert(ds, scale)

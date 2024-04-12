@@ -231,7 +231,7 @@ def format_variables(ds,
         ds[var].encoding = variables[var]["encoding"]
 
         # for mole fractions, replace % with species name, etc.
-        if "mf" in var:
+        if "mf" in var and var != "mf_N":
             ds[var].attrs["long_name"] = ds[var].attrs["long_name"].replace("%",
                                                         lookup_locals_and_attrs("species", locals(), attrs))
             ds[var].attrs["standard_name"] = ds[var].attrs["standard_name"].replace("%",

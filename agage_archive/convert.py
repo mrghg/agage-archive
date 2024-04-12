@@ -6,7 +6,7 @@ import json
 
 from agage_archive.config import open_data_file
 from agage_archive.data_selection import calibration_scale_default
-from agage_archive.formatting import format_species
+from agage_archive.formatting import format_species, format_variables
 
 
 def resample(ds,
@@ -32,8 +32,16 @@ def resample(ds,
         variable_defaults = json.load(f)
 
     # Add some additional variables that can be processed, but don't need to be in variables.json
-    variable_defaults["baseline"] = {"resample_method": ""}
-
+    #variable_defaults["baseline"] = {"resample_method": ""}
+    variable_defaults.update({"baseline": {"resample_method": ""},
+                          "mf_mean_stdev": {"resample_method": "mean"},
+                          "mf_mean_N": {"resample_method": "sum"},
+                          # NOT TO BE USED without more work:
+                          "data_flag": {"resample_method": "mean"},
+                          "git_pollution_flag": {"resample_method": "mean"},
+                          "met_office_baseline_flag": {"resample_method": "mean"},
+                          })
+    
     # check if median time difference is less than minimum_averaging_period
     if (ds.time.diff("time").median() < np.timedelta64(resample_threshold, "s")):
 
@@ -74,8 +82,22 @@ def resample(ds,
                                             coords={"time": ds.time})
         ds["mf_variability"].attrs = variable_defaults["mf_variability"]["attrs"].copy()
         ds["mf_variability"].attrs["units"] = ds["mf"].attrs["units"]
-        ds["mf_variability"].attrs["calibration_scale"] = ds["mf"].attrs["calibration_scale"]
+        # Copy either "calibration_scale" or "scale" attribute from "mf" variable
+        if "calibration_scale" in ds["mf"].attrs:
+            ds["mf_variability"].attrs["calibration_scale"] = ds["mf"].attrs["calibration_scale"]
+        elif "scale" in ds["mf"].attrs:
+            ds["mf_variability"].attrs["calibration_scale"] = ds["mf"].attrs["scale"]
+        else:
+            raise ValueError("No calibration scale found for mole fraction variable.")
 
+        # Add in number of samples variable
+        # If this variable is already in the dataset, it should have been resampled apprioriately
+        if not "mf_N" in variables:
+            ds["mf_N"] = xr.DataArray(df_resample["mf"].count().values, dims=["time"],
+                                    coords={"time": ds.time})
+            ds["mf_N"].attrs = variable_defaults["mf_N"]["attrs"].copy()
+            ds["mf_N"].attrs["units"] = ""
+        
         return ds
 
     else:
