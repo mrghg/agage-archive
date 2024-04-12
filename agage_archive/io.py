@@ -176,6 +176,12 @@ def read_nc(network, species, site, instrument,
                                site=site)
     ds = ds.sel(time=slice(None, rs))
 
+    # Rename some variables, so that they can be resampled properly
+    if "mf_mean_N" in ds:
+        ds = ds.rename({"mf_mean_N": "mf_N"})
+    if "mf_mean_stdev" in ds:
+        ds = ds.rename({"mf_mean_stdev": "mf_variability"})
+
     # Resample dataset, if needed
     ds = resample(ds)
 

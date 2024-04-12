@@ -36,7 +36,7 @@ def resample(ds,
     variable_defaults.update({"baseline": {"resample_method": ""},
                           "mf_mean_stdev": {"resample_method": "mean"},
                           "mf_mean_N": {"resample_method": "sum"},
-                          # NOT TO BE USED without more work:
+                          # Outputs of the following are NOT TO BE USED without more work:
                           "data_flag": {"resample_method": "mean"},
                           "git_pollution_flag": {"resample_method": "mean"},
                           "met_office_baseline_flag": {"resample_method": "mean"},
@@ -74,6 +74,9 @@ def resample(ds,
                 elif var == "sampling_period":
                     # Set sampling period to resample_period
                     ds[var].values = np.ones_like(ds.time.values).astype(float) * resample_period
+                elif var == "mf_variability":
+                    # Overwritten below
+                    pass
                 else:
                     raise ValueError(f"Resample method not defined for {var}")
 
