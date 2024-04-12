@@ -143,11 +143,15 @@ def read_nc(network, species, site, instrument,
         ds_baseline.baseline.values = ds_baseline.baseline == 66
         ds_baseline = ds_baseline.astype(np.int8)
 
+        # Add baseline flag back in to main dataset so that it gets resampled, etc. consistently
+        ds["baseline"] = xr.DataArray(ds_baseline.baseline.values, dims="time")
+
     # Everything should have been flagged in the AGAGE files already, but just in case...
     flagged = ds.data_flag != 0
     ds.mf[flagged] = np.nan
     ds.mf_repeatability[flagged] = np.nan
 
+    # Add global attributes and format attributes
     ds.attrs["site_code"] = site.upper()
 
     # If no instrument attributes are present, add them using format_attributes
@@ -161,15 +165,11 @@ def read_nc(network, species, site, instrument,
                         network=network,
                         species=species)
 
-    # Temporarily add baseline flag back in
-    if baseline:
-        ds["baseline"] = xr.DataArray(ds_baseline.baseline.values, dims="time")
-
     # Remove any excluded data
     if data_exclude:
         ds = read_data_exclude(ds, format_species(species), site, instrument)
 
-    # Check against release schedule
+    # Check against release schedule and remove any data after end date
     rs = read_release_schedule(network, 
                                instrument,
                                species=format_species(species),
@@ -179,7 +179,7 @@ def read_nc(network, species, site, instrument,
     # Resample dataset, if needed
     ds = resample(ds)
 
-    # If baseline is True, return baseline dataset
+    # If baseline is not None, return baseline dataset
     if baseline:
         ds_baseline = ds.baseline.copy(deep=True).to_dataset(name="baseline")
         ds_baseline.attrs = ds.attrs
