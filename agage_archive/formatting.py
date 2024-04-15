@@ -216,15 +216,19 @@ def format_variables(ds,
             warnings.simplefilter("error")
 
             # Try to convert variable to new type. If there are missing values, choose an appropriate missing value for the type
-            if "_FillValue" in variables[var]["encoding"]:
-                missing_value = variables[var]["encoding"]["_FillValue"]
+            # If the variable is a float, we still want to use NaNs
+            if nc4_types[variables[var]["encoding"]["dtype"]][0] != "f":
+                if "_FillValue" in variables[var]["encoding"]:
+                    missing_value = variables[var]["encoding"]["_FillValue"]
+                else:
+                    missing_value = np.nan
             else:
                 missing_value = np.nan
             
             var_temp = ds[var_ds].values.copy()
             var_temp[np.isnan(var_temp)] = missing_value
             vars_out[var] = ("time", var_temp.copy().astype(typ))
-            
+
             warnings.simplefilter("default")
 
         else:
