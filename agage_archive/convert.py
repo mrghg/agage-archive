@@ -10,8 +10,8 @@ from agage_archive.formatting import format_species, format_variables
 
 
 def resample(ds,
-            resample_period = 3600,
-            resample_threshold = 600,
+            resample_period = "3600s",
+            resample_threshold = "600s",
             ):
     """Resample the dataset to a regular time interval
     
@@ -43,13 +43,14 @@ def resample(ds,
                           })
     
     # check if median time difference is less than minimum_averaging_period
-    if (ds.time.diff("time").median() < np.timedelta64(resample_threshold, "s")):
+    if pd.to_timedelta(ds.time.diff("time").median().values) < \
+            pd.to_timedelta(resample_threshold):
 
         # Pandas does resampling more efficiently, for some reason
         df = ds.to_dataframe()
-        df_resample = df.resample(f"{resample_period}s", closed="left", label="left")
+        df_resample = df.resample(resample_period, closed="left", label="left")
         df_resample_means = df_resample.mean()
-        df_resample_std = df_resample.std()
+        df_resample_std = df_resample.std(ddof=0) # Use biased estimator for standard deviation
 
         # Create new dataset to store resampled data
         ds = ds.isel(time=0)
@@ -67,13 +68,18 @@ def resample(ds,
                 ds[var].values = df_resample[var].median().values
             elif variable_defaults[var]["resample_method"] == "sum":
                 ds[var].values = df_resample[var].sum().values
+            elif variable_defaults[var]["resample_method"] == "standard_error":
+                ds[var].values = df_resample[var].mean().values / np.sqrt(df_resample[var].count().values)
+                ds[var].attrs["long_name"] = "Standard error in mean of " + ds[var].attrs["long_name"].lower()
+            elif variable_defaults[var]["resample_method"] == "mode":
+                ds[var].values = df_resample[var].apply(lambda x: x.mode()[0] if not x.mode().empty else -1)
             else:
                 if var == "baseline":
                     # If any value in a resampled period is not 1, set baseline to 0
                     ds[var].values = np.where(df_resample[var].prod() != 1, 0, 1)
                 elif var == "sampling_period":
                     # Set sampling period to resample_period
-                    ds[var].values = np.ones_like(ds.time.values).astype(float) * resample_period
+                    ds[var].values = np.ones_like(ds.time.values).astype(float) * pd.Timedelta(resample_period).total_seconds()
                 elif var == "mf_variability":
                     # Overwritten below
                     pass
@@ -106,6 +112,49 @@ def resample(ds,
     else:
 
         return ds
+
+
+def monthly_baseline(ds, ds_baseline):
+    '''Calculate monthly baseline mole fractions
+
+    Args:
+        ds (xr.Dataset): Dataset
+        ds_baseline (xr.Dataset): Baseline dataset
+
+    Returns:
+        xr.Dataset: Dataset with monthly baseline mole fractions
+    '''
+
+    # Select baseline points
+    ds_baseline_points = ds.where(ds_baseline.baseline == 1, drop=True)
+
+    # Remove any baseline points where the mole fraction is NaN
+    ds_baseline_points = ds_baseline_points.where(~np.isnan(ds_baseline_points.mf), drop=True)
+
+    # Calculate monthly mean
+    # If there are no baseline points, return an empty dataset with same attributes
+    if len(ds_baseline_points.time) == 0:
+        ds_monthly = ds.isel(time=[])
+        ds_monthly["mf_variability"] = ds.mf.isel(time=[])
+        ds_monthly["mf_variability"].attrs["units"] = ds.mf.attrs["units"]
+        ds_monthly["mf_repeatability"] = ds.mf.isel(time=[])
+        ds_monthly["mf_repeatability"].attrs["units"] = ds.mf.attrs["units"]
+    else:
+        ds_monthly = resample(ds_baseline_points,
+                              resample_period="1MS",
+                              resample_threshold="1000D") # Big number so that everything gets resampled
+
+    # Relabel some attributes
+    ds_monthly["mf_variability"].attrs["long_name"] = "Monthly standard deviation of baseline mole fractions"
+    ds_monthly["mf_repeatability"].attrs["long_name"] = "Monthly standard error in mean of baseline mole fractions"
+    
+    # Copy global attributes
+    ds_monthly.attrs = ds.attrs.copy()
+
+    # Add baseline flag
+    ds_monthly.attrs["baseline_flag"] = ds_baseline.attrs["baseline_flag"]
+
+    return ds_monthly
 
 
 def scale_graph(species):

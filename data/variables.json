@@ -39,7 +39,7 @@
             "_FillValue": -9999
         },
         "optional": "False",
-        "resample_method": "mean"
+        "resample_method": "standard_error"
     },
     "mf_variability": {
         "attrs": {
@@ -100,9 +100,10 @@
             "comment": ""
         },
         "encoding": {
-            "dtype": "i1"
+            "dtype": "i1",
+            "_FillValue": -99
         },
         "optional": "True",
-        "resample_method": ""
+        "resample_method": "mode"
     }
 }

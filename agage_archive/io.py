@@ -577,7 +577,10 @@ def combine_datasets(network, species, site,
             error_message += f"{instrument}:{sc}, " 
         raise ValueError(error_message)
 
-    ds_combined = xr.concat(dss, dim="time")
+    ds_combined = xr.concat(dss, dim="time",
+                            data_vars="all",
+                            coords="all",
+                            combine_attrs="drop_conflicts")
 
     # Sort by time
     ds_combined = ds_combined.sortby("time")

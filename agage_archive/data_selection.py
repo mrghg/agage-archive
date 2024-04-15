@@ -170,5 +170,20 @@ def read_data_exclude(ds, species, site, instrument):
     else:
         # Replace values in xarray dataset with NaN between start and end dates
         for start, end in data_exclude.values:
-            ds.loc[dict(time=slice(start, end))] = np.nan
+            exclude_dict = dict(time = slice(start, end))
+            for var in ds.variables:
+                if var == "time":
+                    continue
+                # If the variable is like a float, set to nan
+                elif np.issubdtype(ds[var].dtype, np.floating):
+                    ds[var].loc[exclude_dict] = np.nan
+                # If the variable is an integer, set to -1
+                elif np.issubdtype(ds[var].dtype, np.integer):
+                    ds[var].loc[exclude_dict] = -1
+                # If the variable is a string, set to ""
+                elif np.issubdtype(ds[var].dtype, str):
+                    ds[var].loc[exclude_dict] = ""
+                else:
+                    raise ValueError("Variable type not recognised")
+
         return ds
