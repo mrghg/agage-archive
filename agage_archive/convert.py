@@ -103,6 +103,16 @@ def resample(ds,
             ds["mf_N"].attrs = variable_defaults["mf_N"]["attrs"].copy()
             ds["mf_N"].attrs["units"] = ""
         
+        # Append to comments saying that the data has been resampled
+        if "comment" not in ds.attrs:
+            ds.attrs["comment"] = f"Resampled to {resample_period}."
+        else:
+            ds.attrs["comment"] = ds.attrs["comment"] + f" Resampled to {resample_period}."
+        if "comment" not in ds.time.attrs:
+            ds.time.attrs["comment"] = f"Resampled to {resample_period}."
+        else:
+            ds.time.attrs["comment"] = ds.time.attrs["comment"] + f"Resampled to {resample_period}."
+
         return ds
 
     else:
