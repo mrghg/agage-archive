@@ -9,6 +9,8 @@ def file_search_species(network, frequency, species):
     """ Search for files containing species
     
     Args:
+        network (str): Network
+        frequency (str): Frequency ("event" or "monthly")
         species (str): Species to search for
 
     Returns:
@@ -21,8 +23,6 @@ def file_search_species(network, frequency, species):
                            sub_path=f"{paths.output_path}",
                            pattern=f"{frequency}/{species}/*.nc",
                            errors="ignore_inputs")[2]
-
-    print(f"{paths.output_path}/{frequency}")
 
     return sorted(files)
 
@@ -60,12 +60,12 @@ def update_instrument_site(species,
     """ Update instrument and site dropdown
 
     Args:
-        change (dict): Widget change dictionary
+        species (str): Species
+        frequency (str): Frequency ("event" or "monthly")
         network (str): Network
-        network_site_dropdown (ipywidgets.Dropdown): Dropdown widget
+        instrument_site_dropdown (ipywidgets.Dropdown): Dropdown widget
     """
     def filter_list(input_list):
-        
         """Filter list to keep only first duplicate"""
         seen_set = set()
         result_list = []
@@ -92,7 +92,8 @@ def get_filenames(species, frequency, instrument_sites):
     
     Args:
         species (str): Species
-        network_sites (list): List of network/site strings
+        frequency (str): Frequency
+        instrument_sites (list): List of instrument/site strings
 
     Returns:
         list: List of filenames
@@ -118,6 +119,7 @@ def load_datasets(network, filenames):
     """ Load datasets from filenames
 
     Args:
+        network (str): Network
         filenames (list): List of filenames
 
     Returns:
@@ -142,6 +144,8 @@ def plot_to_output(sender, network, frequency, species, network_site, output_wid
 
     Args:
         sender (ipywidgets.Button): Button widget
+        network (str): Network
+        frequency (str): Frequency
         species (str): Species
         network_site (str): Network and site
         output_widget (ipywidgets.Output): Output widget
@@ -153,10 +157,11 @@ def plot_to_output(sender, network, frequency, species, network_site, output_wid
             print("Please select a network and site") 
 
     filenames = get_filenames(species, frequency, network_site)
-    print(filenames)
+    
     datasets = load_datasets(network, filenames)
 
     renderer = is_jupyterlab_session()
+
     with output_widget:
         clear_output()
         print(f"Plotting {species} for {network_site}... please wait...")
@@ -166,6 +171,14 @@ def plot_to_output(sender, network, frequency, species, network_site, output_wid
 
 
 def show_netcdf_info(sender, network, frequency, species, network_site, output_widget):
+    """ Show NetCDF info to output widget
+
+    Args:
+        sender (ipywidgets.Button): Button widget
+        species (str): Species
+        network_site (str): Network and site
+        output_widget (ipywidgets.Output): Output widget
+    """
 
     if not network_site:
         with output_widget:
