@@ -28,6 +28,9 @@ species_translator = {"pfc-116": "c2f6",
                       "pfc-218": "c3f8",
                       "pfc-318": "c4f8"}
 
+minimum_averaging_period = {"Picarro": "1H"}
+
+
 def instrument_type_definition():
     '''Define instrument numbers for each instrument type
 
