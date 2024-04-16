@@ -17,11 +17,13 @@ def resample(ds,
     
     Args:
         ds (xarray.Dataset): Dataset
-        resample_period (int, optional): Period to resample to, in seconds. Defaults to 3600.
-        resample_threshold (int, optional): Threshold for resampling, in seconds. Defaults to 600.
+        resample_period (str, optional): Period to resample to. Defaults to "3600s". 
+            Pandas alias for time period, e.g. "1H" for hourly, "1D" for daily.
+        resample_threshold (str, optional): Threshold for resampling, in seconds. Defaults to 600s.
             If the median time difference is greater than this threshold, the dataset is not resampled.
             So, if the threshold is 600s and the resample_period is 3600s and 1-minute data is provided, 
             the dataset is resampled to houry. If 20-minute data is provided, the dataset is not resampled.
+            Pandas alias for time period, e.g. "600s" for 10 minutes.
 
     Returns:
         xarray.Dataset: Resampled dataset
@@ -31,16 +33,10 @@ def resample(ds,
     with open_data_file("variables.json", this_repo=True) as f:
         variable_defaults = json.load(f)
 
-    # Add some additional variables that can be processed, but don't need to be in variables.json
-    #variable_defaults["baseline"] = {"resample_method": ""}
-    variable_defaults.update({"baseline": {"resample_method": ""},
-                          "mf_mean_stdev": {"resample_method": "mean"},
-                          "mf_mean_N": {"resample_method": "sum"},
-                          # Outputs of the following are NOT TO BE USED without more work:
-                          "data_flag": {"resample_method": "mean"},
-                          "git_pollution_flag": {"resample_method": "mean"},
-                          "met_office_baseline_flag": {"resample_method": "mean"},
-                          })
+    # Read variable defaults for non-public data to find how to resample these variables
+    with open_data_file("variables_not_public.json", this_repo=True) as f:
+        variable_np_defaults = json.load(f)
+    variable_defaults.update(variable_np_defaults)
     
     # check if median time difference is less than minimum_averaging_period
     if pd.to_timedelta(ds.time.diff("time").median().values) < \

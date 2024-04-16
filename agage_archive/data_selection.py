@@ -1,5 +1,6 @@
 import pandas as pd
 import numpy as np
+import json
 
 from agage_archive.config import open_data_file
 from agage_archive.formatting import format_species
@@ -157,6 +158,15 @@ def read_data_exclude(ds, species, site, instrument):
                                     comment="#",
                                     sheet_name=site.upper())
     
+    # Read variable defaults to find what to do with missing data
+    with open_data_file("variables.json", this_repo=True) as f:
+        variable_defaults = json.load(f)
+
+    # Read variable defaults for non-public data to find what to do with missing data
+    with open_data_file("variables_not_public.json", this_repo=True) as f:
+        variable_np_defaults = json.load(f)
+    variable_defaults.update(variable_np_defaults)
+
     # Remove whitespace from strings
     data_exclude = data_exclude.map(lambda x: x.strip() if isinstance(x, str) else x)
 
@@ -169,21 +179,19 @@ def read_data_exclude(ds, species, site, instrument):
         return ds
     else:
         # Replace values in xarray dataset with NaN between start and end dates
+        # The remove_flagged value in variables.json determines what to do with the missing data
         for start, end in data_exclude.values:
             exclude_dict = dict(time = slice(start, end))
             for var in ds.variables:
                 if var == "time":
                     continue
-                # If the variable is like a float, set to nan
-                elif np.issubdtype(ds[var].dtype, np.floating):
+                elif variable_defaults[var]["remove_flagged"] == "True":
                     ds[var].loc[exclude_dict] = np.nan
-                # If the variable is an integer, set to -1
-                elif np.issubdtype(ds[var].dtype, np.integer):
-                    ds[var].loc[exclude_dict] = -1
-                # If the variable is a string, set to ""
-                elif np.issubdtype(ds[var].dtype, str):
-                    ds[var].loc[exclude_dict] = ""
+                elif variable_defaults[var]["remove_flagged"] == "False":
+                    continue
+                elif variable_defaults[var]["remove_flagged"] == "Zero":
+                    ds[var].loc[exclude_dict] = 0
                 else:
-                    raise ValueError("Variable type not recognised")
+                    raise ValueError(f"Unknown remove_flagged value for {var}. Check in variables.json or variables_not_public.json")
 
         return ds

@@ -25,7 +25,8 @@
             "_FillValue": -9999
         },
         "optional": "False",
-        "resample_method": "mean"
+        "resample_method": "mean",
+        "remove_flagged": "True"
     },
     "mf_repeatability": {
         "attrs": {
@@ -39,7 +40,8 @@
             "_FillValue": -9999
         },
         "optional": "False",
-        "resample_method": "standard_error"
+        "resample_method": "standard_error",
+        "remove_flagged": "True"
     },
     "mf_variability": {
         "attrs": {
@@ -53,7 +55,8 @@
             "_FillValue": -9999
         },
         "optional": "True",
-        "resample_method": ""
+        "resample_method": "",
+        "remove_flagged": "True"
     },
     "mf_N": {
         "attrs": {
@@ -66,7 +69,8 @@
             "_FillValue": -99
         },
         "optional": "True",
-        "resample_method": "sum"
+        "resample_method": "sum",
+        "remove_flagged": "Zero"
     },
     "inlet_height": {
         "attrs": {
@@ -79,7 +83,8 @@
             "_FillValue": -99
         },
         "optional": "False",
-        "resample_method": "median"
+        "resample_method": "median",
+        "remove_flagged": "False"
     },
     "sampling_period": {
         "attrs": {
@@ -92,7 +97,8 @@
             "_FillValue": -99
         },
         "optional": "True",
-        "resample_method": ""
+        "resample_method": "",
+        "remove_flagged": "False"
     },
     "instrument_type": {
         "attrs": {
@@ -104,6 +110,7 @@
             "_FillValue": -99
         },
         "optional": "True",
-        "resample_method": "mode"
+        "resample_method": "mode",
+        "remove_flagged": "False"
     }
 }
