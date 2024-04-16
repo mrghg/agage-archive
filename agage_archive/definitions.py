@@ -38,7 +38,8 @@ def instrument_type_definition():
         str: Instrument type definition
     '''
 
-    instrument_number = {"ALE": 0,
+    instrument_number = {"UNDEFINED": -1,
+                        "ALE": 0,
                         "GAGE": 1,
                         "GCMD": 2,
                         "GCMS-ADS": 3,

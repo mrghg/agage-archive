@@ -55,7 +55,7 @@ def plot_combined(ds, fig):
     instrument_types = set(ds.instrument_type.values)
 
     # Create a trace for each instrument type
-    for instrument_type in list(instrument_types):
+    for instrument_type in sorted(list(instrument_types))[1:]:
 
         instrument_type_name = list(instrument_number.keys())[list(instrument_number.values()).index(instrument_type)]
 
