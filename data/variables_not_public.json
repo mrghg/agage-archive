@@ -1,0 +1,26 @@
+{
+    "baseline":{
+        "resample_method": "",
+        "remove_flagged": "False"
+    },
+    "mf_mean_stdev": {
+        "resample_method": "mean",
+        "remove_flagged": "True"
+    },
+    "mf_mean_N": {
+        "resample_method": "sum",
+        "remove_flagged": "Zero"
+    },
+    "data_flag": {
+        "resample_method": "mean",
+        "remove_flagged": "False"
+    },
+    "git_pollution_flag": {
+        "resample_method": "mean",
+        "remove_flagged": "False"
+    },
+    "met_office_baseline_flag": {
+        "resample_method": "mean",
+        "remove_flagged": "False"
+    }
+}

@@ -7,7 +7,7 @@ from io import StringIO
 import json
 
 from agage_archive.config import Paths, open_data_file, data_file_list, data_file_path
-from agage_archive.convert import scale_convert
+from agage_archive.convert import scale_convert, resample
 from agage_archive.formatting import format_species, \
     format_variables, format_attributes
 from agage_archive.data_selection import read_release_schedule, read_data_exclude, \
@@ -145,14 +145,16 @@ def read_nc(network, species, site, instrument,
         ds_baseline.baseline.values = ds_baseline.baseline == 66
         ds_baseline = ds_baseline.astype(np.int8)
 
+        # Add baseline flag back in to main dataset so that it gets resampled, etc. consistently
+        ds["baseline"] = xr.DataArray(ds_baseline.baseline.values, dims="time")
+
     # Everything should have been flagged in the AGAGE files already, but just in case...
     flagged = ds.data_flag != 0
     ds.mf[flagged] = np.nan
     ds.mf_repeatability[flagged] = np.nan
 
+    # Add global attributes and format attributes
     ds.attrs["site_code"] = site.upper()
-
-    ds = format_variables(ds)
 
     # If no instrument attributes are present, add them using format_attributes
     if "instrument" not in ds.attrs:
@@ -165,15 +167,11 @@ def read_nc(network, species, site, instrument,
                         network=network,
                         species=species)
 
-    # Temporarily add baseline flag back in
-    if baseline:
-        ds["baseline"] = xr.DataArray(ds_baseline.baseline.values, dims="time")
-
     # Remove any excluded data
     if data_exclude:
         ds = read_data_exclude(ds, format_species(species), site, instrument)
 
-    # Check against release schedule  
+    # Check against release schedule and remove any data after end date
     rs = read_release_schedule(network, 
                             instrument,
                             species=format_species(species),
@@ -181,11 +179,23 @@ def read_nc(network, species, site, instrument,
                             public=public)
     ds = ds.sel(time=slice(None, rs))
 
-    # If baseline is True, return baseline dataset
+    # Rename some variables, so that they can be resampled properly
+    if "mf_mean_N" in ds:
+        ds = ds.rename({"mf_mean_N": "mf_N"})
+    if "mf_mean_stdev" in ds:
+        ds = ds.rename({"mf_mean_stdev": "mf_variability"})
+
+    # Resample dataset, if needed
+    ds = resample(ds)
+
+    # If baseline is not None, return baseline dataset
     if baseline:
         ds_baseline = ds.baseline.copy(deep=True).to_dataset(name="baseline")
         ds_baseline.attrs = ds.attrs
         return ds_baseline
+
+    # Apply standard variable formatting and return only variables in variable.json
+    ds = format_variables(ds)
 
     # Convert scale, if needed
     ds = scale_convert(ds, scale)
@@ -574,7 +584,10 @@ def combine_datasets(network, species, site,
             error_message += f"{instrument}:{sc}, " 
         raise ValueError(error_message)
 
-    ds_combined = xr.concat(dss, dim="time")
+    ds_combined = xr.concat(dss, dim="time",
+                            data_vars="all",
+                            coords="all",
+                            combine_attrs="drop_conflicts")
 
     # Sort by time
     ds_combined = ds_combined.sortby("time")

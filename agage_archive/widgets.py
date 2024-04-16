@@ -1,7 +1,7 @@
 import xarray as xr
 from IPython.display import clear_output
 
-from agage_archive.config import Paths, data_file_list, open_data_file
+from agage_archive.config import Paths, data_file_list, open_data_file, is_jupyterlab_session
 from agage_archive.visualise import plot_datasets
 
 
@@ -19,7 +19,7 @@ def file_search_species(network, species):
 
     files = data_file_list(network,
                            sub_path=paths.output_path,
-                           pattern=f"{species}/*.nc",
+                           pattern=f"*/{species}/*.nc",
                            errors="ignore_inputs")[2]
 
     return sorted(files)
@@ -59,15 +59,27 @@ def update_instrument_site(change, network, instrument_site_dropdown):
         network (str): Network
         network_site_dropdown (ipywidgets.Dropdown): Dropdown widget
     """
+    def filter_list(input_list):
+        
+        """Filter list to keep only first duplicate"""
+        seen_set = set()
+        result_list = []
+
+        for item in input_list:
+            if item not in seen_set:
+                seen_set.add(item)
+                result_list.append(item)
+
+        return result_list
 
     files = file_search_species(network, change["new"])
     instruments, sites = instruments_sites(files)
     options = sorted([f"{s}, {i}" for (s, i) in zip(sites, instruments) if "*" not in i])
     options += sorted([f"{s}, {i}" for (s, i) in zip(sites, instruments) if "*" in i])
     if instrument_site_dropdown:
-        instrument_site_dropdown.options = options
+        instrument_site_dropdown.options = filter_list(options)
     else:
-        return options
+        return filter_list(options)
 
 
 def get_filenames(species, instrument_sites):
@@ -85,9 +97,9 @@ def get_filenames(species, instrument_sites):
     for instrument_site in instrument_sites:
         site, instrument = instrument_site.split(', ')
         if "*" in instrument:
-            filenames.append(f"{species}/individual/{instrument.split('*')[-1]}_{site}_{species}.nc")
+            filenames.append(f"*/{species}/individual/{instrument.split('*')[-1]}_{site}_{species}_*.nc")
         else:
-            filenames.append(f"{species}/{instrument}_{site}_{species}.nc")
+            filenames.append(f"*/{species}/{instrument}_{site}_{species}_*.nc")
 
     return filenames
 
@@ -133,12 +145,13 @@ def plot_to_output(sender, network, species, network_site, output_widget):
     filenames = get_filenames(species, network_site)
     datasets = load_datasets(network, filenames)
 
+    renderer = is_jupyterlab_session()
     with output_widget:
         clear_output()
         print(f"Plotting {species} for {network_site}... please wait...")
         clear_output(True)
         fig = plot_datasets(datasets)
-        fig.show(renderer="notebook")
+        fig.show(renderer=renderer)
 
 
 def show_netcdf_info(sender, network, species, network_site, output_widget):
