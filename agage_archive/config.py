@@ -304,15 +304,18 @@ def open_data_file(filename,
     else:
         return (pth / filename).open("rb")
 
+
 def is_jupyterlab_session():
     """Check whether we are in a Jupyter-Lab session.
     Taken from:
     https://stackoverflow.com/questions/57173235/how-to-detect-whether-in-jupyter-notebook-or-lab
     """
+
     # inspect parent process for any signs of being a jupyter lab server
     parent = psutil.Process().parent()
     if parent.name() == "jupyter-lab":
         return "jupyterlab"
+    
     keys = (
         "JUPYTERHUB_API_KEY",
         "JPY_API_TOKEN",
