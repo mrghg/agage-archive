@@ -698,7 +698,7 @@ def output_path(network, species, site, instrument,
 
     paths = Paths(network)
 
-    version_str = f"_{version}" if version else ""
+    version_str = f"_{version.replace(' ','_')}" if version else ""
 
     if public:
         sub_path =  paths.output_path
