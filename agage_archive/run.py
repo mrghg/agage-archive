@@ -7,7 +7,7 @@ from agage_archive.data_selection import read_release_schedule, read_data_combin
 from agage_archive.io import combine_datasets, combine_baseline, \
     read_nc, read_baseline, read_ale_gage, \
     output_dataset
-from agage_archive.formatting import monthly_baseline
+from agage_archive.convert import monthly_baseline
 
 
 def run_individual_instrument(network, instrument,

@@ -86,7 +86,7 @@ def test_read_ale_gage():
                                  utc=False, data_exclude=False)
     
     # check that all df_ale_local timestamps are 10 hours ahead of df_ale (CGO is UTC+10)
-    assert ((ds_ale_local.time.to_series().index - ds_ale.time.to_series().index) == pd.Timedelta("10H")).all()
+    assert ((ds_ale_local.time.to_series().index - ds_ale.time.to_series().index) == pd.Timedelta("10h")).all()
 
     # Check that some data have been excluded
     assert ds_ale.mf.to_series().isnull().sum() > ds_ale_local.mf.to_series().isnull().sum()
@@ -251,5 +251,3 @@ def test_combine_baseline():
     # Test that a version number has been added
     assert "version" in ds_baseline.attrs.keys()
     assert ds_baseline.attrs["version"] != ""
-
-test_combine_datasets()

@@ -2,6 +2,7 @@ import json
 import numpy as np
 import xarray as xr
 from datetime import datetime
+import warnings
 
 from agage_archive.config import open_data_file
 from agage_archive.util import is_number, lookup_username
@@ -200,7 +201,8 @@ def format_variables(ds,
     vars_out = {}
 
     # Loop through standard variable names
-    for var in variables:
+    variables_standardise = [v for v in variables if v != "time"]
+    for var in variables_standardise:
 
         # Do we need to translate any variable names?
         if var in variable_translate:
@@ -212,16 +214,33 @@ def format_variables(ds,
         if var_ds in ds.variables:
             # Convert type to that contained in variables.json
             typ = np.__getattribute__(nc4_types[variables[var]["encoding"]["dtype"]])
+
+            # Error on warnings, in case casting to type causes problems
+            warnings.simplefilter("error")
+
+            # Try to convert variable to new type. If there are missing values, choose an appropriate missing value for the type
+            # If the variable is a float, we still want to use NaNs
+            if nc4_types[variables[var]["encoding"]["dtype"]][0] != "f":
+                if "_FillValue" in variables[var]["encoding"]:
+                    missing_value = variables[var]["encoding"]["_FillValue"]
+                else:
+                    missing_value = np.nan
+            else:
+                missing_value = np.nan
             
-            vars_out[var] = ("time", ds[var_ds].values.copy().astype(typ))
+            var_temp = ds[var_ds].values.copy()
+            var_temp[np.isnan(var_temp)] = missing_value
+            vars_out[var] = ("time", var_temp.copy().astype(typ))
+
+            warnings.simplefilter("default")
 
         else:
             if variables[var]["optional"] == "False":
                 raise ValueError(f"Variable {var_ds} not found in dataset. " + \
                                 "Use variable_translate to map to a different variable name.")
     
-    # Time can't be in variable list
-    del vars_out["time"]
+    # # Time can't be in variable list
+    # del vars_out["time"]
 
     # Create new dataset
     ds = xr.Dataset(vars_out,
@@ -234,7 +253,7 @@ def format_variables(ds,
         ds[var].encoding = variables[var]["encoding"]
 
         # for mole fractions, replace % with species name in long_name
-        if "mf" in var:
+        if "mf" in var and var != "mf_N":
             ds[var].attrs["long_name"] = ds[var].attrs["long_name"].replace("%",
                                                         lookup_locals_and_attrs("species", locals(), attrs))
         
@@ -413,53 +432,3 @@ def lookup_locals_and_attrs(v, local, attrs):
     else:
         # If set, format it
         return eval(f"format_{v}('{local[v]}')")
-
-
-def monthly_baseline(ds, ds_baseline):
-    '''Calculate monthly baseline mole fractions
-
-    Args:
-        ds (xr.Dataset): Dataset
-        ds_baseline (xr.Dataset): Baseline dataset
-
-    Returns:
-        xr.Dataset: Dataset with monthly baseline mole fractions
-    '''
-
-    # Select baseline points
-    ds_baseline_points = ds.where(ds_baseline.baseline == 1, drop=True)
-
-    # Remove any baseline points where the mole fraction is NaN
-    ds_baseline_points = ds_baseline_points.where(~np.isnan(ds_baseline_points.mf), drop=True)
-
-    # Calculate monthly mean
-    # If there are no baseline points, return an empty dataset with same attributes
-    if len(ds_baseline_points.time) == 0:
-        ds_monthly = ds.isel(time=[])
-    else:
-        ds_monthly = ds_baseline_points.resample(time="1MS").mean()
-    
-    # Calculate monthly standard deviation
-    variability_name = "mf_variability"
-    if len(ds_baseline_points.time) == 0:
-        ds_monthly[variability_name] = ds.mf.isel(time=[])
-    else:
-        ds_monthly[variability_name] = ds_baseline_points.mf.resample(time="1MS").std()
-    ds_monthly[variability_name].attrs["long_name"] = "Monthly standard deviation of baseline mole fractions"
-    ds_monthly[variability_name].attrs["units"] = ds.mf.attrs["units"]
-    
-    # Calculate standard error in mean
-    if len(ds_baseline_points.time) == 0:
-        ds_monthly["mf_repeatability"] = ds.mf.isel(time=[])
-    else:
-        ds_monthly["mf_repeatability"] = ds_monthly["mf_repeatability"] / np.sqrt(ds_baseline_points.mf.resample(time = "1MS").count())
-    ds_monthly["mf_repeatability"].attrs["long_name"] = "Monthly standard error in mean of baseline mole fractions"
-    ds_monthly["mf_repeatability"].attrs["units"] = ds.mf.attrs["units"]
-
-    # Copy attributes
-    ds_monthly.attrs = ds.attrs.copy()
-
-    # Add baseline flag
-    ds_monthly.attrs["baseline_flag"] = ds_baseline.attrs["baseline_flag"]
-
-    return ds_monthly

@@ -21,9 +21,12 @@
             "calibration_scale": ""
         },
         "encoding": {
-            "dtype": "f4"
+            "dtype": "f4",
+            "_FillValue": -9999
         },
-        "optional": "False"
+        "optional": "False",
+        "resample_method": "mean",
+        "remove_flagged": "True"
     },
     "mf_repeatability": {
         "attrs": {
@@ -33,9 +36,41 @@
             "calibration_scale": ""
         },
         "encoding": {
-            "dtype": "f4"
+            "dtype": "f4",
+            "_FillValue": -9999
         },
-        "optional": "False"
+        "optional": "False",
+        "resample_method": "standard_error",
+        "remove_flagged": "True"
+    },
+    "mf_variability": {
+        "attrs": {
+            "long_name": "Mole fraction variability of % in dry air",
+            "units": "",
+            "standard_name": "mole_fraction_of_%_variability",
+            "calibration_scale": ""
+        },
+        "encoding": {
+            "dtype": "f4",
+            "_FillValue": -9999
+        },
+        "optional": "True",
+        "resample_method": "",
+        "remove_flagged": "True"
+    },
+    "mf_N": {
+        "attrs": {
+            "long_name": "Number of data points in mean",
+            "units": "",
+            "calibration_scale": ""
+        },
+        "encoding": {
+            "dtype": "i2",
+            "_FillValue": -99
+        },
+        "optional": "True",
+        "resample_method": "sum",
+        "remove_flagged": "Zero"
     },
     "inlet_height": {
         "attrs": {
@@ -44,20 +79,26 @@
             "comment": "Height of inlet above inlet_base_elevation_masl"
         },
         "encoding": {
-            "dtype": "i2"
+            "dtype": "i2",
+            "_FillValue": -99
         },
-        "optional": "False"
+        "optional": "False",
+        "resample_method": "median",
+        "remove_flagged": "False"
     },
     "sampling_period": {
         "attrs": {
             "long_name": "sampling_period",
             "units": "s",
-            "comment": "Time period over which sample was collected"
+            "comment": "Time period over which sample was collected or averaged"
         },
         "encoding": {
-            "dtype": "i2"
+            "dtype": "i2",
+            "_FillValue": -99
         },
-        "optional": "True"
+        "optional": "True",
+        "resample_method": "",
+        "remove_flagged": "False"
     },
     "instrument_type": {
         "attrs": {
@@ -65,8 +106,11 @@
             "comment": ""
         },
         "encoding": {
-            "dtype": "i1"
+            "dtype": "i1",
+            "_FillValue": -99
         },
-        "optional": "True"
+        "optional": "True",
+        "resample_method": "mode",
+        "remove_flagged": "False"
     }
 }
