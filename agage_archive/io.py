@@ -165,7 +165,8 @@ def read_nc(network, species, site, instrument,
     ds = format_attributes(ds,
                         instruments=instruments,
                         network=network,
-                        species=species)
+                        species=species,
+                        public=public)
 
     # Remove any excluded data
     if data_exclude:
@@ -205,7 +206,8 @@ def read_nc(network, species, site, instrument,
 
 def read_baseline(network, species, site, instrument,
                 flag_name = "git_pollution_flag",
-                verbose = False):
+                verbose = False,
+                public = True):
     """Read GCWerks netCDF files
 
     Args:
@@ -230,7 +232,8 @@ def read_baseline(network, species, site, instrument,
 
         ds_out = read_nc(network, species, site, instrument,
                         verbose=verbose,
-                        baseline = flag_name)
+                        baseline = flag_name,
+                        public=public)
 
     else:
 
@@ -239,7 +242,8 @@ def read_baseline(network, species, site, instrument,
 
         ds_out = read_ale_gage(network, species, site, instrument,
                            baseline = True,
-                           verbose=verbose)
+                           verbose=verbose,
+                           public=public)
 
     # Add attributes
     ds_out.baseline.attrs = {
@@ -261,7 +265,10 @@ def read_baseline(network, species, site, instrument,
     ds_out.attrs["species"] = format_species(species)
     ds_out.attrs["instrument"] = instrument
     ds_out.attrs["network"] = network
-    ds_out.attrs["version"] = attributes_default["version"]
+    if public:
+        ds_out.attrs["version"] = attributes_default["version"]
+    else:
+        ds_out.attrs["version"] = "NOT FOR PUBLIC RELEASE"
 
     return ds_out
 
@@ -466,7 +473,8 @@ def read_ale_gage(network, species, site, instrument,
                         network=network,
                         species=format_species(species),
                         calibration_scale=species_info["scale"],
-                        units=species_info["units"])
+                        units=species_info["units"],
+                        public=public)
 
     ds = format_variables(ds)
 
@@ -507,7 +515,8 @@ def read_ale_gage(network, species, site, instrument,
 
 def combine_datasets(network, species, site, 
                     scale = "default",
-                    verbose = True):
+                    verbose = True,
+                    public = True):
     '''Combine ALE/GAGE/AGAGE datasets for a given species and site
 
     Args:
@@ -517,6 +526,7 @@ def combine_datasets(network, species, site,
         scale (str, optional): Calibration scale. Defaults to value in scale_defaults.csv.
             If None, will attempt to leave scale unchanged.
         verbose (bool, optional): Print verbose output. Defaults to False.
+        public (bool, optional): Whether the dataset is for public release. Default to True.
 
     Returns:
         xr.Dataset: Dataset containing data
@@ -542,11 +552,13 @@ def combine_datasets(network, species, site,
         if instrument in ["ALE", "GAGE"]:
             ds = read_ale_gage(network, species, site, instrument,
                                verbose=verbose,
-                               scale=scale)
+                               scale=scale,
+                               public=public)
         else:
             ds = read_nc(network, species, site, instrument,
                         verbose=verbose,
-                        scale=scale)
+                        scale=scale,
+                        public=public)
 
         # Store attributes
         attrs.append(ds.attrs)
@@ -593,7 +605,7 @@ def combine_datasets(network, species, site,
     ds_combined = ds_combined.sortby("time")
 
     # Add details on instruments to global attributes
-    ds_combined = format_attributes(ds_combined, instrument_rec)
+    ds_combined = format_attributes(ds_combined, instrument_rec, public=public)
 
     # Extend comment attribute describing all datasets
     if len(comments) > 1:
@@ -619,7 +631,7 @@ def combine_datasets(network, species, site,
 
 
 def combine_baseline(network, species, site,
-                     verbose = True):
+                     verbose = True, public = True):
     '''Combine ALE/GAGE/AGAGE baseline datasets for a given species and site
 
     Args:
@@ -635,14 +647,16 @@ def combine_baseline(network, species, site,
     # Read instrument dates from CSV files
     instruments = read_data_combination(network, format_species(species), site)
 
-    # Combine datasets    
+    # Combine datasets
     dss = []
 
     for instrument, date in instruments.items():
 
         # Read baseline. Only git_pollution_flag is available for ALE/GAGE data
         ds = read_baseline(network, species, site, instrument,
-                           verbose=verbose, flag_name="git_pollution_flag")
+                           verbose=verbose,
+                           flag_name="git_pollution_flag",
+                           public=public)
 
         # Subset date
         ds = ds.sel(time=slice(*date))
@@ -777,5 +791,5 @@ def output_dataset(ds, network,
     ds_out = ds_out.sel(time=slice(None, end_date))
 
     output_write(ds_out, out_path, filename,
-                 output_subpath=output_subpath, verbose=verbose)
+                output_subpath=output_subpath, verbose=verbose)
 

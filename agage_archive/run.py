@@ -155,14 +155,15 @@ def run_combined_instruments(network,
             # Produce combined dataset
             if verbose:
                 print(f"... combining datasets for {species} at {site}")
-            ds = combine_datasets(network, species, site, verbose=verbose)
+            ds = combine_datasets(network, species, site,
+                                  verbose=verbose, public=public)
 
             if baseline:
                 if verbose:
                     print(f"... combining baselines for {species} at {site}")
                 # Note that GIT baselines is hard-wired here because Met Office not available for ALE/GAGE
                 ds_baseline = combine_baseline(network, species, site,
-                                            verbose=verbose)
+                                            verbose=verbose, public=public)
 
             output_subpath = f"event/{species}"
 
