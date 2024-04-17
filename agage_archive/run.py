@@ -252,12 +252,24 @@ def run_all(network,
 
     path = Paths(network, errors="ignore")
 
-    if public:
-        sub_path = path.output_path
-    else:
-        sub_path = path.output_path_private
+    # Check if output_path attribute is available
+    if not hasattr(path, "output_path"):
+        raise AttributeError("Output path not set in config.yaml")
+    sub_path = path.output_path
+
+    # Check if output_path_private attribute is available
+    #TODO: At the moment, need to have some private output path, even if not used
+    if not hasattr(path, "output_path_private"):
+        raise AttributeError("Private output path not set in config.yaml")
+    sub_path_private = path.output_path_private
         
-    out_pth = data_file_path("", network=network, sub_path=sub_path, errors="ignore")
+    out_pth_public = data_file_path("", network=network, sub_path=sub_path, errors="ignore")
+    out_pth_private = data_file_path("", network=network, sub_path=sub_path_private, errors="ignore")
+
+    if public:
+        out_pth = out_pth_public
+    else:
+        out_pth = out_pth_private
 
     if delete:
         # Clear output directory, removing all files and subdirectories
@@ -286,9 +298,12 @@ def run_all(network,
                 else:
                     print(f"Warning: {pth} must be in a data/network directory")
 
-    # If out_pth is a zip file that doesn't exist, create it
-    if out_pth.suffix == ".zip" and not out_pth.exists():
-        with ZipFile(out_pth, "w") as f:
+    # If either out_pth is a zip file that doesn't, create them
+    if out_pth_public.suffix == ".zip" and not out_pth_public.exists():
+        with ZipFile(out_pth_public, "w") as f:
+            pass
+    if out_pth_private.suffix == ".zip" and not out_pth_private.exists():
+        with ZipFile(out_pth_private, "w") as f:
             pass
 
     # Must run combined instruments first
@@ -321,6 +336,7 @@ if __name__ == "__main__":
     print("#####Processing public archive######")
     print("####################################")
     run_all("agage", species = ["ch4"])
+
     print("####################################")
     print("#####Processing private archive#####")
     print("####################################")

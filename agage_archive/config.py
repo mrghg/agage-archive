@@ -84,10 +84,15 @@ class Paths():
                 if errors == "ignore":
                     continue
                 elif errors == "ignore_inputs":
-                    if value == "output_path":
+                    if key == "output_path":
                         raise FileNotFoundError(f"Folder or zip archive {full_path} doesn't exist")
                     else:
                         continue
+                elif errors == "ignore_outputs":
+                    if key == "output_path":
+                        continue
+                    else:
+                        raise FileNotFoundError(f"Folder or zip archive {full_path} doesn't exist")
                 elif errors == "raise":
                     raise FileNotFoundError(f"Folder or zip archive {full_path} doesn't exist")
             
@@ -102,6 +107,7 @@ class Paths():
                         continue
                 elif errors == "raise":
                     raise FileNotFoundError(f"{full_path} is not a folder or zip archive")
+
 
 def setup():
     """ Setup the config.yml file for the agage_archive package.
