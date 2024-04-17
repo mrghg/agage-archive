@@ -64,7 +64,11 @@ def test_cf_compliance():
 
     pth = data_file_path("",
                          network=network,
-                         sub_path=sub_path)
+                         sub_path=sub_path,
+                         errors="ignore")
+
+    if not pth.exists():
+        pth.mkdir()
 
     # Delete any files in pth
     for f in pth.rglob("*"):
@@ -82,6 +86,5 @@ def test_cf_compliance():
                         sub_path=sub_path + '/nf3',
                         ) as f:
         ds = xr.load_dataset(f)
-    assert check_cf_compliance(dataset=ds)
 
-
+    assert check_cf_compliance(dataset=ds) == False

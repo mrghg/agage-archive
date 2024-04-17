@@ -466,10 +466,9 @@ def read_ale_gage(network, species, site, instrument,
                         instruments=[{"instrument": f"{instrument.upper()}_GCMD"}],
                         network=network,
                         species=format_species(species),
-                        calibration_scale=species_info["scale"],
-                        units=species_info["units"])
+                        calibration_scale=species_info["scale"])
 
-    ds = format_variables(ds)
+    ds = format_variables(ds, units=species_info["units"])
 
     # Add pollution flag back in temporarily with dimension time
     ds["baseline"] = xr.DataArray(da_baseline.values, dims="time")

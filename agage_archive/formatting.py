@@ -197,7 +197,14 @@ def format_variables(ds,
         standard_names=json.load(f)
 
     attrs = ds.attrs.copy()
-    
+
+    # Units shouldn't be in attrs (CF convention), so try to find in dataset
+    if units is None:
+        if "units" in ds.mf.attrs:
+            units = ds.mf.attrs["units"]
+        else:
+            raise ValueError("No units specified and none found in dataset attributes. Specify in function call.")
+        
     vars_out = {}
 
     # Loop through standard variable names
@@ -258,13 +265,13 @@ def format_variables(ds,
                                                         lookup_locals_and_attrs("species", locals(), attrs))
         
             # standard names need to found from the standard_names.json for CF compliance. 
-            # if not in there (e.g. trichloroethylene the only example currently), no standard_name attribute assigned. 
-            if lookup_locals_and_attrs("species", locals(), attrs) in standard_names.keys():
-                ds[var].attrs["standard_name"]=ds[var].attrs["standard_name"].replace("%", 
-                                                                    standard_names[lookup_locals_and_attrs("species",
-                                                                                                            locals(),
-                                                                                                            attrs)])
-
+            # if not in there (e.g. trichloroethylene the only example currently), no standard_name attribute assigned.
+            if "standard_name" in ds[var].attrs:
+                if lookup_locals_and_attrs("species", locals(), attrs) in standard_names.keys():
+                    ds[var].attrs["standard_name"]=ds[var].attrs["standard_name"].replace("%", 
+                                                                        standard_names[lookup_locals_and_attrs("species",
+                                                                                                                locals(),
+                                                                                                                attrs)])
 
             ds[var].attrs["units"] = lookup_locals_and_attrs("units", locals(), attrs)
             ds[var].attrs["calibration_scale"] = lookup_locals_and_attrs("calibration_scale", locals(), attrs)
@@ -280,7 +287,6 @@ def format_variables(ds,
 def format_attributes(ds, instruments = [],
                       network = None,
                       species = None,
-                      units = None,
                       calibration_scale = None):
     '''Format attributes
 
@@ -333,7 +339,7 @@ def format_attributes(ds, instruments = [],
                         attrs[attr] = att
 
     # Format certain key attributes, and determine if they have been set as keywords
-    for v in ["species", "units", "calibration_scale", "network"]:
+    for v in ["species", "calibration_scale", "network"]:
         attrs[v] = lookup_locals_and_attrs(v, locals(), ds.attrs.copy())
 
     ds_out = ds.copy(deep=True)

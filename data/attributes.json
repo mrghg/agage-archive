@@ -11,7 +11,6 @@
     "inlet_comment": "",
     "species": "",
     "calibration_scale": "",
-    "units": "",
     "file_created": "",
     "file_created_by": "",
     "site_code": "",
@@ -24,5 +23,5 @@
     "data_citation_1":"(1) Prinn, R.G.; Weiss, R.F.; Arduini, J.; Arnold, T.; Fraser, P.J.; Ganesan, A.L.; Gasore, J.; Harth, C.M.; Hermansen, O.; Kim, J.; Krummel, P. B.; Li, S.; Loh, Z.M.; Lunder, C.R.; Maione, M.; Manning, A.J.; Miller, B.R.; Mitrevski, B.; Mühle, J.; O’Doherty, S.; Park, S.; Reimann, S.; Rigby, M.; Salameh, P.K.; Schmidt, R.; Simmonds, P.G.; Steele, L.P.; Vollmer, M.K.; Wang, R.H.; and Young, D.: The ALE/GAGE/AGAGE Data Base http://agage.mit.edu/data, or The ALE/GAGE/AGAGE Network (DB 1001), http://cdiac.ess-dive.lbl.gov/ndps/alegage.html (https://doi.org/10.3334/CDIAC/atg.db1001)",
     "data_citation_2":"(2) Prinn, R.G., R.F. Weiss, J. Arduini, T. Arnold, H.L. DeWitt, P.J. Fraser, A.L. Ganesan, J. Gasore, C.M. Harth, O. Hermansen, J. Kim, P.B. Krummel, S. Li, Z. M. Loh, C.R. Lunder, M. Maione, A.J. Manning, B.R. Miller, B. Mitrevski, J. Mühle, S. O’Doherty, S. Park, S. Reimann, M. Rigby, T. Saito, P.K. Salameh, R. Schmidt, P.G.  Simmonds, L.P. Steele, M.K. Vollmer, R.H. Wang, B. Yao, Y. Yokouchi, D. Young, and L. Zhou: History of chemically and radiatively important atmospheric gases from the Advanced Global Atmospheric Gases Experiment (AGAGE), Earth Syst. Sci. Data, 10, 985-1018, 2018, https://doi.org/10.5194/essd-10-985-2018. Website: agage.mit.edu.",
     "data_citation_3":"(3) Most recent AGAGE paper publishing the relevant data, as listed on AGAGE Publications.",
-    "Convention":"CF-1.8"
+    "Conventions":"CF-1.8"
 }
