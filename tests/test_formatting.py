@@ -22,25 +22,25 @@ def check_cf_compliance(dataset):
 
     checker = CFChecker(debug=False, version="1.8")
 
+    catch_errors_warnings = False
+
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
         with NamedTemporaryFile(suffix=".nc") as tmpfile:
             dataset.to_netcdf(tmpfile.name)
             result = checker.checker(file=tmpfile.name)
 
-            fatal_global = result["global"]["FATAL"]
-            error_global = result["global"]["ERROR"]
+            if result["global"]["FATAL"] or result["global"]["ERROR"]:
+                catch_errors_warnings = True
 
-            fatal_vars = []
-            error_vars = []
-            for var in result["variables"].keys():
-                fatal_vars.append(result["variables"][var]["FATAL"])
-                error_vars.append(result["variables"][var]["ERROR"])
-            
-            if fatal_global or error_global or fatal_vars or error_vars:
-                return False
-            else:
-                return True
+            for var in result["variables"].keys():            
+                if result["variables"][var]["FATAL"] or result["variables"][var]["ERROR"]:
+                    catch_errors_warnings = True
+
+    if catch_errors_warnings:
+        return False
+    else:
+        return True
 
 
 def test_cf_compliance():
@@ -87,4 +87,4 @@ def test_cf_compliance():
                         ) as f:
         ds = xr.load_dataset(f)
 
-    assert check_cf_compliance(dataset=ds) == False
+    assert check_cf_compliance(dataset=ds) == True
