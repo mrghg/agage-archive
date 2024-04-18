@@ -84,10 +84,15 @@ class Paths():
                 if errors == "ignore":
                     continue
                 elif errors == "ignore_inputs":
-                    if value == "output_path":
+                    if key == "output_path":
                         raise FileNotFoundError(f"Folder or zip archive {full_path} doesn't exist")
                     else:
                         continue
+                elif errors == "ignore_outputs":
+                    if key == "output_path":
+                        continue
+                    else:
+                        raise FileNotFoundError(f"Folder or zip archive {full_path} doesn't exist")
                 elif errors == "raise":
                     raise FileNotFoundError(f"Folder or zip archive {full_path} doesn't exist")
             
@@ -102,6 +107,7 @@ class Paths():
                         continue
                 elif errors == "raise":
                     raise FileNotFoundError(f"{full_path} is not a folder or zip archive")
+
 
 def setup():
     """ Setup the config.yml file for the agage_archive package.
@@ -139,7 +145,8 @@ def setup():
                 "gcms_path": "data-gcms-nc.zip",
                 "ale_path": "ale_gage_sio1993/ale",
                 "gage_path": "ale_gage_sio1993/gage",
-                "output_path": "agage-public-archive.zip"
+                "output_path": "agage-public-archive.zip",
+                "output_path_private" : "agage-private-archive.zip"
         }
     }
 
@@ -303,15 +310,18 @@ def open_data_file(filename,
     else:
         return (pth / filename).open("rb")
 
+
 def is_jupyterlab_session():
     """Check whether we are in a Jupyter-Lab session.
     Taken from:
     https://stackoverflow.com/questions/57173235/how-to-detect-whether-in-jupyter-notebook-or-lab
     """
+
     # inspect parent process for any signs of being a jupyter lab server
     parent = psutil.Process().parent()
     if parent.name() == "jupyter-lab":
         return "jupyterlab"
+    
     keys = (
         "JUPYTERHUB_API_KEY",
         "JPY_API_TOKEN",
