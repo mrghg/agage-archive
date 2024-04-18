@@ -18,7 +18,7 @@ def check_cf_compliance(dataset):
     Returns:
         bool: True if compliant
     """
-    from cfchecker import CFChecker
+    from cfchecker.cfchecks import CFChecker
 
     checker = CFChecker(debug=False, version="1.8")
 
