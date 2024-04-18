@@ -2,7 +2,7 @@ import pandas as pd
 from shutil import rmtree
 from zipfile import ZipFile
 
-from agage_archive.config import Paths, open_data_file, data_file_list, data_file_path
+from agage_archive.config import Paths, open_data_file, data_file_list, data_file_path, copy_to_archive
 from agage_archive.data_selection import read_release_schedule, read_data_combination
 from agage_archive.io import combine_datasets, combine_baseline, \
     read_nc, read_baseline, read_ale_gage, \
@@ -306,7 +306,7 @@ def run_all(network,
     if out_pth_private.suffix == ".zip" and not out_pth_private.exists():
         with ZipFile(out_pth_private, "w") as f:
             pass
-
+    
     # Must run combined instruments first
     if combined:
         run_combined_instruments(network,
@@ -330,6 +330,14 @@ def run_all(network,
                                     monthly=monthly, species=species,
                                     public=public)
 
+    # Incorporate README file into output directory or zip file
+    try:
+        readme_file = data_file_path(filename='README.md',
+                                    network='agage')
+        copy_to_archive(readme_file, out_pth)
+    except FileNotFoundError:
+        print("No README file found")
+
 
 if __name__ == "__main__":
 
@@ -338,7 +346,7 @@ if __name__ == "__main__":
     print("####################################")
     run_all("agage", species = ["ch4"])
 
-    print("####################################")
-    print("#####Processing private archive#####")
-    print("####################################")
-    run_all("agage", species = ["ch4"], public=False)
+    # print("####################################")
+    # print("#####Processing private archive#####")
+    # print("####################################")
+    # run_all("agage", species = ["ch4"], public=False)

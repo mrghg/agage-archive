@@ -15,9 +15,9 @@
     },
     "mf": {
         "attrs": {
-            "long_name": "Mole fraction of % in dry air",
+            "long_name": "Mole fraction of %",
             "units": "",
-            "standard_name": "mole_fraction_of_%_in_dry_air",
+            "standard_name": "mole_fraction_of_%",
             "calibration_scale": ""
         },
         "encoding": {
@@ -30,9 +30,8 @@
     },
     "mf_repeatability": {
         "attrs": {
-            "long_name": "Mole fraction repeatability of % in dry air",
+            "long_name": "Mole fraction repeatability of %",
             "units": "",
-            "standard_name": "mole_fraction_repeatability_of_%_in_dry_air",
             "calibration_scale": ""
         },
         "encoding": {
@@ -45,9 +44,8 @@
     },
     "mf_variability": {
         "attrs": {
-            "long_name": "Mole fraction variability of % in dry air",
+            "long_name": "Mole fraction variability of %",
             "units": "",
-            "standard_name": "mole_fraction_of_%_variability",
             "calibration_scale": ""
         },
         "encoding": {

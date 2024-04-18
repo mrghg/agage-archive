@@ -11,3 +11,7 @@ nbformat
 h5netcdf
 dvc
 dvc-gdrive
+networkx
+
+# for testing
+cfchecker

@@ -4,6 +4,7 @@ from zipfile import ZipFile
 import yaml
 from fnmatch import fnmatch, filter
 import psutil
+from shutil import copy
 
 class Paths():
 
@@ -309,6 +310,32 @@ def open_data_file(filename,
         return tarfile.open(pth / filename, "r:gz")
     else:
         return (pth / filename).open("rb")
+
+
+def copy_to_archive(src_file, archive_path):
+    """Copy file to archive. Structure is data/network/sub_path
+    sub_path can be a zip archive
+
+    Args:
+        src_file (str): Source file
+        network (str, optional): Network. Defaults to "".
+        sub_path (str, optional): Sub-path. Defaults to "". Can be a zip archive or directory
+        this_repo (bool, optional): If True, look for the root and data folder within this repository (no config).
+            If False, will look for the root and data folders and config file in the working directory.
+
+    Raises:
+        FileNotFoundError: Can't find file
+
+    Returns:
+        file: File object
+    """
+
+    if archive_path.suffix == ".zip":
+        with ZipFile(archive_path, "a") as z:
+            z.write(src_file, arcname=src_file.name)
+    else:
+        # Copy file into pth directory
+        copy(src_file, archive_path / src_file.name)
 
 
 def is_jupyterlab_session():

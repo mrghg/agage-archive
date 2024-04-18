@@ -189,6 +189,12 @@ def read_nc(network, species, site, instrument,
     # Resample dataset, if needed
     ds = resample(ds)
 
+    # Check that time is monotonic and that there are no duplicate indices
+    if not pd.Index(ds.time).is_monotonic_increasing:
+        ds.sortby("time", inplace=True)
+    if len(ds.time) != len(ds.time.drop_duplicates(dim="time")):
+        ds.drop_duplicates(dim="time", inplace=True)
+
     # If baseline is not None, return baseline dataset
     if baseline:
         ds_baseline = ds.baseline.copy(deep=True).to_dataset(name="baseline")
@@ -473,10 +479,9 @@ def read_ale_gage(network, species, site, instrument,
                         network=network,
                         species=format_species(species),
                         calibration_scale=species_info["scale"],
-                        units=species_info["units"],
                         public=public)
 
-    ds = format_variables(ds)
+    ds = format_variables(ds, units=species_info["units"])
 
     # Add pollution flag back in temporarily with dimension time
     ds["baseline"] = xr.DataArray(da_baseline.values, dims="time")
