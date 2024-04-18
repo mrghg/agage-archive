@@ -93,7 +93,8 @@ def read_nc(network, species, site, instrument,
             verbose = False,
             data_exclude = True,
             baseline = None,
-            scale = "default"):
+            scale = "default",
+            public = True):
     """Read GCWerks netCDF files
 
     Args:
@@ -104,7 +105,8 @@ def read_nc(network, species, site, instrument,
         verbose (bool, optional): Print verbose output. Defaults to False.
         data_exclude (bool, optional): Exclude data based on data_exclude.xlsx. Defaults to True.
         scale (str, optional): Scale to convert to. Defaults to "default". If None, will keep original scale.
-
+        public (bool, optional): Whether the dataset is for public release. Default to True.
+        
     Raises:
         FileNotFoundError: Can't find netCDF file
 
@@ -163,7 +165,8 @@ def read_nc(network, species, site, instrument,
     ds = format_attributes(ds,
                         instruments=instruments,
                         network=network,
-                        species=species)
+                        species=species,
+                        public=public)
 
     # Remove any excluded data
     if data_exclude:
@@ -171,9 +174,10 @@ def read_nc(network, species, site, instrument,
 
     # Check against release schedule and remove any data after end date
     rs = read_release_schedule(network, 
-                               instrument,
-                               species=format_species(species),
-                               site=site)
+                            instrument,
+                            species=format_species(species),
+                            site=site,
+                            public=public)
     ds = ds.sel(time=slice(None, rs))
 
     # Rename some variables, so that they can be resampled properly
@@ -208,7 +212,8 @@ def read_nc(network, species, site, instrument,
 
 def read_baseline(network, species, site, instrument,
                 flag_name = "git_pollution_flag",
-                verbose = False):
+                verbose = False,
+                public = True):
     """Read GCWerks netCDF files
 
     Args:
@@ -233,7 +238,8 @@ def read_baseline(network, species, site, instrument,
 
         ds_out = read_nc(network, species, site, instrument,
                         verbose=verbose,
-                        baseline = flag_name)
+                        baseline = flag_name,
+                        public=public)
 
     else:
 
@@ -242,7 +248,8 @@ def read_baseline(network, species, site, instrument,
 
         ds_out = read_ale_gage(network, species, site, instrument,
                            baseline = True,
-                           verbose=verbose)
+                           verbose=verbose,
+                           public=public)
 
     # Add attributes
     ds_out.baseline.attrs = {
@@ -264,7 +271,10 @@ def read_baseline(network, species, site, instrument,
     ds_out.attrs["species"] = format_species(species)
     ds_out.attrs["instrument"] = instrument
     ds_out.attrs["network"] = network
-    ds_out.attrs["version"] = attributes_default["version"]
+    if public:
+        ds_out.attrs["version"] = attributes_default["version"]
+    else:
+        ds_out.attrs["version"] = "NOT FOR PUBLIC RELEASE"
 
     return ds_out
 
@@ -299,7 +309,8 @@ def read_ale_gage(network, species, site, instrument,
                   utc = True,
                   data_exclude = True,
                   scale = "default",
-                  baseline = False):
+                  baseline = False,
+                  public=True):
     """Read GA Tech ALE/GAGE files, process and clean
 
     Args:
@@ -314,6 +325,7 @@ def read_ale_gage(network, species, site, instrument,
         scale (str, optional): Calibration scale. Defaults to None, which means no conversion is attempted.
             Set to "default" to use value in scale_defaults.csv.
         baseline (bool, optional): Return baseline dataset. Defaults to False.
+        public (bool, optional): Whether the dataset is for public release. Default to True.
 
     Returns:
         pd.DataFrame: Pandas dataframe containing file contents
@@ -466,7 +478,8 @@ def read_ale_gage(network, species, site, instrument,
                         instruments=[{"instrument": f"{instrument.upper()}_GCMD"}],
                         network=network,
                         species=format_species(species),
-                        calibration_scale=species_info["scale"])
+                        calibration_scale=species_info["scale"],
+                        public=public)
 
     ds = format_variables(ds, units=species_info["units"])
 
@@ -479,10 +492,12 @@ def read_ale_gage(network, species, site, instrument,
             raise ValueError("Can't exclude data if time is not UTC")
         ds = read_data_exclude(ds, format_species(species), site, instrument)
 
-    # Check against release schedule
-    rs = read_release_schedule(network, instrument,
-                               species=format_species(species),
-                               site=site)
+    # Check against release schedule if for public release. 
+    rs = read_release_schedule(network, 
+                            instrument,
+                            species=format_species(species),
+                            site=site,
+                            public=public)
     ds = ds.sel(time=slice(None, rs))
 
     # Remove pollution flag
@@ -505,7 +520,8 @@ def read_ale_gage(network, species, site, instrument,
 
 def combine_datasets(network, species, site, 
                     scale = "default",
-                    verbose = True):
+                    verbose = True,
+                    public = True):
     '''Combine ALE/GAGE/AGAGE datasets for a given species and site
 
     Args:
@@ -515,6 +531,7 @@ def combine_datasets(network, species, site,
         scale (str, optional): Calibration scale. Defaults to value in scale_defaults.csv.
             If None, will attempt to leave scale unchanged.
         verbose (bool, optional): Print verbose output. Defaults to False.
+        public (bool, optional): Whether the dataset is for public release. Default to True.
 
     Returns:
         xr.Dataset: Dataset containing data
@@ -540,11 +557,13 @@ def combine_datasets(network, species, site,
         if instrument in ["ALE", "GAGE"]:
             ds = read_ale_gage(network, species, site, instrument,
                                verbose=verbose,
-                               scale=scale)
+                               scale=scale,
+                               public=public)
         else:
             ds = read_nc(network, species, site, instrument,
                         verbose=verbose,
-                        scale=scale)
+                        scale=scale,
+                        public=public)
 
         # Store attributes
         attrs.append(ds.attrs)
@@ -591,7 +610,7 @@ def combine_datasets(network, species, site,
     ds_combined = ds_combined.sortby("time")
 
     # Add details on instruments to global attributes
-    ds_combined = format_attributes(ds_combined, instrument_rec)
+    ds_combined = format_attributes(ds_combined, instrument_rec, public=public)
 
     # Extend comment attribute describing all datasets
     if len(comments) > 1:
@@ -617,7 +636,7 @@ def combine_datasets(network, species, site,
 
 
 def combine_baseline(network, species, site,
-                     verbose = True):
+                     verbose = True, public = True):
     '''Combine ALE/GAGE/AGAGE baseline datasets for a given species and site
 
     Args:
@@ -633,14 +652,16 @@ def combine_baseline(network, species, site,
     # Read instrument dates from CSV files
     instruments = read_data_combination(network, format_species(species), site)
 
-    # Combine datasets    
+    # Combine datasets
     dss = []
 
     for instrument, date in instruments.items():
 
         # Read baseline. Only git_pollution_flag is available for ALE/GAGE data
         ds = read_baseline(network, species, site, instrument,
-                           verbose=verbose, flag_name="git_pollution_flag")
+                           verbose=verbose,
+                           flag_name="git_pollution_flag",
+                           public=public)
 
         # Subset date
         ds = ds.sel(time=slice(*date))
@@ -660,7 +681,7 @@ def combine_baseline(network, species, site,
 
 
 def output_path(network, species, site, instrument,
-                extra = "", version=""):
+                extra = "", version="", public=True):
     '''Determine output path and filename
 
     Args:
@@ -670,6 +691,7 @@ def output_path(network, species, site, instrument,
         instrument (str): Instrument
         extra (str, optional): Extra string to add to filename. Defaults to "".
         version (str, optional): Version number. Defaults to "".
+        public (bool, optional): Whether the dataset is for public release. Default to True.
 
     Raises:
         FileNotFoundError: Can't find output path
@@ -681,9 +703,14 @@ def output_path(network, species, site, instrument,
 
     paths = Paths(network)
 
-    version_str = f"_{version}" if version else ""
+    version_str = f"_{version.replace(' ','')}" if version else ""
 
-    output_path = data_file_path("", network = network, sub_path = paths.output_path)
+    if public:
+        sub_path =  paths.output_path
+    else:
+        sub_path =  paths.output_path_private
+        
+    output_path = data_file_path("", network = network, sub_path = sub_path)
 
     # Check if the output path exists
     if not output_path.exists():
@@ -739,6 +766,7 @@ def output_dataset(ds, network,
                    output_subpath = "",
                    extra = "",
                    version = True,
+                   public = True,
                    verbose = False):
     '''Output dataset to netCDF file
 
@@ -751,16 +779,16 @@ def output_dataset(ds, network,
             Used to put species in sub-directories.
         extra (str, optional): Extra string to add to filename. 
             Defaults to using the version number from global attributes.
+        public (bool, optional): Whether the dataset is for public release. Default to True.
         verbose (bool, optional): Print verbose output. Defaults to False.
     '''
-
     if version:
         version_str = f"{ds.attrs['version']}"
     else:
         version_str = ""
-
+        
     out_path, filename = output_path(network, ds.attrs["species"], ds.attrs["site_code"], instrument,
-                                     extra=extra, version=version_str)
+                                     extra=extra, version=version_str, public=public)
 
     ds_out = ds.copy(deep = True)
 
@@ -768,5 +796,5 @@ def output_dataset(ds, network,
     ds_out = ds_out.sel(time=slice(None, end_date))
 
     output_write(ds_out, out_path, filename,
-                 output_subpath=output_subpath, verbose=verbose)
+                output_subpath=output_subpath, verbose=verbose)
 

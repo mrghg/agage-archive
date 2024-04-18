@@ -5,13 +5,14 @@ from agage_archive.config import Paths, data_file_list, open_data_file, is_jupyt
 from agage_archive.visualise import plot_datasets
 
 
-def file_search_species(network, frequency, species):
+def file_search_species(network, frequency, species, public = True):
     """ Search for files containing species
     
     Args:
         network (str): Network
         frequency (str): Frequency ("event" or "monthly")
         species (str): Species to search for
+        public (bool): Search public or private archive
 
     Returns:
         list: List of files containing species        
@@ -19,8 +20,13 @@ def file_search_species(network, frequency, species):
     
     paths = Paths(network, errors="ignore_inputs")
 
+    if public:
+        output_path = paths.output_path
+    else:
+        output_path = paths.output_path_private
+
     files = data_file_list(network,
-                           sub_path=f"{paths.output_path}",
+                           sub_path=f"{output_path}",
                            pattern=f"{frequency}/{species}/*.nc",
                            errors="ignore_inputs")[2]
 
@@ -56,6 +62,7 @@ def instruments_sites(files):
 def update_instrument_site(species,
                         frequency,
                         network,
+                        public,
                         instrument_site_dropdown):
     """ Update instrument and site dropdown
 
@@ -63,6 +70,7 @@ def update_instrument_site(species,
         species (str): Species
         frequency (str): Frequency ("event" or "monthly")
         network (str): Network
+        public (str): Load from public or private archive (public or private)
         instrument_site_dropdown (ipywidgets.Dropdown): Dropdown widget
     """
     def filter_list(input_list):
@@ -77,7 +85,8 @@ def update_instrument_site(species,
 
         return result_list
 
-    files = file_search_species(network, frequency, species)
+    files = file_search_species(network, frequency, species,
+                                public = {"public": True, "private": False}[public])
     instruments, sites = instruments_sites(files)
     options = sorted([f"{s}, {i}" for (s, i) in zip(sites, instruments) if "*" not in i])
     options += sorted([f"{s}, {i}" for (s, i) in zip(sites, instruments) if "*" in i])
@@ -115,12 +124,13 @@ def get_filenames(species, frequency, instrument_sites):
     return filenames
 
 
-def load_datasets(network, filenames):
+def load_datasets(network, filenames, public = True):
     """ Load datasets from filenames
 
     Args:
         network (str): Network
         filenames (list): List of filenames
+        public (bool): Load from public or private archive
 
     Returns:
         list: List of datasets
@@ -128,9 +138,14 @@ def load_datasets(network, filenames):
 
     paths = Paths(network, errors="ignore_inputs")
 
+    if public:
+        output_path = paths.output_path
+    else:
+        output_path = paths.output_path_private
+
     datasets = []
     for filename in filenames:
-        with open_data_file(filename, network, paths.output_path, errors="ignore_inputs") as f:
+        with open_data_file(filename, network, output_path, errors="ignore_inputs") as f:
             with xr.open_dataset(f) as ds:
                 ds_species = ds.load()
 
@@ -139,7 +154,8 @@ def load_datasets(network, filenames):
     return datasets
 
 
-def plot_to_output(sender, network, frequency, species, network_site, output_widget):
+def plot_to_output(sender, network, frequency, species, instrument_site, public,
+                   output_widget):
     """ Plot to output widget
 
     Args:
@@ -151,42 +167,47 @@ def plot_to_output(sender, network, frequency, species, network_site, output_wid
         output_widget (ipywidgets.Output): Output widget
     """
 
-    if not network_site:
+    if not instrument_site:
         with output_widget:
             clear_output(True)
             print("Please select a network and site") 
 
-    filenames = get_filenames(species, frequency, network_site)
+    filenames = get_filenames(species, frequency, instrument_site)
     
-    datasets = load_datasets(network, filenames)
+    datasets = load_datasets(network, filenames,
+                            public = {"public": True, "private": False}[public])
 
     renderer = is_jupyterlab_session()
 
     with output_widget:
         clear_output()
-        print(f"Plotting {species} for {network_site}... please wait...")
+        print(f"Plotting {species} for {instrument_site}... please wait...")
         clear_output(True)
         fig = plot_datasets(datasets)
         fig.show(renderer=renderer)
 
 
-def show_netcdf_info(sender, network, frequency, species, network_site, output_widget):
+def show_netcdf_info(sender, network, frequency, species, instrument_site, public,
+                    output_widget):
     """ Show NetCDF info to output widget
 
     Args:
         sender (ipywidgets.Button): Button widget
         species (str): Species
+        frequency (str): Frequency ("event" or "monthly")
         network_site (str): Network and site
+        public (str): Load from public or private archive (public or private)
         output_widget (ipywidgets.Output): Output widget
     """
 
-    if not network_site:
+    if not instrument_site:
         with output_widget:
             clear_output(True)
             print("Please select a network and site") 
 
-    filenames = get_filenames(species, frequency, network_site)
-    datasets = load_datasets(network, filenames)
+    filenames = get_filenames(species, frequency, instrument_site)
+    datasets = load_datasets(network, filenames,
+                            public = {"public": True, "private": False}[public])
 
     with output_widget:
         clear_output()

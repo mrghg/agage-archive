@@ -285,14 +285,23 @@ def format_variables(ds,
 
 
 def format_attributes(ds, instruments = [],
-                      network = None,
-                      species = None,
-                      calibration_scale = None):
+                    network = None,
+                    species = None,
+                    calibration_scale = None,
+                    public=True):
     '''Format attributes
+
+    Note that many of the above arguments don't appear to be used,
+    but they can be accessed in the lookup_locals_and_attrs function
 
     Args:
         ds (xr.Dataset): Dataset
         instruments (list, optional): List of instrument dictionaries containing the keys "instrument", "instrument_date" and "instrument_comment"
+        network (str, optional): Network name. Defaults to None, in which case it is looked up in the dataset attributes.
+        species (str, optional): Species name. Defaults to None, in which case it is looked up in the dataset attributes.
+        units (str, optional): Units. Defaults to None, in which case it is looked up in the dataset attributes.
+        calibration_scale (str, optional): Calibration scale. Defaults to None, in which case it is looked up in the dataset attributes.
+        public (bool, optional): Whether the dataset is for public release. Defaults to True.
 
     Returns:
         xr.Dataset: Dataset with formatted attributes
@@ -344,6 +353,9 @@ def format_attributes(ds, instruments = [],
 
     ds_out = ds.copy(deep=True)
     ds_out.attrs = attrs.copy()
+
+    if not public:
+        ds_out.attrs["version"] = "NOT FOR PUBLIC RELEASE"
 
     return ds_out
 
