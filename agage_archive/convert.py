@@ -202,5 +202,10 @@ def scale_convert(ds, scale_new):
 
     # Update attributes
     ds_out.attrs["calibration_scale"] = scale_new
+    for var in ds_out.variables:
+        if "calibration_scale" in ds_out[var].attrs:
+            ds_out[var].attrs["calibration_scale"] = scale_new
+        if "scale" in ds_out[var].attrs:
+            ds_out[var].attrs["scale"] = scale_new
 
     return ds_out

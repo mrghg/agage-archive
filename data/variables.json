@@ -31,8 +31,7 @@
     "mf_repeatability": {
         "attrs": {
             "long_name": "Mole fraction repeatability of %",
-            "units": "",
-            "calibration_scale": ""
+            "units": ""
         },
         "encoding": {
             "dtype": "f4",
@@ -45,8 +44,7 @@
     "mf_variability": {
         "attrs": {
             "long_name": "Mole fraction variability of %",
-            "units": "",
-            "calibration_scale": ""
+            "units": ""
         },
         "encoding": {
             "dtype": "f4",
@@ -59,8 +57,7 @@
     "mf_N": {
         "attrs": {
             "long_name": "Number of data points in mean",
-            "units": "",
-            "calibration_scale": ""
+            "units": ""
         },
         "encoding": {
             "dtype": "i2",
