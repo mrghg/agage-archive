@@ -3,7 +3,43 @@ import pandas as pd
 import numpy as np
 
 from agage_archive.convert import resample
-from agage_archive.convert import monthly_baseline
+from agage_archive.convert import monthly_baseline, scale_convert
+
+
+def test_scale_convert():
+    # Also relying on the tests in openghg_calscales
+
+    def test_dataset(time, species, scale):
+        coords = {"time": pd.date_range(time, time)}
+        data = {"mf": (["time"], [1.]),
+                "mf_repeatability": (["time"], [0.1])}
+        ds = xr.Dataset(coords=coords, data_vars=data)
+        ds.attrs["species"] = species
+        ds.attrs["calibration_scale"] = scale
+        return ds
+    
+    # Create xarray dataset with one time point
+    ds = test_dataset("1991-01-01", "cfc-11", "SIO-93")
+
+    # Test a set of conversion factors (chosen because these factors shouldn't change)
+    tests = [("cfc-11", "SIO-93", "SIO-98", 1.0082),
+             ("cfc-11", "SIO-93", "SIO-05", 1.0026549),
+             ("ch4", "CSIRO-94", "TU-87", 1.0119),
+             ("n2o", "SIO-93", "SIO-16", 1.0058)]
+
+    for test in tests:
+        ds = test_dataset("1991-01-01", test[0], test[1])
+        ds_new = scale_convert(ds, test[2])
+
+        # Just assert that values have been scaled
+        assert np.allclose(ds_new.mf.values,  ds.mf.values * test[3], rtol=1e-5)
+                
+    # Period where N2O time conversion applies
+    ds = test_dataset("1985-01-01", "n2o", "SIO-93")
+    ds_new = scale_convert(ds, "SIO-98")
+
+    # Check that the conversion has been applied
+    assert np.allclose(ds_new.mf.values, ds.mf.values * 1.0058 * 0.9962230167482587, rtol=1e-5)
 
 
 def test_resample():

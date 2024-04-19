@@ -11,7 +11,9 @@ nbformat
 h5netcdf
 dvc
 dvc-gdrive
-networkx
 
 # for testing
-cfchecker
+cfchecker @ git+https://github.com/openghg/cf-checker@master#egg=cf-checker
+
+# for scale factor conversion
+openghg_calscales @ git+https://github.com/openghg/openghg_calscales@main#egg=openghg_calscales
