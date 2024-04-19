@@ -246,8 +246,6 @@ def format_variables(ds,
                 raise ValueError(f"Variable {var_ds} not found in dataset. " + \
                                 "Use variable_translate to map to a different variable name.")
     
-    # # Time can't be in variable list
-    # del vars_out["time"]
 
     # Create new dataset
     ds = xr.Dataset(vars_out,
@@ -274,7 +272,8 @@ def format_variables(ds,
                                                                                                                 attrs)])
 
             ds[var].attrs["units"] = lookup_locals_and_attrs("units", locals(), attrs)
-            ds[var].attrs["calibration_scale"] = lookup_locals_and_attrs("calibration_scale", locals(), attrs)
+            if "calibration_scale" in ds[var].attrs:
+                ds[var].attrs["calibration_scale"] = lookup_locals_and_attrs("calibration_scale", locals(), attrs)
 
     # If instrument_type variable is in file, make sure comment is formatted properly
     if "instrument_type" in ds.variables:
