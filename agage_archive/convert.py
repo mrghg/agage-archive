@@ -49,18 +49,9 @@ def resample(ds,
         df_resample_means = df_resample.mean()
         df_resample_std = df_resample.std(ddof=0) # Use biased estimator for standard deviation
 
-        # Shift the time index to the middle of the resample period
-        if resample_period == "1MS":
-            df_resample_means.index = df_resample_means.index + pd.Timedelta("15D")
-            time_comment = "Offset by 15 days to represent the middle of the month."
-        else:
-            df_resample_means.index = df_resample_means.index + pd.Timedelta(resample_period) / 2
-            time_comment = "Center of averaging period"
-
         # Create new dataset to store resampled data
         ds = ds.isel(time=0)
         ds = ds.expand_dims(time=df_resample_means.index)
-        ds.time.attrs["comment"] = time_comment
 
         # Create list of variables from dataset, excluding time
         variables = list(ds.variables)
@@ -171,7 +162,6 @@ def monthly_baseline(ds, ds_baseline):
     ds_monthly.attrs["baseline_flag"] = ds_baseline.attrs["baseline_flag"]
 
     # Run variable formatting
-#    time_comment = {"time": {"comment": ds_monthly.time.attrs["comment"]}}
     ds_monthly = format_variables(ds_monthly)
 
     return ds_monthly

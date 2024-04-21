@@ -127,10 +127,14 @@ def read_nc(network, species, site, instrument,
     # Read sampling time
     if "sampling_time_seconds" in ds.time.attrs:
         sampling_period = int(ds.time.attrs["sampling_time_seconds"])
+        # Timestamp is the middle of the sampling period
+        # Offset to be the start of the sampling period
+        ds["time"] = ds.time - pd.Timedelta(sampling_period/2, unit="s")
     else:
         # GCMD files don't have sampling time in the file
         # assume it's 1s (Peter Salameh, pers. comm., 2023-07-06)
         sampling_period = 1
+    ds["time"].attrs["comment"] = "Timestamp is the start of the sampling period"
 
     # Add sampling time to variables
     ds["sampling_period"] = xr.DataArray(np.ones(len(ds.time)).astype(np.int16)*sampling_period,
