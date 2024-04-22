@@ -134,3 +134,5 @@ dmypy.json
 .DS_store
 ~$*
 agage-gdrive.json
+data-nc
+data-gcms-nc
