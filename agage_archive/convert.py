@@ -167,7 +167,9 @@ def monthly_baseline(ds, ds_baseline):
     ds_monthly.attrs["baseline_flag"] = ds_baseline.attrs["baseline_flag"]
 
     # Run variable formatting
-    ds_monthly = format_variables(ds_monthly)
+    ds_monthly = format_variables(ds_monthly,
+                                  attribute_override={"mf_variability": ds_monthly["mf_variability"].attrs,
+                                                      "mf_repeatability": ds_monthly["mf_repeatability"].attrs})
 
     return ds_monthly
 

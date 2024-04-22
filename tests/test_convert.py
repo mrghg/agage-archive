@@ -94,7 +94,8 @@ def test_monthly_baseline():
     # Create a sample dataset
     time = pd.date_range("1991-01-01", "1991-12-31", freq="D")
     data = {"mf": (["time"], np.random.rand(len(time))),
-            "mf_repeatability": (["time"], np.random.rand(len(time)))}
+            "mf_repeatability": (["time"], np.random.rand(len(time))),
+            "inlet_height": (["time"], np.ones(len(time)))}
     ds = xr.Dataset(coords={"time": time}, data_vars=data)
     ds.mf.attrs["units"] = "1e-12"
     ds.mf.attrs["calibration_scale"] = "TU-87"
@@ -102,6 +103,8 @@ def test_monthly_baseline():
     ds.mf_repeatability.attrs["calibration_scale"] = "TU-87"
     ds.mf_repeatability.attrs["long_name"] = "Repeatability"
     ds.attrs["version"] = "test"
+    ds.attrs["species"] = "ch4"
+    ds.attrs["calibration_scale"] = "TU-87"
 
     # Create a sample baseline dataset
     baseline_data = {"baseline": (["time"], np.random.choice([0, 1], size=len(time)))}

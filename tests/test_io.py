@@ -4,8 +4,9 @@ import numpy as np
 import json
 
 from agage_archive.config import Paths, open_data_file, data_file_path, data_file_list
-from agage_archive.io import read_ale_gage, combine_datasets, read_nc_path, \
+from agage_archive.io import read_ale_gage, read_nc, combine_datasets, read_nc_path, \
     read_baseline, combine_baseline, output_dataset
+from agage_archive.convert import scale_convert
 
 
 paths = Paths("agage_test")
@@ -185,3 +186,54 @@ def test_combine_baseline():
     # Test that a version number has been added
     assert "version" in ds_baseline.attrs.keys()
     assert ds_baseline.attrs["version"] != ""
+
+
+def test_timestamp():
+    """Test that some timestamps are read correctly and corrected for the sampling time offset
+    """
+
+    # Medusa files have a substantial sampling period
+    filename, sub_path = read_nc_path("agage_test", "CH3CCl3", "CGO", "GCMS-Medusa")
+
+    with open_data_file(filename, network="agage_test", sub_path=sub_path) as f:
+        ds_original = xr.open_dataset(f).load()
+        
+    ds = read_nc("agage_test", "CH3CCl3", "CGO", "GCMS-Medusa")
+
+    time_offset = int(ds_original.time.attrs["sampling_time_seconds"])
+    assert np.all(ds_original.time.values == ds.time.values + pd.Timedelta(seconds=time_offset)/2)
+
+    assert ds.time.attrs["long_name"] == "time"
+    assert ds.time.attrs["comment"] == "Timestamp is the start of the sampling period"
+
+
+def test_picarro():
+    """Test that Picarro file is read correctly, resampled to hourly and that the timestamp is at the beginning of the sampling period
+    """
+
+    filename, sub_path = read_nc_path("agage_test", "ch4", "THD", "Picarro")
+    
+    # Original data
+    with open_data_file(filename, network="agage_test", sub_path=sub_path) as f:
+        ds_original = xr.open_dataset(f).load()
+    
+    # Output of read_nc
+    ds = read_nc("agage_test", "ch4", "THD", "Picarro")
+
+    # Apply any scale conversion
+    ds_original = scale_convert(ds_original, ds.attrs["calibration_scale"])
+
+    # Find the first hour of the dataset
+    first_hour = ds_original.time.dt.floor("h").min()
+    first_hour_mean = ds_original.mf.sel(time=slice(first_hour, first_hour + pd.Timedelta("1h"))).mean()
+
+    # Check that the dataset has been resampled to hourly
+    assert np.isclose(ds.mf.values[0], first_hour_mean.values, rtol=0.0001)
+
+    # Check that timestamp is at the beginning of the sampling period
+    assert ds.time[0].values == first_hour.values
+
+    # Check that the time variable has the correct attributes
+    assert ds.time.attrs["long_name"] == "time"
+    assert "Timestamp is the start of the sampling period" in ds.time.attrs["comment"]
+    assert "Resampled" in ds.time.attrs["comment"]
