@@ -210,7 +210,7 @@ def format_variables(ds,
     if "comment" in ds.time.attrs:
         time_comment = ds.time.attrs["comment"]
     else:
-        time_comment = ""
+        time_comment = variables["time"]["attrs"]["comment"]
 
     # Units shouldn't be in attrs (CF convention), so try to find in dataset
     if units is None:

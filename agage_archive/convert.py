@@ -51,7 +51,12 @@ def resample(ds,
 
         # Create new dataset to store resampled data
         ds = ds.isel(time=0)
+
+        # Expand dimensions to include time
+        # This step removes time attributes, so need to store and replace
+        time_attrs = ds.time.attrs
         ds = ds.expand_dims(time=df_resample_means.index)
+        ds.time.attrs = time_attrs
 
         # Create list of variables from dataset, excluding time
         variables = list(ds.variables)
