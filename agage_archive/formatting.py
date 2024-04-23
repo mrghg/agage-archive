@@ -172,8 +172,16 @@ def format_variables(ds,
                     variable_translate={},
                     species = None,
                     units = None,
-                    calibration_scale = None):
+                    calibration_scale = None,
+                    attribute_override = {}):
     '''Standardise variable names and units
+
+    Things to note:
+        - The variable names are standardised according to the variables.json file
+        - The units are standardised according to the unit_translator dictionary in definitions.py
+        - The calibration scale is standardised according to the scale_translator dictionary in definitions.py
+        - Variable attributes are taken from the variables.json file, and can be overridden using the attribute_override dictionary
+        - The time comment attribute is carried over from the original dataset, to retain any information on resampling, etc.
 
     Args:
         ds (xr.Dataset): Dataset
@@ -181,6 +189,7 @@ def format_variables(ds,
         species (str, optional): Species name. Defaults to None, in which case it is looked up in the dataset attributes.
         units (str, optional): Units. Defaults to None, in which case it is looked up in the dataset attributes.
         calibration_scale (str, optional): Calibration scale. Defaults to None, in which case it is looked up in the dataset attributes.
+        attribute_override (dict, optional): Dictionary of attribute overrides. Defaults to {}.
 
     Returns:
         xr.Dataset: Dataset with standardised variable names and units
@@ -196,7 +205,12 @@ def format_variables(ds,
     with open_data_file("standard_names.json", this_repo=True) as f:
         standard_names=json.load(f)
 
+    # Some attributes that we want to keep without changing
     attrs = ds.attrs.copy()
+    if "comment" in ds.time.attrs:
+        time_comment = ds.time.attrs["comment"]
+    else:
+        time_comment = variables["time"]["attrs"]["comment"]
 
     # Units shouldn't be in attrs (CF convention), so try to find in dataset
     if units is None:
@@ -275,10 +289,21 @@ def format_variables(ds,
             if "calibration_scale" in ds[var].attrs:
                 ds[var].attrs["calibration_scale"] = lookup_locals_and_attrs("calibration_scale", locals(), attrs)
 
+    # Copy time comment attribute
+    ds.time.attrs["comment"] = time_comment
+
     # If instrument_type variable is in file, make sure comment is formatted properly
     if "instrument_type" in ds.variables:
         instrument_number, instrument_number_string = instrument_type_definition()
         ds.instrument_type.attrs["comment"] = instrument_number_string
+
+    # If there are any attribute overrides, apply them
+    for var in attribute_override:
+        if var in ds.variables:
+            for attr in attribute_override[var]:
+                ds[var].attrs[attr] = attribute_override[var][attr]
+        else:
+            raise ValueError(f"Variable {var} not found in dataset. Can't override attributes.")
 
     return ds
 
