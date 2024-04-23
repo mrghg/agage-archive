@@ -760,7 +760,7 @@ def output_write(ds, out_path, filename,
     else:
         # Test if output_path exists and if not create it
         if not (out_path / output_subpath).exists():
-            (out_path / output_subpath).mkdir()
+            (out_path / output_subpath).mkdir(parents=True, exist_ok=True)
 
         with open(out_path / output_subpath / filename, mode="wb") as f:
             # ds_out.to_netcdf(f, mode="w", format="NETCDF4", engine="h5netcdf")

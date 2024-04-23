@@ -333,7 +333,7 @@ def run_all(network,
     # Incorporate README file into output directory or zip file
     try:
         readme_file = data_file_path(filename='README.md',
-                                    network='agage')
+                                    network=network)
         copy_to_archive(readme_file, out_pth)
     except FileNotFoundError:
         print("No README file found")
