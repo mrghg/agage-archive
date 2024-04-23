@@ -1,5 +1,5 @@
 {
-    "baseline":{
+    "baseline": {
         "resample_method": "",
         "remove_flagged": "False"
     },
@@ -12,7 +12,11 @@
         "remove_flagged": "Zero"
     },
     "data_flag": {
-        "resample_method": "mean",
+        "resample_method": "mode",
+        "remove_flagged": "False"
+    },
+    "integration_flag": {
+        "resample_method": "mode",
         "remove_flagged": "False"
     },
     "git_pollution_flag": {
