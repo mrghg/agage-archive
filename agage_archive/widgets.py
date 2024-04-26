@@ -1,5 +1,6 @@
 import xarray as xr
-from IPython.display import clear_output
+from IPython.display import clear_output, display
+import ipywidgets as widgets
 
 from agage_archive.config import Paths, data_file_list, open_data_file, is_jupyterlab_session
 from agage_archive.visualise import plot_datasets
@@ -217,3 +218,123 @@ def show_netcdf_info(sender, network, frequency, species, instrument_site, publi
             print("-----------------------------------------")
             print("")
 
+
+def dashboard(network,
+            frequencies = ["event", "monthly"]):
+    """ Create dashboard for visualising data
+
+    Args:
+        network (str): Network
+        frequencies (list): List of frequencies ("event" or "monthly")
+    """
+    
+
+    paths = Paths(network, errors="ignore_inputs")    
+    
+    # Get species names from the output directory structure
+    species = []
+    for f in data_file_list(network, paths.output_path, errors="ignore_inputs")[2]:
+        if "/" in f:
+            species.append(f.split("/")[1])
+        else:
+            continue
+
+    if len(species) == 0:
+        raise ValueError("No files found in the output directory")
+
+    species = sorted(set(species))
+
+    # Public or private archive radio button
+    public_button = widgets.RadioButtons(
+        options=["public", "private"],
+        description='Archive:',
+        disabled=False,
+        default="public"
+    )
+
+    # Create dropdown widget
+    species_dropdown = widgets.Dropdown(
+        options=species,
+        description='Species:',
+        disabled=False,
+        default=species[0]
+        )
+
+    # Create file_type widget
+    frequency_dropdown = widgets.Dropdown(
+        options=frequencies,
+        description='Frequency:',
+        disabled=False,
+        default=frequencies[0]
+    )
+
+    # Selection widget for network and site
+    instrument_site = widgets.SelectMultiple(
+        options=update_instrument_site(species[0],
+                                    frequencies[0],
+                                    network,
+                                    "public",
+                                    None),
+        description='Site, instrument:',
+        disabled=False,
+        indent=True,
+        style={'description_width': 'initial'}
+    )
+
+    # Plotting button
+    plot_button = widgets.Button(description="Plot")
+
+    # Output widget
+    output = widgets.Output()
+    output_netcdf = widgets.Output()
+
+    # Text widget to explain what the asterisk means
+    asterisk_text = widgets.HTML(value="<p>* Asterisk indicates individual, rather than combined file</p>")
+
+    # Update network and site dropdown when species is changed
+    species_dropdown.observe(lambda change:
+                            update_instrument_site(change["new"],
+                                                frequency_dropdown.value,
+                                                network,
+                                                public_button.value,
+                                                instrument_site),
+                            names="value")
+
+    frequency_dropdown.observe(lambda change:
+                            update_instrument_site(species_dropdown.value,
+                                            change["new"],
+                                            network,
+                                            public_button.value,
+                                            instrument_site),
+                            names="value")
+
+    public_button.observe(lambda change:
+                        update_instrument_site(species_dropdown.value,
+                                        frequency_dropdown.value,
+                                        network,
+                                        change["new"],
+                                        instrument_site),
+                        names="value")
+
+    # Plot to output when button is clicked
+    plot_button.on_click(lambda x: plot_to_output(x, network,
+                                                frequency_dropdown.value,
+                                                species_dropdown.value,
+                                                instrument_site.value,
+                                                public_button.value,
+                                                output))
+    plot_button.on_click(lambda x: show_netcdf_info(x, network,
+                                                    frequency_dropdown.value,
+                                                    species_dropdown.value,
+                                                    instrument_site.value,
+                                                    public_button.value,
+                                                    output_netcdf))                                         
+
+    display(public_button)
+    display(species_dropdown)
+    display(frequency_dropdown)
+    display(instrument_site)
+    display(asterisk_text)
+    display(plot_button)
+    display(output)
+    display(output_netcdf)
