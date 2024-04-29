@@ -360,7 +360,7 @@ def dashboard(network,
                                                     frequency_dropdown.value,
                                                     instrument_site.value,
                                                     public_button.value,
-                                                    output_netcdf))                                         
+                                                    output_netcdf))
 
     display(public_button)
     display(species_dropdown)
