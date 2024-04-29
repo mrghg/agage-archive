@@ -37,7 +37,8 @@ def file_search_species(network, frequency, species, public = True):
                            pattern=f"{frequency}/{species}/*.nc",
                            errors="ignore_inputs")[2]
 
-    print(files)
+    # Remove baseline files
+    files = [f for f in files if "baseline" not in f]
 
     return sorted(files)
 
@@ -82,17 +83,26 @@ def update_instrument_site(species,
         public (str): Load from public or private archive (public or private)
         instrument_site_dropdown (ipywidgets.Dropdown): Dropdown widget
     """
-    def filter_list(input_list):
-        """Filter list to keep only first duplicate"""
-        seen_set = set()
-        result_list = []
+    def find_duplicates(options):
+        """ Find duplicates in options list
+        """
+        seen = set()
+        duplicates = set()
+        for option in options:
+            if option in seen:
+                duplicates.add(option)
+            else:
+                seen.add(option)
+        
+        error_str = "Duplicate options found in instrument and site combinations:"
 
-        for item in input_list:
-            if item not in seen_set:
-                seen_set.add(item)
-                result_list.append(item)
+        if duplicates:
+            for duplicate in duplicates:
+                error_str += f"\n{duplicate}"
+            raise ValueError(error_str)
 
-        return result_list
+    # Clear contents of instrument_site_filenames
+    instrument_site_filenames.clear()
 
     files = file_search_species(network, frequency, species,
                                 public = {"public": True, "private": False}[public])
@@ -111,45 +121,27 @@ def update_instrument_site(species,
             options.append(f"{s}, {i}")
             options_files.append(f)
 
-    if len(set(options)) != len(options):
-        # Find and print duplicates
-        seen = set()
-        duplicates = set()
-        for option in options:
-            if option in seen:
-                duplicates.add(option)
-            else:
-                seen.add(option)
-        print(duplicates)
-        
-        raise ValueError("Duplicate options found in instrument and site combinations")
-    if len(set(options_individual)) != len(options_individual):
-        print(options_individual)
-        raise ValueError("Duplicate options found in individual instrument and site combinations")
-
+    # Check for duplicates and raise an error if found
+    find_duplicates(options)
+    find_duplicates(options_individual)
+    
+    # Populate dictionary with instrument/site strings as keys and filenames as values
     for option in sorted(options):
         instrument_site_filenames[option] = options_files[options.index(option)]
     for option in sorted(options_individual):
         instrument_site_filenames[option] = options_individual_files[options_individual.index(option)]
 
+    # Update dropdown widget if passed as kwarg, otherwise return options list
     if instrument_site_dropdown:
         instrument_site_dropdown.options = instrument_site_filenames.keys()
     else:
         return instrument_site_filenames.keys()
 
-    # options = sorted([f"{s}, {i}" for (s, i) in zip(sites, instruments) if "*" not in i])
-    # options += sorted([f"{s}, {i}" for (s, i) in zip(sites, instruments) if "*" in i])
-    # if instrument_site_dropdown:
-    #     instrument_site_dropdown.options = filter_list(options)
-    # else:
-    #     return filter_list(options)
 
-
-def get_filenames(species, frequency, instrument_sites):
+def get_filenames(frequency, instrument_sites):
     """ Get filenames from species and network/site
     
     Args:
-        species (str): Species
         frequency (str): Frequency
         instrument_sites (list): List of instrument/site strings
 
@@ -157,52 +149,13 @@ def get_filenames(species, frequency, instrument_sites):
         list: List of filenames
     """
 
-    if frequency == "monthly":
-        frequency_suffix = "-monthly"
-    else:
-        frequency_suffix = ""
-
-    # filenames = []
-    # for instrument_site in instrument_sites:
-    #     site, instrument = instrument_site.split(', ')
-    #     if "*" in instrument:
-    #         search_str = f"{frequency}/{species}/individual/{instrument.split('*')[-1]}_{site}_{species}{frequency_suffix}_*.nc"
-    #     else:
-    #         search_str = f"{frequency}/{species}/{instrument}_{site}_{species}{frequency_suffix}_*.nc"
-
-    #     files = glob(search_str)
-    #     if len(files) == 0:
-    #         raise ValueError(f"No files found for {instrument_site}")
-    #     elif len(files) > 1:
-    #         raise ValueError(f"Multiple files found for {instrument_site}")
-    #     else:
-    #         # Append just the filename without the path
-    #         filenames.append(files[0].split('/')[-1])
-    
-    print(instrument_site_filenames)
-
-    #if instrument_site_filenames:
-    filenames = [Path(instrument_site_filenames[instrument_site]).name for instrument_site in instrument_sites]
-    # else:
-    #     filenames = []
+    # Extract everything in file path from frequency onwards
+    filenames = []
+    for instrument_site in instrument_sites:
+        filepath = instrument_site_filenames[instrument_site]
+        filenames.append(f"{frequency}/{filepath.split(frequency + '/')[1]}")
 
     return filenames
-
-# # Test for get_filenames
-# def test_get_filenames():
-
-#     species = "ch4"
-#     frequency = "event"
-#     instrument_sites = ["CGO, combined"]
-
-#     filenames = get_filenames(species, frequency, instrument_sites)
-
-#     assert len(filenames) == 1
-#     assert filenames[0] == "AGAGE_mace_head_ch4-monthly_2000-01.nc"
-
-#     print("get_filenames passed")
-
-# test_get_filenames()
 
 
 def load_datasets(network, filenames, public = True):
@@ -253,8 +206,8 @@ def plot_to_output(sender, network, frequency, species, instrument_site, public,
             clear_output(True)
             print("Please select a network and site") 
 
-    filenames = get_filenames(species, frequency, instrument_site)
-    print(filenames)
+    filenames = get_filenames(frequency, instrument_site)
+
     datasets = load_datasets(network, filenames,
                             public = {"public": True, "private": False}[public])
 
@@ -268,7 +221,7 @@ def plot_to_output(sender, network, frequency, species, instrument_site, public,
         fig.show(renderer=renderer)
 
 
-def show_netcdf_info(sender, network, frequency, species, instrument_site, public,
+def show_netcdf_info(sender, network, frequency, instrument_site, public,
                     output_widget):
     """ Show NetCDF info to output widget
 
@@ -286,7 +239,7 @@ def show_netcdf_info(sender, network, frequency, species, instrument_site, publi
             clear_output(True)
             print("Please select a network and site") 
 
-    filenames = get_filenames(species, frequency, instrument_site)
+    filenames = get_filenames(frequency, instrument_site)
     datasets = load_datasets(network, filenames,
                             public = {"public": True, "private": False}[public])
 
@@ -405,7 +358,6 @@ def dashboard(network,
                                                 output))
     plot_button.on_click(lambda x: show_netcdf_info(x, network,
                                                     frequency_dropdown.value,
-                                                    species_dropdown.value,
                                                     instrument_site.value,
                                                     public_button.value,
                                                     output_netcdf))                                         
