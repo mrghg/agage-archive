@@ -1,9 +1,15 @@
 import xarray as xr
 from IPython.display import clear_output, display
 import ipywidgets as widgets
+from glob import glob
+from pathlib import Path
 
 from agage_archive.config import Paths, data_file_list, open_data_file, is_jupyterlab_session
 from agage_archive.visualise import plot_datasets
+
+
+# Global dictionary to store filenames associated with instrument/site string displayed in dropdown
+instrument_site_filenames = {}
 
 
 def file_search_species(network, frequency, species, public = True):
@@ -30,6 +36,8 @@ def file_search_species(network, frequency, species, public = True):
                            sub_path=f"{output_path}",
                            pattern=f"{frequency}/{species}/*.nc",
                            errors="ignore_inputs")[2]
+
+    print(files)
 
     return sorted(files)
 
@@ -89,12 +97,52 @@ def update_instrument_site(species,
     files = file_search_species(network, frequency, species,
                                 public = {"public": True, "private": False}[public])
     instruments, sites = instruments_sites(files)
-    options = sorted([f"{s}, {i}" for (s, i) in zip(sites, instruments) if "*" not in i])
-    options += sorted([f"{s}, {i}" for (s, i) in zip(sites, instruments) if "*" in i])
+
+    options = []
+    options_files = []
+    options_individual = []
+    options_individual_files = []
+
+    for f, i, s in zip(files, instruments, sites):
+        if "*" in i:
+            options_individual.append(f"{s}, {i}")
+            options_individual_files.append(f)
+        else:
+            options.append(f"{s}, {i}")
+            options_files.append(f)
+
+    if len(set(options)) != len(options):
+        # Find and print duplicates
+        seen = set()
+        duplicates = set()
+        for option in options:
+            if option in seen:
+                duplicates.add(option)
+            else:
+                seen.add(option)
+        print(duplicates)
+        
+        raise ValueError("Duplicate options found in instrument and site combinations")
+    if len(set(options_individual)) != len(options_individual):
+        print(options_individual)
+        raise ValueError("Duplicate options found in individual instrument and site combinations")
+
+    for option in sorted(options):
+        instrument_site_filenames[option] = options_files[options.index(option)]
+    for option in sorted(options_individual):
+        instrument_site_filenames[option] = options_individual_files[options_individual.index(option)]
+
     if instrument_site_dropdown:
-        instrument_site_dropdown.options = filter_list(options)
+        instrument_site_dropdown.options = instrument_site_filenames.keys()
     else:
-        return filter_list(options)
+        return instrument_site_filenames.keys()
+
+    # options = sorted([f"{s}, {i}" for (s, i) in zip(sites, instruments) if "*" not in i])
+    # options += sorted([f"{s}, {i}" for (s, i) in zip(sites, instruments) if "*" in i])
+    # if instrument_site_dropdown:
+    #     instrument_site_dropdown.options = filter_list(options)
+    # else:
+    #     return filter_list(options)
 
 
 def get_filenames(species, frequency, instrument_sites):
@@ -114,15 +162,47 @@ def get_filenames(species, frequency, instrument_sites):
     else:
         frequency_suffix = ""
 
-    filenames = []
-    for instrument_site in instrument_sites:
-        site, instrument = instrument_site.split(', ')
-        if "*" in instrument:
-            filenames.append(f"{frequency}/{species}/individual/{instrument.split('*')[-1]}_{site}_{species}{frequency_suffix}_*.nc")
-        else:
-            filenames.append(f"{frequency}/{species}/{instrument}_{site}_{species}{frequency_suffix}_*.nc")
+    # filenames = []
+    # for instrument_site in instrument_sites:
+    #     site, instrument = instrument_site.split(', ')
+    #     if "*" in instrument:
+    #         search_str = f"{frequency}/{species}/individual/{instrument.split('*')[-1]}_{site}_{species}{frequency_suffix}_*.nc"
+    #     else:
+    #         search_str = f"{frequency}/{species}/{instrument}_{site}_{species}{frequency_suffix}_*.nc"
+
+    #     files = glob(search_str)
+    #     if len(files) == 0:
+    #         raise ValueError(f"No files found for {instrument_site}")
+    #     elif len(files) > 1:
+    #         raise ValueError(f"Multiple files found for {instrument_site}")
+    #     else:
+    #         # Append just the filename without the path
+    #         filenames.append(files[0].split('/')[-1])
+    
+    print(instrument_site_filenames)
+
+    #if instrument_site_filenames:
+    filenames = [Path(instrument_site_filenames[instrument_site]).name for instrument_site in instrument_sites]
+    # else:
+    #     filenames = []
 
     return filenames
+
+# # Test for get_filenames
+# def test_get_filenames():
+
+#     species = "ch4"
+#     frequency = "event"
+#     instrument_sites = ["CGO, combined"]
+
+#     filenames = get_filenames(species, frequency, instrument_sites)
+
+#     assert len(filenames) == 1
+#     assert filenames[0] == "AGAGE_mace_head_ch4-monthly_2000-01.nc"
+
+#     print("get_filenames passed")
+
+# test_get_filenames()
 
 
 def load_datasets(network, filenames, public = True):
@@ -174,7 +254,7 @@ def plot_to_output(sender, network, frequency, species, instrument_site, public,
             print("Please select a network and site") 
 
     filenames = get_filenames(species, frequency, instrument_site)
-    
+    print(filenames)
     datasets = load_datasets(network, filenames,
                             public = {"public": True, "private": False}[public])
 
