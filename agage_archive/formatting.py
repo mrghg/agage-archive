@@ -4,6 +4,7 @@ import xarray as xr
 from datetime import datetime
 import warnings
 
+from agage_archive import __version__ as code_version
 from agage_archive.config import open_data_file
 from agage_archive.util import is_number, lookup_username
 from agage_archive.definitions import instrument_type_definition, nc4_types
@@ -334,6 +335,20 @@ def format_attributes(ds, instruments = [],
     with open_data_file("attributes.json", this_repo=True) as f:
         attributes_default = json.load(f)
 
+    if network is None:
+        if "network" in ds.attrs:
+            network_attrs = ds.attrs["network"]
+        else:
+            raise ValueError("No network specified and none found in dataset attributes. Specify in function call.")
+    else:
+        network_attrs = network
+
+    with open_data_file("attributes.json", network=network_attrs) as f:
+        attributes_network = json.load(f)
+
+    # Combine default and network attributes
+    attributes_default.update(attributes_network)
+
     attrs = {}
 
     for attr in attributes_default:
@@ -351,6 +366,10 @@ def format_attributes(ds, instruments = [],
         elif attr == "file_created":
             # Get current time
             attrs[attr] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        
+        elif attr == "processing_code_version":
+            # Get code version
+            attrs[attr] = code_version
 
         else:
             # Set default
