@@ -101,6 +101,8 @@ def update_instrument_site(species,
                 error_str += f"\n{duplicate}"
             raise ValueError(error_str)
 
+    global instrument_site_filenames
+
     # Clear contents of instrument_site_filenames
     instrument_site_filenames.clear()
 
@@ -148,6 +150,8 @@ def get_filenames(frequency, instrument_sites):
     Returns:
         list: List of filenames
     """
+
+    global instrument_site_filenames
 
     # Extract everything in file path from frequency onwards
     filenames = []
