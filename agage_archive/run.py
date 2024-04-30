@@ -346,24 +346,23 @@ def run_all(network,
 
         print(f'Deleting all files in {out_pth}')
 
+        # If out_pth is a zip file, delete it
         if out_pth.suffix == ".zip" and out_pth.exists():
-
             out_pth.unlink()
-
         else:
+            # For safety that out_pth is in data/network directory
+            if out_pth.parents[1] == path.data and out_pth.parents[0].name == network:
+                pass
+            else:
+                raise ValueError(f"{out_pth} must be in a data/network directory")
 
+            # Delete all files in output directory
             for f in files:
-
                 pth = out_pth / f
-
-                # Make sure pth is in data/network directory (for safety)
-                if pth.parents[2] == path.data and pth.parents[1].name == network:
-                    if pth.is_file():
-                        pth.unlink()
-                    elif pth.is_dir():
-                        rmtree(pth)
-                else:
-                    print(f"Warning: {pth} must be in a data/network directory")
+                if pth.is_file():
+                    pth.unlink()
+                elif pth.is_dir():
+                    rmtree(pth)
 
     # If either out_pth is a zip file that doesn't, create them
     if out_pth_public.suffix == ".zip" and not out_pth_public.exists():
