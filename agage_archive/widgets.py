@@ -265,7 +265,6 @@ def dashboard(network,
         frequencies (list): List of frequencies ("event" or "monthly")
     """
     
-
     paths = Paths(network, errors="ignore_inputs")    
     
     # Get species names from the output directory structure
