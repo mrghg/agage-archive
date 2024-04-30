@@ -238,7 +238,7 @@ def read_baseline(network, species, site, instrument,
         xarray.Dataset: Contents of netCDF file
     """
 
-    with open_data_file("attributes.json", this_repo=True) as f:
+    with open_data_file("attributes.json", network=network) as f:
         attributes_default = json.load(f)
 
     if not instrument.lower() in ["ale", "gage"]:

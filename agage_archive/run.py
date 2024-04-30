@@ -416,7 +416,7 @@ if __name__ == "__main__":
     print("####################################")
     print("#####Processing public archive######")
     print("####################################")
-    run_all("agage")
+    run_all("agage", species = ["cf4"])
 
     # print("####################################")
     # print("#####Processing private archive#####")

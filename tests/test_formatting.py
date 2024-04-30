@@ -58,7 +58,7 @@ def test_cf_compliance():
     species = "nf3"
 
     # Get current version number from attributes.json
-    with open_data_file("attributes.json", this_repo=True) as f:
+    with open_data_file("attributes.json", network=network) as f:
         attributes = json.load(f)
     version = attributes["version"]
 
@@ -88,3 +88,5 @@ def test_cf_compliance():
         ds = xr.load_dataset(f)
 
     assert check_cf_compliance(dataset=ds) == True
+
+test_cf_compliance()
