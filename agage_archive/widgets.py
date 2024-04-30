@@ -1,8 +1,15 @@
 import xarray as xr
-from IPython.display import clear_output
+from IPython.display import clear_output, display
+import ipywidgets as widgets
+from glob import glob
+from pathlib import Path
 
 from agage_archive.config import Paths, data_file_list, open_data_file, is_jupyterlab_session
 from agage_archive.visualise import plot_datasets
+
+
+# Global dictionary to store filenames associated with instrument/site string displayed in dropdown
+instrument_site_filenames = {}
 
 
 def file_search_species(network, frequency, species, public = True):
@@ -29,6 +36,9 @@ def file_search_species(network, frequency, species, public = True):
                            sub_path=f"{output_path}",
                            pattern=f"{frequency}/{species}/*.nc",
                            errors="ignore_inputs")[2]
+
+    # Remove baseline files
+    files = [f for f in files if "baseline" not in f]
 
     return sorted(files)
 
@@ -73,34 +83,67 @@ def update_instrument_site(species,
         public (str): Load from public or private archive (public or private)
         instrument_site_dropdown (ipywidgets.Dropdown): Dropdown widget
     """
-    def filter_list(input_list):
-        """Filter list to keep only first duplicate"""
-        seen_set = set()
-        result_list = []
+    def find_duplicates(options):
+        """ Find duplicates in options list
+        """
+        seen = set()
+        duplicates = set()
+        for option in options:
+            if option in seen:
+                duplicates.add(option)
+            else:
+                seen.add(option)
+        
+        error_str = "Duplicate options found in instrument and site combinations:"
 
-        for item in input_list:
-            if item not in seen_set:
-                seen_set.add(item)
-                result_list.append(item)
+        if duplicates:
+            for duplicate in duplicates:
+                error_str += f"\n{duplicate}"
+            raise ValueError(error_str)
 
-        return result_list
+    global instrument_site_filenames
+
+    # Clear contents of instrument_site_filenames
+    instrument_site_filenames.clear()
 
     files = file_search_species(network, frequency, species,
                                 public = {"public": True, "private": False}[public])
     instruments, sites = instruments_sites(files)
-    options = sorted([f"{s}, {i}" for (s, i) in zip(sites, instruments) if "*" not in i])
-    options += sorted([f"{s}, {i}" for (s, i) in zip(sites, instruments) if "*" in i])
+
+    options = []
+    options_files = []
+    options_individual = []
+    options_individual_files = []
+
+    for f, i, s in zip(files, instruments, sites):
+        if "*" in i:
+            options_individual.append(f"{s}, {i}")
+            options_individual_files.append(f)
+        else:
+            options.append(f"{s}, {i}")
+            options_files.append(f)
+
+    # Check for duplicates and raise an error if found
+    find_duplicates(options)
+    find_duplicates(options_individual)
+    
+    # Populate dictionary with instrument/site strings as keys and filenames as values
+    for option in sorted(options):
+        instrument_site_filenames[option] = options_files[options.index(option)]
+    for option in sorted(options_individual):
+        instrument_site_filenames[option] = options_individual_files[options_individual.index(option)]
+
+    # Update dropdown widget if passed as kwarg, otherwise return options list
     if instrument_site_dropdown:
-        instrument_site_dropdown.options = filter_list(options)
+        instrument_site_dropdown.options = instrument_site_filenames.keys()
     else:
-        return filter_list(options)
+        return instrument_site_filenames.keys()
 
 
-def get_filenames(species, frequency, instrument_sites):
+def get_filenames(frequency, instrument_sites):
     """ Get filenames from species and network/site
     
     Args:
-        species (str): Species
         frequency (str): Frequency
         instrument_sites (list): List of instrument/site strings
 
@@ -108,18 +151,13 @@ def get_filenames(species, frequency, instrument_sites):
         list: List of filenames
     """
 
-    if frequency == "monthly":
-        frequency_suffix = "-monthly"
-    else:
-        frequency_suffix = ""
+    global instrument_site_filenames
 
+    # Extract everything in file path from frequency onwards
     filenames = []
     for instrument_site in instrument_sites:
-        site, instrument = instrument_site.split(', ')
-        if "*" in instrument:
-            filenames.append(f"{frequency}/{species}/individual/{instrument.split('*')[-1]}_{site}_{species}{frequency_suffix}_*.nc")
-        else:
-            filenames.append(f"{frequency}/{species}/{instrument}_{site}_{species}{frequency_suffix}_*.nc")
+        filepath = instrument_site_filenames[instrument_site]
+        filenames.append(f"{frequency}/{filepath.split(frequency + '/')[1]}")
 
     return filenames
 
@@ -172,8 +210,8 @@ def plot_to_output(sender, network, frequency, species, instrument_site, public,
             clear_output(True)
             print("Please select a network and site") 
 
-    filenames = get_filenames(species, frequency, instrument_site)
-    
+    filenames = get_filenames(frequency, instrument_site)
+
     datasets = load_datasets(network, filenames,
                             public = {"public": True, "private": False}[public])
 
@@ -187,7 +225,7 @@ def plot_to_output(sender, network, frequency, species, instrument_site, public,
         fig.show(renderer=renderer)
 
 
-def show_netcdf_info(sender, network, frequency, species, instrument_site, public,
+def show_netcdf_info(sender, network, frequency, instrument_site, public,
                     output_widget):
     """ Show NetCDF info to output widget
 
@@ -205,7 +243,7 @@ def show_netcdf_info(sender, network, frequency, species, instrument_site, publi
             clear_output(True)
             print("Please select a network and site") 
 
-    filenames = get_filenames(species, frequency, instrument_site)
+    filenames = get_filenames(frequency, instrument_site)
     datasets = load_datasets(network, filenames,
                             public = {"public": True, "private": False}[public])
 
@@ -217,3 +255,121 @@ def show_netcdf_info(sender, network, frequency, species, instrument_site, publi
             print("-----------------------------------------")
             print("")
 
+
+def dashboard(network,
+            frequencies = ["event", "monthly"]):
+    """ Create dashboard for visualising data
+
+    Args:
+        network (str): Network
+        frequencies (list): List of frequencies ("event" or "monthly")
+    """
+    
+    paths = Paths(network, errors="ignore_inputs")    
+    
+    # Get species names from the output directory structure
+    species = []
+    for f in data_file_list(network, paths.output_path, errors="ignore_inputs")[2]:
+        if "/" in f:
+            species.append(f.split("/")[1])
+        else:
+            continue
+
+    if len(species) == 0:
+        raise ValueError("No files found in the output directory")
+
+    species = sorted(set(species))
+
+    # Public or private archive radio button
+    public_button = widgets.RadioButtons(
+        options=["public", "private"],
+        description='Archive:',
+        disabled=False,
+        default="public"
+    )
+
+    # Create dropdown widget
+    species_dropdown = widgets.Dropdown(
+        options=species,
+        description='Species:',
+        disabled=False,
+        default=species[0]
+        )
+
+    # Create file_type widget
+    frequency_dropdown = widgets.Dropdown(
+        options=frequencies,
+        description='Frequency:',
+        disabled=False,
+        default=frequencies[0]
+    )
+
+    # Selection widget for network and site
+    instrument_site = widgets.SelectMultiple(
+        options=update_instrument_site(species[0],
+                                    frequencies[0],
+                                    network,
+                                    "public",
+                                    None),
+        description='Site, instrument:',
+        disabled=False,
+        indent=True,
+        style={'description_width': 'initial'}
+    )
+
+    # Plotting button
+    plot_button = widgets.Button(description="Plot")
+
+    # Output widget
+    output = widgets.Output()
+    output_netcdf = widgets.Output()
+
+    # Text widget to explain what the asterisk means
+    asterisk_text = widgets.HTML(value="<p>* Asterisk indicates individual, rather than combined file</p>")
+
+    # Update network and site dropdown when species is changed
+    species_dropdown.observe(lambda change:
+                            update_instrument_site(change["new"],
+                                                frequency_dropdown.value,
+                                                network,
+                                                public_button.value,
+                                                instrument_site),
+                            names="value")
+
+    frequency_dropdown.observe(lambda change:
+                            update_instrument_site(species_dropdown.value,
+                                            change["new"],
+                                            network,
+                                            public_button.value,
+                                            instrument_site),
+                            names="value")
+
+    public_button.observe(lambda change:
+                        update_instrument_site(species_dropdown.value,
+                                        frequency_dropdown.value,
+                                        network,
+                                        change["new"],
+                                        instrument_site),
+                        names="value")
+
+    # Plot to output when button is clicked
+    plot_button.on_click(lambda x: plot_to_output(x, network,
+                                                frequency_dropdown.value,
+                                                species_dropdown.value,
+                                                instrument_site.value,
+                                                public_button.value,
+                                                output))
+    plot_button.on_click(lambda x: show_netcdf_info(x, network,
+                                                    frequency_dropdown.value,
+                                                    instrument_site.value,
+                                                    public_button.value,
+                                                    output_netcdf))
+
+    display(public_button)
+    display(species_dropdown)
+    display(frequency_dropdown)
+    display(instrument_site)
+    display(asterisk_text)
+    display(plot_button)
+    display(output)
+    display(output_netcdf)
