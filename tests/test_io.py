@@ -5,7 +5,7 @@ import json
 
 from agage_archive.config import Paths, open_data_file, data_file_path, data_file_list
 from agage_archive.io import read_ale_gage, read_nc, combine_datasets, read_nc_path, \
-    read_baseline, combine_baseline, output_dataset
+    read_baseline, combine_baseline, output_dataset, read_gcwerks_flask
 from agage_archive.convert import scale_convert
 
 
@@ -237,3 +237,23 @@ def test_picarro():
     assert ds.time.attrs["long_name"] == "time"
     assert "Timestamp is the start of the sampling period" in ds.time.attrs["comment"]
     assert "Resampled" in ds.time.attrs["comment"]
+
+
+def test_read_gcwerks_flask():
+
+    ds = read_gcwerks_flask("agage_test", "cf4", "CBW", "GCMS-Medusa-flask")
+
+    # Check that the dataset has the correct attributes
+    assert ds.attrs["species"] == "cf4"
+
+    # First sample should be at 2021-02-15 1300 minus 30 minutes
+    assert ds.time[0].values == pd.Timestamp("2021-02-15 1230")
+
+    # Check that the time variable has the correct attributes
+    assert ds.time.attrs["long_name"] == "time"
+    assert "Timestamp is the start of sampling period" in ds.time.attrs["comment"]
+
+    # Check that some attributes that are only in site attributes have been added
+    assert "sampling_period" in ds.attrs.keys()
+    assert ds.attrs["inlet_latitude"] == 2
+

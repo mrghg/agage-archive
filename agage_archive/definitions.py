@@ -28,6 +28,11 @@ species_translator = {"pfc-116": "c2f6",
                       "pfc-218": "c3f8",
                       "pfc-318": "c4f8"}
 
+species_translator_flask = {"c2f6": "PFC-116",
+                            "c3f8": "PFC-218",
+                            "c4f8": "PFC-318",
+                            "benzene": "benzene"}
+
 minimum_averaging_period = {"Picarro": "1H"}
 
 

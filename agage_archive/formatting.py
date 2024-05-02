@@ -5,7 +5,7 @@ from datetime import datetime
 import warnings
 
 from agage_archive import __version__ as code_version
-from agage_archive.config import open_data_file
+from agage_archive.config import open_data_file, data_file_path
 from agage_archive.util import is_number, lookup_username
 from agage_archive.definitions import instrument_type_definition, nc4_types
 
@@ -313,7 +313,8 @@ def format_attributes(ds, instruments = [],
                     network = None,
                     species = None,
                     calibration_scale = None,
-                    public=True):
+                    public = True,
+                    site = False):
     '''Format attributes
 
     Note that many of the above arguments don't appear to be used,
@@ -327,6 +328,7 @@ def format_attributes(ds, instruments = [],
         units (str, optional): Units. Defaults to None, in which case it is looked up in the dataset attributes.
         calibration_scale (str, optional): Calibration scale. Defaults to None, in which case it is looked up in the dataset attributes.
         public (bool, optional): Whether the dataset is for public release. Defaults to True.
+        site (bool, optional): Look for site-specific attributes.
 
     Returns:
         xr.Dataset: Dataset with formatted attributes
@@ -347,7 +349,26 @@ def format_attributes(ds, instruments = [],
         attributes_network = json.load(f)
 
     # Combine default and network attributes
-    attributes_default.update(attributes_network)
+    # Allow default attributes to be overwritten by network attributes
+    for attr in attributes_network:
+        attributes_default[attr] = attributes_network[attr]
+    
+    # Add site attributes, if available
+    if site:
+        if data_file_path("attributes_site.json", network=network_attrs).exists():
+            with open_data_file("attributes_site.json", network=network_attrs) as f:
+                attributes_sites = json.load(f)
+            if ds.attrs["site_code"] in attributes_sites:
+                # Combine default and site attributes
+                # Allow default attributes to be overwritten by site attributes
+                attributes_site = attributes_sites[ds.attrs["site_code"]]
+                for attr in attributes_site:
+                    attributes_default[attr] = attributes_site[attr]
+
+                if "instrument" in attributes_site:
+                    instruments = [{"instrument": attributes_site["instrument"],
+                                    "instrument_date": attributes_site["instrument_date"],
+                                    "instrument_comment": attributes_site["instrument_comment"]}]
 
     attrs = {}
 
@@ -421,6 +442,21 @@ def format_species(species):
         return species.lower()
 
 
+def format_species_flask(species):
+    """Species name translation for GCWerks flask data
+
+    Args:
+        species (str): species string
+    """
+
+    from agage_archive.definitions import species_translator_flask
+
+    if format_species(species) in species_translator_flask:
+        return species_translator_flask[format_species(species)]
+    else:
+        return format_species(species).upper()
+        
+     
 def format_units(units):
     '''Format units
 
