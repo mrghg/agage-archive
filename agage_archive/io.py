@@ -528,7 +528,19 @@ def read_ale_gage(network, species, site, instrument,
 def read_gcwerks_flask(network, species, site, instrument,
                        verbose = True,
                        public = True):
+    '''Read GCWerks flask data
 
+    Args:
+        network (str): Network
+        species (str): Species
+        site (str): Site
+        instrument (str): Instrument
+        verbose (bool, optional): Print verbose output. Defaults to False.
+        public (bool, optional): Whether the dataset is for public release. Default to True.
+
+    Returns:
+        xr.Dataset: Dataset containing data
+    '''
 
     # Need to get some information from the attributes_site.json file
     with open_data_file("attributes_site.json", network=network) as f:
@@ -571,6 +583,7 @@ def read_gcwerks_flask(network, species, site, instrument,
             "mf_repeatability": ("time", ds_raw[f"{species_flask}_std_stdev"].values),
             "inlet_height": ("time", np.repeat(inlet_height, len(ds_raw[f"{species_flask}_C"]))),
             "sampling_period": ("time", np.repeat(sampling_period, len(ds_raw[f"{species_flask}_C"]))),
+            "mf_N": ("time", np.repeat(1, len(ds_raw[f"{species_flask}_C"]))),
         },
         # Sampling time is the middle of the sampling period, so offset to the start
         coords={"time": xr.coding.times.decode_cf_datetime(ds_raw["sample_time"].values - sampling_period/2,
@@ -584,8 +597,11 @@ def read_gcwerks_flask(network, species, site, instrument,
 
     # Find duplicate timestamps and average those points
     if len(ds.time) != len(ds.time.drop_duplicates(dim="time")):
+        # For mf_N, just sum, otherwise average
+        mf_N = ds.mf_N.groupby("time").sum()
         ds = ds.groupby("time").mean()
-    
+        ds["mf_N"] = mf_N
+
     # Get cal scale from scale_defaults file
     scale = calibration_scale_default(network, species)
 
