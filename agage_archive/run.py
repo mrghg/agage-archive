@@ -5,7 +5,7 @@ from zipfile import ZipFile
 from agage_archive.config import Paths, open_data_file, data_file_list, data_file_path, copy_to_archive
 from agage_archive.data_selection import read_release_schedule, read_data_combination
 from agage_archive.io import combine_datasets, combine_baseline, \
-    read_nc, read_baseline, read_ale_gage, \
+    read_nc, read_baseline, read_ale_gage, read_gcwerks_flask, \
     output_dataset
 from agage_archive.convert import monthly_baseline
 
@@ -53,6 +53,9 @@ def run_individual_instrument(network, instrument,
         read_function = read_ale_gage
         read_baseline_function = read_baseline
         instrument_out = instrument.upper() + "-GCMD"
+    elif instrument.upper() == "GCMS-MEDUSA-FLASK":
+        read_function = read_gcwerks_flask
+        instrument_out = "GCMS-MEDUSA-FLASK"
     else:
         read_function = read_nc
         read_baseline_function = read_baseline
