@@ -121,8 +121,12 @@ def read_nc(network, species, site, instrument,
 
     # Read netCDF file
     with open_data_file(nc_file, network, sub_path=sub_path, verbose=verbose) as f:
-        with xr.open_dataset(f, engine="h5netcdf") as ds_file:
-            ds = ds_file.load()
+        try:
+            with xr.open_dataset(f, engine="h5netcdf") as ds_file:
+                ds = ds_file.load()
+        except ValueError:
+            with xr.open_dataset(f, engine="scipy") as ds_file:
+                ds = ds_file.load()            
 
     # Read sampling time
     if "sampling_time_seconds" in ds.time.attrs:
