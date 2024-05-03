@@ -33,7 +33,8 @@ def run_individual_instrument(network, instrument,
                               baseline = "",
                               monthly = False,
                               species = [],
-                              public=True):
+                              public=True,
+                              resample=True):
     """Process individual data files for a given instrument.
     Reads the release schedule for the instrument
 
@@ -45,6 +46,7 @@ def run_individual_instrument(network, instrument,
         monthly (bool): Produce monthly baseline files
         species (list): List of species to process. If empty, process all species
         public (bool, optional): Whether the dataset is for public release. Default to True.
+        resample (bool, optional): Whether to resample the data, if needed. Default to True.
     """
     
     rs = read_release_schedule(network, instrument, public=public)
@@ -79,7 +81,7 @@ def run_individual_instrument(network, instrument,
                 if rs.loc[sp, site].lower() != "x":
 
                     ds = read_function(network, sp, site, instrument,
-                                    public = public, verbose=verbose)
+                                    public = public, verbose=verbose, resample=resample)
 
                     if baseline:
                         ds_baseline = read_baseline_function(network, sp, site, instrument,
@@ -146,7 +148,8 @@ def run_combined_instruments(network,
                              monthly = False,
                              verbose = False,
                              species = [],
-                             public = True):
+                             public = True,
+                             resample=True):
     """Process combined data files for a given network.
     Reads the data selection file to determine which sites to process
 
@@ -157,6 +160,7 @@ def run_combined_instruments(network,
         verbose (bool): Print progress to screen
         species (list): List of species to process. If empty, process all species
         public (bool, optional): Whether the dataset is for public release. Default to True.
+        resample (bool, optional): Whether to resample the data, if needed. Default to True.
     """
 
     with open_data_file("data_combination.xlsx", network=network) as data_selection_path:
@@ -196,7 +200,7 @@ def run_combined_instruments(network,
                 if verbose:
                     print(f"... combining datasets for {species} at {site}")
                 ds = combine_datasets(network, species, site,
-                                    verbose=verbose, public=public)
+                                    verbose=verbose, public=public, resample=resample)
 
                 if baseline:
                     if verbose:
@@ -266,7 +270,8 @@ def run_all(network,
             instrument_include = [],
             instrument_exclude = ["GCPDD"],
             species = [],
-            public = True):
+            public = True,
+            resample=True):
     """Process data files for multiple instruments. Reads the release schedule to determine which
     instruments to process
 
@@ -280,6 +285,8 @@ def run_all(network,
         verbose (bool): Print progress to screen
         species (list): List of species to process. If empty, process all species
         public (bool, optional): Whether the dataset is for public release. Default to True.
+        resample (bool, optional): Whether to resample the data, if needed. Default to True.
+
         
     """
 
@@ -377,7 +384,7 @@ def run_all(network,
         run_combined_instruments(network,
                                 baseline=baseline, verbose=True,
                                 monthly=monthly, species=species,
-                                public=public)
+                                public=public, resample=resample)
 
     # If include is empty, process all instruments in release schedule
     if len(instrument_include) == 0:
@@ -393,7 +400,7 @@ def run_all(network,
             run_individual_instrument(network, instrument, 
                                     baseline=baseline_flag, verbose=True,
                                     monthly=monthly, species=species,
-                                    public=public)
+                                    public=public, resample=resample)
 
     # Incorporate README file into output directory or zip file
     try:

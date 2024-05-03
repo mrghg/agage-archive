@@ -93,6 +93,7 @@ def read_nc(network, species, site, instrument,
             verbose = False,
             data_exclude = True,
             baseline = None,
+            resample=True,
             scale = "default",
             public = True):
     """Read GCWerks netCDF files
@@ -106,6 +107,7 @@ def read_nc(network, species, site, instrument,
         data_exclude (bool, optional): Exclude data based on data_exclude.xlsx. Defaults to True.
         scale (str, optional): Scale to convert to. Defaults to "default". If None, will keep original scale.
         public (bool, optional): Whether the dataset is for public release. Default to True.
+        resample (bool, optional): Whether to resample the data, if needed. Default to True.
         
     Raises:
         FileNotFoundError: Can't find netCDF file
@@ -197,8 +199,9 @@ def read_nc(network, species, site, instrument,
     if "mf_mean_stdev" in ds:
         ds = ds.rename({"mf_mean_stdev": "mf_variability"})
 
-    # Resample dataset, if needed
-    ds = resample(ds)
+    # Resample dataset, if needed and called
+    if resample:
+        ds = resample(ds)
 
     # Check that time is monotonic and that there are no duplicate indices
     if not pd.Index(ds.time).is_monotonic_increasing:
@@ -532,7 +535,8 @@ def read_ale_gage(network, species, site, instrument,
 def combine_datasets(network, species, site, 
                     scale = "default",
                     verbose = True,
-                    public = True):
+                    public = True,
+                    resample=True):
     '''Combine ALE/GAGE/AGAGE datasets for a given species and site
 
     Args:
@@ -543,6 +547,8 @@ def combine_datasets(network, species, site,
             If None, will attempt to leave scale unchanged.
         verbose (bool, optional): Print verbose output. Defaults to False.
         public (bool, optional): Whether the dataset is for public release. Default to True.
+        resample (bool, optional): Whether to resample the data, if needed. Default to True.
+
 
     Returns:
         xr.Dataset: Dataset containing data
@@ -574,7 +580,8 @@ def combine_datasets(network, species, site,
             ds = read_nc(network, species, site, instrument,
                         verbose=verbose,
                         scale=scale,
-                        public=public)
+                        public=public,
+                        resample=resample)
 
         # Store attributes
         attrs.append(ds.attrs)
