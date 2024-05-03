@@ -612,7 +612,7 @@ def read_gcwerks_flask(network, species, site, instrument,
                         public=public,
                         site = True)
     
-    ds = format_variables(ds, species,
+    ds = format_variables(ds, species = species,
                         units="ppt",
                         calibration_scale = scale)
     
