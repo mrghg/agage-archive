@@ -204,7 +204,7 @@ def read_nc(network, species, site, instrument,
     if not pd.Index(ds.time).is_monotonic_increasing:
         ds.sortby("time", inplace=True)
     if len(ds.time) != len(ds.time.drop_duplicates(dim="time")):
-        ds.drop_duplicates(dim="time", inplace=True)
+        ds = ds.drop_duplicates(dim="time")
 
     # If baseline is not None, return baseline dataset
     if baseline:
