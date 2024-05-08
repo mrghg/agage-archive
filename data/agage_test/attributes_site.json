@@ -1,0 +1,16 @@
+{
+    "CBW": {
+        "inlet_height": 10,
+        "sampling_period": 3600,
+        "inlet_base_elevation": 1,
+        "inlet_latitude": 2,
+        "inlet_longitude": 3,
+        "data_owner": "Test",
+        "data_owner_email": "test@test",
+        "station_long_name": "Cabauw (NL)",
+        "site_code": "CBW",
+        "instrument": "medusa-22",
+        "instrument_date": "",
+        "instrument_comment": "University of Bristol lab Medusa"
+    }
+}

@@ -9,9 +9,9 @@ import json
 from agage_archive.config import Paths, open_data_file, data_file_list, data_file_path
 from agage_archive.convert import scale_convert, resample
 from agage_archive.formatting import format_species, \
-    format_variables, format_attributes
+    format_variables, format_attributes, format_species_flask
 from agage_archive.data_selection import read_release_schedule, read_data_exclude, \
-    read_data_combination
+    read_data_combination, calibration_scale_default
 from agage_archive.definitions import instrument_type_definition
 from agage_archive.util import tz_local_to_utc
 
@@ -532,6 +532,100 @@ def read_ale_gage(network, species, site, instrument,
         return ds
 
 
+def read_gcwerks_flask(network, species, site, instrument,
+                       verbose = True,
+                       public = True):
+    '''Read GCWerks flask data
+
+    Args:
+        network (str): Network
+        species (str): Species
+        site (str): Site
+        instrument (str): Instrument
+        verbose (bool, optional): Print verbose output. Defaults to False.
+        public (bool, optional): Whether the dataset is for public release. Default to True.
+
+    Returns:
+        xr.Dataset: Dataset containing data
+    '''
+
+    # Need to get some information from the attributes_site.json file
+    with open_data_file("attributes_site.json", network=network) as f:
+        site_info = json.load(f)[site]
+
+    if "sampling_period" not in site_info:
+        raise ValueError(f"Sampling period not found in attributes_site.json for {site}")
+    else:
+        sampling_period = site_info["sampling_period"]
+    
+    if "inlet_height" not in site_info:
+        raise ValueError(f"Inlet height not found in attributes_site.json for {site}")
+    else:
+        inlet_height = site_info["inlet_height"]
+
+    if instrument != "GCMS-Medusa-flask":
+        raise ValueError(f"Only valid for instrument GCMS-Medusa-flask, not {instrument}")
+    
+    species_search = format_species(species)
+    species_flask = format_species_flask(species)
+
+    sub_path = Paths(network).gcms_flask_path
+    
+    network_out, sub_path, nc_files = data_file_list(network, sub_path, f"{species_flask.lower()}_air.nc")
+
+    if len(nc_files) == 0:
+        raise ValueError(f"No files found for {species_search} in {network} network")
+    elif len(nc_files) > 1:
+        raise ValueError(f"Multiple files found for {species_search} in {network} network")
+    else:
+        nc_file = nc_files[0]
+
+    with open_data_file(nc_file, network, sub_path=sub_path, verbose=verbose) as f:
+        with xr.open_dataset(f, engine="h5netcdf") as ds_file:
+            ds_raw = ds_file.load()
+
+    # Create new dataset with the time coordinate as sample time in seconds since 1970-01-01
+    ds = xr.Dataset(data_vars={
+            "mf": ("time", ds_raw[f"{species_flask}_C"].values),
+            "mf_repeatability": ("time", ds_raw[f"{species_flask}_std_stdev"].values),
+            "inlet_height": ("time", np.repeat(inlet_height, len(ds_raw[f"{species_flask}_C"]))),
+            "sampling_period": ("time", np.repeat(sampling_period, len(ds_raw[f"{species_flask}_C"]))),
+            "mf_N": ("time", np.repeat(1, len(ds_raw[f"{species_flask}_C"]))),
+        },
+        # Sampling time is the middle of the sampling period, so offset to the start
+        coords={"time": xr.coding.times.decode_cf_datetime(ds_raw["sample_time"].values - sampling_period/2,
+                                                           units="seconds since 1970-01-01")},
+        attrs={"comment": f"GCMS Medusa flask data for {species_search} at {site_info['station_long_name']}.",
+               "site_code": site}
+    )
+
+    # Sort by sampling time
+    ds = ds.sortby("time")
+
+    # Find duplicate timestamps and average those points
+    if len(ds.time) != len(ds.time.drop_duplicates(dim="time")):
+        # For mf_N, just sum, otherwise average
+        mf_N = ds.mf_N.groupby("time").sum()
+        ds = ds.groupby("time").mean()
+        ds["mf_N"] = mf_N
+
+    # Get cal scale from scale_defaults file
+    scale = calibration_scale_default(network, species)
+
+    ds = format_attributes(ds,
+                        network = network,
+                        species = species,
+                        calibration_scale = scale,
+                        public=public,
+                        site = True)
+    
+    ds = format_variables(ds, species = species,
+                        units="ppt",
+                        calibration_scale = scale)
+    
+    return ds
+
+                                          
 def combine_datasets(network, species, site, 
                     scale = "default",
                     verbose = True,
