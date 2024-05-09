@@ -10,7 +10,7 @@ colour_max = len(colours)
 instrument_number, instrument_number_string = instrument_type_definition()
 
 def plot_add_trace(fig, ds,
-                name=""):
+                name="", mode="line"):
 
     # If data density is more than one point every hour, thin the dataset
     time_diff = ds.time.diff(dim="time")
@@ -27,8 +27,8 @@ def plot_add_trace(fig, ds,
     fig.add_trace(
         go.Scatter(
             visible=True,
-            mode="lines",
-            #marker=dict(color=colours[colour_counter % colour_max], size=3),
+            mode=mode,
+            marker=dict(color=colours[colour_counter % colour_max], size=5, symbol='cross'),
             line=dict(color=colours[colour_counter % colour_max], width=2),
             name=name,
             x=ds_plot.time,
@@ -38,12 +38,13 @@ def plot_add_trace(fig, ds,
     return fig
 
 
-def plot_combined(ds, fig):
+def plot_combined(ds, fig, mode="line"):
     """ Plot multiple instruments on the same plot
     
     Args:
         ds (xarray.Dataset): Dataset containing multiple instruments (instrument_type variable needed)
         fig (plotly.graph_objects.Figure): Figure object
+        mode (str) : how to plot the data. Defaults to "line", but can be set to "markers" if desired
 
     Returns:
         plotly.graph_objects.Figure: Figure object
@@ -67,20 +68,21 @@ def plot_combined(ds, fig):
 
         # Add trace
         fig = plot_add_trace(fig, ds.isel(time=ind),
-                             name=f"{ds.attrs['site_code']}, {instrument_type_name}")
+                             name=f"{ds.attrs['site_code']}, {instrument_type_name}", mode=mode)
 
         colour_counter += 1
         
     return fig
 
 
-def plot_single(ds, fig):
+def plot_single(ds, fig, mode="line"):
     """ Plot a single instrument on the same plot
 
     Args:
         ds (xarray.Dataset): Dataset containing a single instrument
         fig (plotly.graph_objects.Figure): Figure object
-
+        mode (str) : how to plot the data. Defaults to "line", but can be set to "markers" if desired
+        
     Returns:
         plotly.graph_objects.Figure: Figure object
     """
@@ -89,14 +91,14 @@ def plot_single(ds, fig):
 
     # Add trace
     fig = plot_add_trace(fig, ds,
-                         name=f"{ds.attrs['site_code']}")
+                         name=f"{ds.attrs['site_code']}", mode=mode)
 
     colour_counter += 1
     
     return fig
 
 
-def plot_datasets(datasets):
+def plot_datasets(datasets, mode="line"):
     """ Plot datasets
 
     Args:
@@ -132,11 +134,11 @@ def plot_datasets(datasets):
         # If instrument_type variable is present, split by instrument_type
         if "instrument_type" in ds.variables:
 
-            fig = plot_combined(ds, fig)
+            fig = plot_combined(ds, fig, mode=mode)
 
         else:
             
-            fig = plot_single(ds, fig)
+            fig = plot_single(ds, fig, mode=mode)
 
     # Make sure legend is visible
     fig.update_layout(showlegend=True)

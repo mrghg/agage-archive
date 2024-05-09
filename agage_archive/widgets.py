@@ -193,7 +193,7 @@ def load_datasets(network, filenames, public = True):
 
 
 def plot_to_output(sender, network, frequency, species, instrument_site, public,
-                   output_widget):
+                   output_widget, mode="line"):
     """ Plot to output widget
 
     Args:
@@ -203,6 +203,8 @@ def plot_to_output(sender, network, frequency, species, instrument_site, public,
         species (str): Species
         network_site (str): Network and site
         output_widget (ipywidgets.Output): Output widget
+        mode (str) : how to plot the data. Defaults to "line", but can be set to "markers" if desired
+
     """
 
     if not instrument_site:
@@ -221,7 +223,7 @@ def plot_to_output(sender, network, frequency, species, instrument_site, public,
         clear_output()
         print(f"Plotting {species} for {instrument_site}... please wait...")
         clear_output(True)
-        fig = plot_datasets(datasets)
+        fig = plot_datasets(datasets, mode=mode)
         fig.show(renderer=renderer)
 
 
@@ -257,12 +259,15 @@ def show_netcdf_info(sender, network, frequency, instrument_site, public,
 
 
 def dashboard(network,
-            frequencies = ["event", "monthly"]):
+            frequencies = ["event", "monthly"],
+            mode="line"):
     """ Create dashboard for visualising data
 
     Args:
         network (str): Network
         frequencies (list): List of frequencies ("event" or "monthly")
+        mode (str) : how to plot the data. Defaults to "line", but can be set to "markers" if desired
+
     """
     
     paths = Paths(network, errors="ignore_inputs")    
@@ -358,7 +363,8 @@ def dashboard(network,
                                                 species_dropdown.value,
                                                 instrument_site.value,
                                                 public_button.value,
-                                                output))
+                                                output,
+                                                mode=mode))
     plot_button.on_click(lambda x: show_netcdf_info(x, network,
                                                     frequency_dropdown.value,
                                                     instrument_site.value,
