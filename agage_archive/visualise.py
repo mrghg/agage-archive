@@ -10,7 +10,7 @@ colour_max = len(colours)
 instrument_number, instrument_number_string = instrument_type_definition()
 
 def plot_add_trace(fig, ds,
-                name="", mode="line"):
+                name="", mode="lines"):
 
     # If data density is more than one point every hour, thin the dataset
     time_diff = ds.time.diff(dim="time")
@@ -38,7 +38,7 @@ def plot_add_trace(fig, ds,
     return fig
 
 
-def plot_combined(ds, fig, mode="line"):
+def plot_combined(ds, fig, mode="lines"):
     """ Plot multiple instruments on the same plot
     
     Args:
@@ -75,7 +75,7 @@ def plot_combined(ds, fig, mode="line"):
     return fig
 
 
-def plot_single(ds, fig, mode="line"):
+def plot_single(ds, fig, mode="lines"):
     """ Plot a single instrument on the same plot
 
     Args:
@@ -98,7 +98,7 @@ def plot_single(ds, fig, mode="line"):
     return fig
 
 
-def plot_datasets(datasets, mode="line"):
+def plot_datasets(datasets, mode="lines"):
     """ Plot datasets
 
     Args:

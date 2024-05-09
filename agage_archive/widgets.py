@@ -193,7 +193,7 @@ def load_datasets(network, filenames, public = True):
 
 
 def plot_to_output(sender, network, frequency, species, instrument_site, public,
-                   output_widget, mode="line"):
+                   output_widget, mode="lines"):
     """ Plot to output widget
 
     Args:
@@ -260,7 +260,7 @@ def show_netcdf_info(sender, network, frequency, instrument_site, public,
 
 def dashboard(network,
             frequencies = ["event", "monthly"],
-            mode="line"):
+            mode="lines"):
     """ Create dashboard for visualising data
 
     Args:
