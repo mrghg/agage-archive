@@ -7,7 +7,8 @@ from io import StringIO
 import json
 
 from agage_archive.config import Paths, open_data_file, data_file_list, data_file_path
-from agage_archive.convert import scale_convert, resample
+from agage_archive.convert import scale_convert
+from agage_archive.convert import resample as resample_function
 from agage_archive.formatting import format_species, \
     format_variables, format_attributes, format_species_flask
 from agage_archive.data_selection import read_release_schedule, read_data_exclude, \
@@ -93,7 +94,7 @@ def read_nc(network, species, site, instrument,
             verbose = False,
             data_exclude = True,
             baseline = None,
-            resample=True,
+            resample = True,
             scale = "default",
             public = True):
     """Read GCWerks netCDF files
@@ -201,7 +202,7 @@ def read_nc(network, species, site, instrument,
 
     # Resample dataset, if needed and called
     if resample:
-        ds = resample(ds)
+        ds = resample_function(ds)
 
     # Check that time is monotonic and that there are no duplicate indices
     if not pd.Index(ds.time).is_monotonic_increasing:
@@ -630,7 +631,7 @@ def combine_datasets(network, species, site,
                     scale = "default",
                     verbose = True,
                     public = True,
-                    resample=True):
+                    resample = True):
     '''Combine ALE/GAGE/AGAGE datasets for a given species and site
 
     Args:
@@ -675,7 +676,7 @@ def combine_datasets(network, species, site,
                         verbose=verbose,
                         scale=scale,
                         public=public,
-                        resample=resample)
+                        resample = resample)
 
         # Store attributes
         attrs.append(ds.attrs)
