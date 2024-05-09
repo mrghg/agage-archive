@@ -166,6 +166,9 @@ def run_combined_instruments(network,
         resample (bool, optional): Whether to resample the data, if needed. Default to True.
     """
 
+    if not isinstance(species, list):
+        raise TypeError("Species must be a list")
+
     with open_data_file("data_combination.xlsx", network=network) as data_selection_path:
         sites = pd.ExcelFile(data_selection_path).sheet_names
 
@@ -195,33 +198,33 @@ def run_combined_instruments(network,
             species_to_process = df.index.values
 
         # Loop through species in index
-        for species in species_to_process:
+        for sp in species_to_process:
 
             try:
 
                 # Produce combined dataset
                 if verbose:
-                    print(f"... combining datasets for {species} at {site}")
-                ds = combine_datasets(network, species, site,
+                    print(f"... combining datasets for {sp} at {site}")
+                ds = combine_datasets(network, sp, site,
                                     verbose=verbose, public=public, resample=resample)
 
                 if baseline:
                     if verbose:
-                        print(f"... combining baselines for {species} at {site}")
+                        print(f"... combining baselines for {sp} at {site}")
                     # Note that GIT baselines is hard-wired here because Met Office not available for ALE/GAGE
-                    ds_baseline = combine_baseline(network, species, site,
+                    ds_baseline = combine_baseline(network, sp, site,
                                                 verbose=verbose, public=public)
 
                 else:
                     ds_baseline = None
 
                 # Check for duplicate time stamps
-                run_timestamp_checks(ds, ds_baseline, species, site)
+                run_timestamp_checks(ds, ds_baseline, sp, site)
 
-                output_subpath = f"event/{species}"
+                output_subpath = f"event/{sp}"
 
                 if verbose:
-                    print(f"... outputting combined dataset for {species} at {site}")
+                    print(f"... outputting combined dataset for {sp} at {site}")
                 output_dataset(ds, network,
                             output_subpath=output_subpath,
                             instrument="combined",
@@ -230,7 +233,7 @@ def run_combined_instruments(network,
                 
                 if baseline:
                     if verbose:
-                        print(f"... outputting combined baseline for {species} at {site}")
+                        print(f"... outputting combined baseline for {sp} at {site}")
                     output_dataset(ds_baseline, network,
                                 output_subpath=output_subpath + "/baseline_flags",
                                 instrument="combined",
@@ -252,7 +255,7 @@ def run_combined_instruments(network,
                         raise NotImplementedError("Monthly baseline files can only be produced if baseline flag is specified")
 
             except Exception as e:
-                error_log.append((site, species, e))
+                error_log.append((site, sp, e))
     
     if error_log:
         # save errors to file
@@ -425,7 +428,7 @@ if __name__ == "__main__":
     print("####################################")
     print("#####Processing public archive######")
     print("####################################")
-    run_all("agage", species = ["cf4"])
+    run_all("agage", species=["cfc-11"])
 
     # print("####################################")
     # print("#####Processing private archive#####")
