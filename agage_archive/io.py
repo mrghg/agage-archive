@@ -7,7 +7,8 @@ from io import StringIO
 import json
 
 from agage_archive.config import Paths, open_data_file, data_file_list, data_file_path
-from agage_archive.convert import scale_convert, resample
+from agage_archive.convert import scale_convert
+from agage_archive.convert import resample as resample_function
 from agage_archive.formatting import format_species, \
     format_variables, format_attributes, format_species_flask
 from agage_archive.data_selection import read_release_schedule, read_data_exclude, \
@@ -93,6 +94,7 @@ def read_nc(network, species, site, instrument,
             verbose = False,
             data_exclude = True,
             baseline = None,
+            resample = True,
             scale = "default",
             public = True):
     """Read GCWerks netCDF files
@@ -106,6 +108,7 @@ def read_nc(network, species, site, instrument,
         data_exclude (bool, optional): Exclude data based on data_exclude.xlsx. Defaults to True.
         scale (str, optional): Scale to convert to. Defaults to "default". If None, will keep original scale.
         public (bool, optional): Whether the dataset is for public release. Default to True.
+        resample (bool, optional): Whether to resample the data, if needed. Default to True.
         
     Raises:
         FileNotFoundError: Can't find netCDF file
@@ -121,8 +124,12 @@ def read_nc(network, species, site, instrument,
 
     # Read netCDF file
     with open_data_file(nc_file, network, sub_path=sub_path, verbose=verbose) as f:
-        with xr.open_dataset(f, engine="h5netcdf") as ds_file:
-            ds = ds_file.load()
+        try:
+            with xr.open_dataset(f, engine="h5netcdf") as ds_file:
+                ds = ds_file.load()
+        except ValueError:
+            with xr.open_dataset(f, engine="scipy") as ds_file:
+                ds = ds_file.load()            
 
     # Read sampling time
     if "sampling_time_seconds" in ds.time.attrs:
@@ -193,14 +200,15 @@ def read_nc(network, species, site, instrument,
     if "mf_mean_stdev" in ds:
         ds = ds.rename({"mf_mean_stdev": "mf_variability"})
 
-    # Resample dataset, if needed
-    ds = resample(ds)
+    # Resample dataset, if needed and called
+    if resample:
+        ds = resample_function(ds)
 
     # Check that time is monotonic and that there are no duplicate indices
     if not pd.Index(ds.time).is_monotonic_increasing:
         ds.sortby("time", inplace=True)
     if len(ds.time) != len(ds.time.drop_duplicates(dim="time")):
-        ds.drop_duplicates(dim="time", inplace=True)
+        ds = ds.drop_duplicates(dim="time")
 
     # If baseline is not None, return baseline dataset
     if baseline:
@@ -622,7 +630,8 @@ def read_gcwerks_flask(network, species, site, instrument,
 def combine_datasets(network, species, site, 
                     scale = "default",
                     verbose = True,
-                    public = True):
+                    public = True,
+                    resample = True):
     '''Combine ALE/GAGE/AGAGE datasets for a given species and site
 
     Args:
@@ -633,6 +642,8 @@ def combine_datasets(network, species, site,
             If None, will attempt to leave scale unchanged.
         verbose (bool, optional): Print verbose output. Defaults to False.
         public (bool, optional): Whether the dataset is for public release. Default to True.
+        resample (bool, optional): Whether to resample the data, if needed. Default to True.
+
 
     Returns:
         xr.Dataset: Dataset containing data
@@ -664,7 +675,8 @@ def combine_datasets(network, species, site,
             ds = read_nc(network, species, site, instrument,
                         verbose=verbose,
                         scale=scale,
-                        public=public)
+                        public=public,
+                        resample = resample)
 
         # Store attributes
         attrs.append(ds.attrs)
