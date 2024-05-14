@@ -325,7 +325,8 @@ def read_ale_gage(network, species, site, instrument,
                   data_exclude = True,
                   scale = "default",
                   baseline = False,
-                  public=True):
+                  public=True,
+                  resample = False):
     """Read GA Tech ALE/GAGE files, process and clean
 
     Args:
@@ -341,6 +342,7 @@ def read_ale_gage(network, species, site, instrument,
             Set to "default" to use value in scale_defaults.csv.
         baseline (bool, optional): Return baseline dataset. Defaults to False.
         public (bool, optional): Whether the dataset is for public release. Default to True.
+        resample (bool, optional): Not used (see run_individual_instrument). Defaults to False.
 
     Returns:
         pd.DataFrame: Pandas dataframe containing file contents
