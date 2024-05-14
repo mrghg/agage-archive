@@ -537,7 +537,8 @@ def read_ale_gage(network, species, site, instrument,
 
 def read_gcwerks_flask(network, species, site, instrument,
                        verbose = True,
-                       public = True):
+                       public = True,
+                       resample=True):
     '''Read GCWerks flask data
 
     Args:
@@ -547,6 +548,7 @@ def read_gcwerks_flask(network, species, site, instrument,
         instrument (str): Instrument
         verbose (bool, optional): Print verbose output. Defaults to False.
         public (bool, optional): Whether the dataset is for public release. Default to True.
+        resample (bool, optional): Whether to resample the data. Default to True, but actually doesn't do anything here
 
     Returns:
         xr.Dataset: Dataset containing data
