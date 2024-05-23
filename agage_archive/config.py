@@ -76,6 +76,13 @@ class Paths():
         if not network:
             return
 
+        # Check if network exists in config file
+        if not network in config["paths"].keys():
+            if errors == "ignore":
+                return
+            else:
+                raise KeyError(f"Network {network} not found in config file")
+
         # Read all sub-paths associated with network
         for key, value in config["paths"][network].items():
             self.__setattr__(key, value)

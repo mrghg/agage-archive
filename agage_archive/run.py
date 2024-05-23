@@ -10,6 +10,48 @@ from agage_archive.io import combine_datasets, combine_baseline, \
 from agage_archive.convert import monthly_baseline
 
 
+def delete_archive(network, out_pth,
+                sub_path = "",
+                public=True,
+                errors="raise"):
+    """Delete all files in output directory before running
+
+    Args:
+        network (str): Network for output filenames
+        out_pth (pathlib.Path): Path to output directory or zip file
+        sub_path (str): Subdirectory in output directory or zip file
+        public (bool): Whether the dataset is for public release
+        errors (str): How to handle errors. Default to "raise"
+    """
+
+    path = Paths(network, errors="ignore")
+
+    # Find all files in output directory
+    network, sub_path, files = data_file_list(network=network,
+                                            sub_path=sub_path,
+                                            errors="ignore")
+
+    print(f'Deleting all files in {out_pth}')
+
+    # If out_pth is a zip file, delete it
+    if out_pth.suffix == ".zip" and out_pth.exists():
+        out_pth.unlink()
+    else:
+        # For safety that out_pth is in data/network directory
+        if out_pth.parents[1] == path.data and out_pth.parents[0].name == network:
+            pass
+        else:
+            raise ValueError(f"{out_pth} must be in a data/network directory")
+
+        # Delete all files in output directory
+        for f in files:
+            pth = out_pth / f
+            if pth.is_file():
+                pth.unlink()
+            elif pth.is_dir():
+                rmtree(pth)
+
+
 def run_timestamp_checks(ds,
                         ds_baseline=None,
                         species="",
@@ -342,7 +384,7 @@ def run_all(network,
     if not hasattr(path, "output_path_private"):
         raise AttributeError("Private output path not set in config.yaml")
     sub_path_private = path.output_path_private
-        
+    
     out_pth_public = data_file_path("", network=network, sub_path=sub_path, errors="ignore")
     out_pth_private = data_file_path("", network=network, sub_path=sub_path_private, errors="ignore")
 
@@ -352,31 +394,9 @@ def run_all(network,
         out_pth = out_pth_private
 
     if delete:
-        # Clear output directory, removing all files and subdirectories
-        network, sub_path, files = data_file_list(network=network,
-                                                  sub_path=sub_path,
-                                                  errors="ignore")
-
-        print(f'Deleting all files in {out_pth}')
-
-        # If out_pth is a zip file, delete it
-        if out_pth.suffix == ".zip" and out_pth.exists():
-            out_pth.unlink()
-        else:
-            # For safety that out_pth is in data/network directory
-            if out_pth.parents[1] == path.data and out_pth.parents[0].name == network:
-                pass
-            else:
-                raise ValueError(f"{out_pth} must be in a data/network directory")
-
-            # Delete all files in output directory
-            for f in files:
-                pth = out_pth / f
-                if pth.is_file():
-                    pth.unlink()
-                elif pth.is_dir():
-                    rmtree(pth)
-
+        delete_archive(network, out_pth,
+            sub_path = sub_path, public=public, errors="ignore")
+        
     # If either out_pth is a zip file that doesn't, create them
     if out_pth_public.suffix == ".zip" and not out_pth_public.exists():
         with ZipFile(out_pth_public, "w") as f:
@@ -428,7 +448,7 @@ if __name__ == "__main__":
     print("####################################")
     print("#####Processing public archive######")
     print("####################################")
-    run_all("agage")
+    run_all("agage", species = ["ch4"], public=True)
 
     # print("####################################")
     # print("#####Processing private archive#####")
