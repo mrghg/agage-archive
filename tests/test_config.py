@@ -1,7 +1,8 @@
 from pathlib import Path
 import yaml
+import json
 
-from agage_archive.config import Paths
+from agage_archive.config import Paths, data_file_path, open_data_file, data_file_list
 
 
 repo_path = Path(__file__).resolve().parents[1]
@@ -53,4 +54,60 @@ def test_paths():
 
     # If we try to retrieve a path that doesn't exist with errors ignored, it should not error
     path = Paths("non_existent_network", errors="ignore")
+
+
+def test_data_file_path():
+
+    assert data_file_path("test.txt", "agage_test", "path_test_files").exists()
+
+    # This should just return the zip file path, but checks for the existance of the file internally
+    assert data_file_path("test_top_level.txt", "agage_test", "path_test_files/A.zip").exists()
+
+    # This should just return the zip file path, but checks for the existance of the file internally
+    assert data_file_path("B/C.txt", "agage_test", "path_test_files/A.zip").exists()
+
+    # Test that we can find a required file in this repo
+    assert data_file_path("attributes.json", this_repo=True).exists()
+
+
+def test_open_data_file():
+
+    # Test that the attributes json is openned correctly
+    with open_data_file("attributes.json", this_repo=True) as f:
+        attributes = json.load(f)
+    assert "calibration_scale" in attributes.keys()
+    assert attributes["species"] == ""
+
+    # Test that we can open a file within the A.zip file
+    with open_data_file("B/C.txt", "agage_test", "path_test_files/A.zip") as f:
+        assert f.read().decode("utf-8") == "test"
+
+
+def test_data_file_list():
+
+    # Test that we can list files in a folder
+    network, sub_path, files = data_file_list("agage_test", "path_test_files")
+    assert network == "agage_test"
+    assert sub_path == "path_test_files/"
+    assert "test.txt" in files
+
+    # Test that we can list files in a zip archive
+    files = data_file_list("agage_test", "path_test_files/A.zip")[2]
+    assert "test_top_level.txt" in files
+    assert "B/C.txt" in files
+
+    # Test that we can list files in a zip archive with pattern
+    files = data_file_list("agage_test", "path_test_files/A.zip", pattern="*.txt")[2]
+    assert "test_top_level.txt" in files
+    assert "B/C.txt" in files
+
+    # Test that we can list files within a subdirectory of a zip archive
+    files_zip = data_file_list("agage_test", "path_test_files/A.zip", pattern="B/*.txt")[2]
+    assert "test_top_level.txt" not in files_zip
+    assert "B/C.txt" in files_zip
+
+    # Test that we get the same output but from an unzipped directory
+    files = data_file_list("agage_test", "path_test_files/A", "B/*.txt")[2]
+    assert "test_top_level.txt" not in files
+    assert "B/C.txt" in files
 
