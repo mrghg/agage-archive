@@ -2,7 +2,9 @@ from pathlib import Path
 import yaml
 import json
 
-from agage_archive.config import Paths, data_file_path, open_data_file, data_file_list
+from agage_archive.config import Paths, data_file_path, \
+    open_data_file, data_file_list
+from agage_archive.io import output_path
 
 
 repo_path = Path(__file__).resolve().parents[1]
@@ -54,6 +56,14 @@ def test_paths():
 
     # If we try to retrieve a path that doesn't exist with errors ignored, it should not error
     path = Paths("non_existent_network", errors="ignore")
+
+    # Test for public or private output path
+    path = Paths("agage_test", errors="ignore")
+    assert path.output_path == \
+              config["paths"]["agage_test"]["output_path"]
+    path = Paths("agage_test", public=False, errors="ignore")
+    assert path.output_path == \
+              config["paths"]["agage_test"]["output_path_private"]
 
 
 def test_data_file_path():
@@ -111,3 +121,36 @@ def test_data_file_list():
     assert "test_top_level.txt" not in files
     assert "B/C.txt" in files
 
+
+def test_output_path():
+
+    # Read the configuration file for agage_test network
+    config_file = repo_path / "agage_archive" / "config.yaml"
+    with open(config_file, "r") as f:
+        config = yaml.safe_load(f)
+
+    # Check that some of the agage_test paths are as expected
+    # First check for a public file
+    path = Paths("agage_test", errors="ignore")
+    out_path_true = path.data / "agage_test" / \
+        config["paths"]["agage_test"]["output_path"]
+
+    out_path, filename = output_path("agage_test",
+                                    "cfc-11", "THD", "GCMS-Medusa",
+                                    extra="testing", version="v1",
+                                    errors="ignore")
+    assert out_path == out_path_true
+    assert filename == "AGAGE_TEST-GCMS-Medusa_THD_cfc-11testing_v1.nc"
+
+    # Next check for a private file
+    path = Paths("agage_test", errors="ignore", public=False)
+    out_path_true = path.data / "agage_test" / \
+        config["paths"]["agage_test"]["output_path_private"]
+
+    out_path, filename = output_path("agage_test",
+                                    "cfc-11", "THD", "GCMS-Medusa",
+                                    extra="testing", version="v1",
+                                    public=False,
+                                    errors="ignore")
+    assert out_path == out_path_true
+    assert filename == "AGAGE_TEST-GCMS-Medusa_THD_cfc-11testing_v1.nc"

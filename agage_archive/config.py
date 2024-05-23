@@ -6,12 +6,14 @@ from fnmatch import fnmatch, filter
 import psutil
 from shutil import copy
 
+
 class Paths():
 
     def __init__(self,
                 network = "",
                 this_repo = False,
-                errors = "raise"):
+                errors = "raise",
+                public = True):
         """Class to store paths to data folders
         
         Args:
@@ -23,6 +25,8 @@ class Paths():
                 If "ignore", return path.
                 If "ignore_inputs", ignore errors in input paths. 
                 Defaults to "raise".
+            public (bool, optional): If True, output path is taken from output_path.
+                If False, output path is taken from output_path_private. Defaults to True.
 
         Raises:
             FileNotFoundError: If config file doesn't exist
@@ -83,38 +87,36 @@ class Paths():
             else:
                 raise KeyError(f"Network {network} not found in config file")
 
-        # Read all sub-paths associated with network
+        # Read all sub-paths associated with network and INPUTS
         for key, value in config["paths"][network].items():
+
+            # If key is either of the output paths, go to next key
+            if "output_path" in key:
+                continue
+
             self.__setattr__(key, value)
+
             # Test that path exists
-            full_path = self.data / network / value
-            if not (full_path).exists():
-                if errors == "ignore":
-                    continue
-                elif errors == "ignore_inputs":
-                    if key == "output_path":
-                        raise FileNotFoundError(f"Folder or zip archive {full_path} doesn't exist")
-                    else:
-                        continue
-                elif errors == "ignore_outputs":
-                    if key == "output_path":
-                        continue
-                    else:
-                        raise FileNotFoundError(f"Folder or zip archive {full_path} doesn't exist")
-                elif errors == "raise":
+            if errors == "raise" or errors == "ignore_outputs":
+                full_path = self.data / network / value
+                if not (full_path).exists():
                     raise FileNotFoundError(f"Folder or zip archive {full_path} doesn't exist")
-            
-            # Test that path is either a folder or a zip archive
-            if not (full_path.is_dir() or full_path.suffix == ".zip"):
-                if errors == "ignore":
-                    continue
-                elif errors == "ignore_inputs":
-                    if value == "output_path":
-                        raise FileNotFoundError(f"{full_path} is not a folder or zip archive")
-                    else:
-                        continue
-                elif errors == "raise":
+                if not (full_path.is_dir() or full_path.suffix == ".zip"):
                     raise FileNotFoundError(f"{full_path} is not a folder or zip archive")
+
+        # Set OUTPUT path
+        if public:
+            self.output_path = config["paths"][network]["output_path"]
+        else:
+            self.output_path = config["paths"][network]["output_path_private"]
+        
+        # Test that output path exists
+        if errors == "raise" or errors == "ignore_inputs":
+            full_path = self.data / network / self.output_path
+            if not (full_path).exists():
+                raise FileNotFoundError(f"Folder or zip archive {full_path} doesn't exist")
+            if not (full_path.is_dir() or full_path.suffix == ".zip"):
+                raise FileNotFoundError(f"{full_path} is not a folder or zip archive")
 
 
 def setup():
@@ -145,7 +147,8 @@ def setup():
                 "gcms_path": "data-gcms-nc",
                 "ale_path": "ale",
                 "gage_path": "gage",
-                "output_path": "output"
+                "output_path": "output",
+                "output_path_private": "output-private"
             },
         "agage":
             {
@@ -236,6 +239,9 @@ def data_file_path(filename,
     """Get path to data file. Structure is data/network/sub_path
     sub_path can be a zip archive, in which case the path to the zip archive is returned
 
+    Note that by default, this function is only for input data.
+    Output data is handled by output_path (which is a wrapper around this function)
+    
     Args:
         filename (str): Filename
         network (str, optional): Network. Defaults to "".
@@ -251,7 +257,9 @@ def data_file_path(filename,
         pathlib.Path: Path to file
     """
 
-    paths = Paths(network, this_repo=this_repo, errors=errors)
+    paths = Paths(network,
+                  this_repo=this_repo,
+                  errors=errors)
 
     if network:
         pth = paths.data / network
@@ -273,7 +281,8 @@ def data_file_path(filename,
             for f in z.filelist:
                 if f.filename == filename:
                     return pth
-            raise FileNotFoundError(f"Can't find {filename} in {pth}")
+            if errors == "raise":
+                raise FileNotFoundError(f"Can't find {filename} in {pth}")
     else:
         return pth / filename
 

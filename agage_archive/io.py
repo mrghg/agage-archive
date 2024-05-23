@@ -6,7 +6,8 @@ from zipfile import ZipFile
 from io import StringIO
 import json
 
-from agage_archive.config import Paths, open_data_file, data_file_list, data_file_path
+from agage_archive.config import Paths, open_data_file, data_file_list, \
+    data_file_path
 from agage_archive.convert import scale_convert
 from agage_archive.convert import resample as resample_function
 from agage_archive.formatting import format_species, \
@@ -798,7 +799,8 @@ def combine_baseline(network, species, site,
 
 
 def output_path(network, species, site, instrument,
-                extra = "", version="", public=True):
+                extra = "", version="", public=True,
+                errors="raise"):
     '''Determine output path and filename
 
     Args:
@@ -809,6 +811,7 @@ def output_path(network, species, site, instrument,
         extra (str, optional): Extra string to add to filename. Defaults to "".
         version (str, optional): Version number. Defaults to "".
         public (bool, optional): Whether the dataset is for public release. Default to True.
+        errors (str, optional): How to handle errors if path doesn't exist. Defaults to "raise".
 
     Raises:
         FileNotFoundError: Can't find output path
@@ -818,20 +821,15 @@ def output_path(network, species, site, instrument,
         str: Filename
     '''
 
-    paths = Paths(network)
+    # Get paths. Ignore errors since outputs may not exist at this stage
+    paths = Paths(network, public=public, errors="ignore_outputs")
 
     version_str = f"_{version.replace(' ','')}" if version else ""
-
-    if public:
-        sub_path =  paths.output_path
-    else:
-        sub_path =  paths.output_path_private
-        
-    output_path = data_file_path("", network = network, sub_path = sub_path)
-
-    # Check if the output path exists
-    if not output_path.exists():
-        raise FileNotFoundError(f"Can't find output path {output_path}")
+    
+    # Can tweak data_file_path to get the output path
+    output_path = data_file_path("", network = network,
+                                sub_path = paths.output_path,
+                                errors=errors)
     
     # Create filename
     filename = f"{network.upper()}-{instrument}_{site}_{format_species(species)}{extra}{version_str}.nc"

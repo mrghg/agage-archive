@@ -334,8 +334,6 @@ def run_all(network,
         species (list): List of species to process. If empty, process all species
         public (bool, optional): Whether the dataset is for public release. Default to True.
         resample (bool, optional): Whether to resample the data, if needed. Default to True.
-
-        
     """
 
     if not network:
@@ -365,7 +363,7 @@ def run_all(network,
     if not isinstance(species, list):
         raise TypeError("species must be a list")
 
-    path = Paths(network, errors="ignore")
+    path = Paths(network, public = public, errors="ignore")
 
     # Delete log files, if they exist
     for log_file in ["error_log_combined.txt", "error_log_individual.txt"]:
@@ -379,31 +377,34 @@ def run_all(network,
         raise AttributeError("Output path not set in config.yaml")
     sub_path = path.output_path
 
-    # Check if output_path_private attribute is available
-    #TODO: At the moment, need to have some private output path, even if not used
-    if not hasattr(path, "output_path_private"):
-        raise AttributeError("Private output path not set in config.yaml")
-    sub_path_private = path.output_path_private
+    # # Check if output_path_private attribute is available
+    # #TODO: At the moment, need to have some private output path, even if not used
+    # if not hasattr(path, "output_path_private"):
+    #     raise AttributeError("Private output path not set in config.yaml")
+    # sub_path_private = path.output_path_private
     
-    out_pth_public = data_file_path("", network=network, sub_path=sub_path, errors="ignore")
-    out_pth_private = data_file_path("", network=network, sub_path=sub_path_private, errors="ignore")
 
-    if public:
-        out_pth = out_pth_public
-    else:
-        out_pth = out_pth_private
+TODO: Replace all these calls to data_file_path, Paths, etc. with the newly edited output_path function
+
+    out_pth = data_file_path("", network=network, sub_path=sub_path, errors="ignore")
+#    out_pth_private = data_file_path("", network=network, sub_path=sub_path_private, errors="ignore")
+
+    # if public:
+    #     out_pth = out_pth_public
+    # else:
+    #     out_pth = out_pth_private
 
     if delete:
         delete_archive(network, out_pth,
             sub_path = sub_path, public=public, errors="ignore")
         
-    # If either out_pth is a zip file that doesn't, create them
-    if out_pth_public.suffix == ".zip" and not out_pth_public.exists():
-        with ZipFile(out_pth_public, "w") as f:
+    # If either out_pth is a zip file that doesn't exist, create
+    if out_pth.suffix == ".zip" and not out_pth.exists():
+        with ZipFile(out_pth, "w") as f:
             pass
-    if out_pth_private.suffix == ".zip" and not out_pth_private.exists():
-        with ZipFile(out_pth_private, "w") as f:
-            pass
+    # if out_pth_private.suffix == ".zip" and not out_pth_private.exists():
+    #     with ZipFile(out_pth_private, "w") as f:
+    #         pass
     
     # Must run combined instruments first
     if combined:
