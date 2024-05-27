@@ -229,7 +229,6 @@ def data_file_list(network = "",
                     files.append(str(f.relative_to(pth)))
         return network, return_sub_path(pth), files
 
-    
 
 def data_file_path(filename,
                    network = "",
@@ -328,23 +327,63 @@ def open_data_file(filename,
         return (pth / filename).open("rb")
 
 
-def copy_to_archive(src_file, archive_path):
+def output_path(network, species, site, instrument,
+                extra = "", version="", public=True,
+                errors="raise"):
+    '''Determine output path and filename
+
+    Args:
+        network (str): Network
+        species (str): Species
+        site (str): Site
+        instrument (str): Instrument
+        extra (str, optional): Extra string to add to filename. Defaults to "".
+        version (str, optional): Version number. Defaults to "".
+        public (bool, optional): Whether the dataset is for public release. Default to True.
+        errors (str, optional): How to handle errors if path doesn't exist. Defaults to "raise".
+
+    Raises:
+        FileNotFoundError: Can't find output path
+
+    Returns:
+        pathlib.Path: Path to output directory
+        str: Filename
+    '''
+
+    # Get paths. Ignore errors since outputs may not exist at this stage
+    paths = Paths(network, public=public, errors="ignore_outputs")
+
+    version_str = f"_{version.replace(' ','')}" if version else ""
+    
+    # Can tweak data_file_path to get the output path
+    output_path = data_file_path("", network = network,
+                                sub_path = paths.output_path,
+                                errors=errors)
+    
+    # Create filename
+    filename = f"{network.upper()}-{instrument}_{site}_{species}{extra}{version_str}.nc"
+
+    return output_path, filename
+
+
+def copy_to_archive(src_file, network, public = True):
     """Copy file to archive. Structure is data/network/sub_path
     sub_path can be a zip archive
 
     Args:
         src_file (str): Source file
         network (str, optional): Network. Defaults to "".
-        sub_path (str, optional): Sub-path. Defaults to "". Can be a zip archive or directory
-        this_repo (bool, optional): If True, look for the root and data folder within this repository (no config).
-            If False, will look for the root and data folders and config file in the working directory.
-
+        public (bool, optional): If True, copy to public archive. If False, copy to private archive.
+            Defaults to True.
     Raises:
         FileNotFoundError: Can't find file
 
     Returns:
         file: File object
     """
+
+    archive_path, _ = output_path(network, "_", "_", "_",
+                                public=public)
 
     if archive_path.suffix == ".zip":
         with ZipFile(archive_path, "a") as z:

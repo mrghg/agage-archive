@@ -3,8 +3,7 @@ import yaml
 import json
 
 from agage_archive.config import Paths, data_file_path, \
-    open_data_file, data_file_list
-from agage_archive.io import output_path
+    open_data_file, data_file_list, output_path
 
 
 repo_path = Path(__file__).resolve().parents[1]

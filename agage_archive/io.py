@@ -7,7 +7,7 @@ from io import StringIO
 import json
 
 from agage_archive.config import Paths, open_data_file, data_file_list, \
-    data_file_path
+    output_path
 from agage_archive.convert import scale_convert
 from agage_archive.convert import resample as resample_function
 from agage_archive.formatting import format_species, \
@@ -798,45 +798,6 @@ def combine_baseline(network, species, site,
     return ds_combined
 
 
-def output_path(network, species, site, instrument,
-                extra = "", version="", public=True,
-                errors="raise"):
-    '''Determine output path and filename
-
-    Args:
-        network (str): Network
-        species (str): Species
-        site (str): Site
-        instrument (str): Instrument
-        extra (str, optional): Extra string to add to filename. Defaults to "".
-        version (str, optional): Version number. Defaults to "".
-        public (bool, optional): Whether the dataset is for public release. Default to True.
-        errors (str, optional): How to handle errors if path doesn't exist. Defaults to "raise".
-
-    Raises:
-        FileNotFoundError: Can't find output path
-
-    Returns:
-        pathlib.Path: Path to output directory
-        str: Filename
-    '''
-
-    # Get paths. Ignore errors since outputs may not exist at this stage
-    paths = Paths(network, public=public, errors="ignore_outputs")
-
-    version_str = f"_{version.replace(' ','')}" if version else ""
-    
-    # Can tweak data_file_path to get the output path
-    output_path = data_file_path("", network = network,
-                                sub_path = paths.output_path,
-                                errors=errors)
-    
-    # Create filename
-    filename = f"{network.upper()}-{instrument}_{site}_{format_species(species)}{extra}{version_str}.nc"
-
-    return output_path, filename
-
-
 def output_write(ds, out_path, filename,
                 output_subpath = "",
                 verbose = False):
@@ -902,7 +863,10 @@ def output_dataset(ds, network,
     else:
         version_str = ""
         
-    out_path, filename = output_path(network, ds.attrs["species"], ds.attrs["site_code"], instrument,
+    out_path, filename = output_path(network,
+                                     format_species(ds.attrs["species"]),
+                                     ds.attrs["site_code"],
+                                     instrument,
                                      extra=extra, version=version_str, public=public)
 
     ds_out = ds.copy(deep = True)

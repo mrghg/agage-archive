@@ -2,7 +2,8 @@ import pandas as pd
 from shutil import rmtree
 from zipfile import ZipFile
 
-from agage_archive.config import Paths, open_data_file, data_file_list, data_file_path, copy_to_archive
+from agage_archive.config import Paths, open_data_file, data_file_list, data_file_path, \
+    copy_to_archive, output_path
 from agage_archive.data_selection import read_release_schedule, read_data_combination
 from agage_archive.io import combine_datasets, combine_baseline, \
     read_nc, read_baseline, read_ale_gage, read_gcwerks_flask, \
@@ -10,26 +11,25 @@ from agage_archive.io import combine_datasets, combine_baseline, \
 from agage_archive.convert import monthly_baseline
 
 
-def delete_archive(network, out_pth,
-                sub_path = "",
-                public=True,
-                errors="raise"):
+def delete_archive(network, public = True):
     """Delete all files in output directory before running
 
     Args:
         network (str): Network for output filenames
-        out_pth (pathlib.Path): Path to output directory or zip file
-        sub_path (str): Subdirectory in output directory or zip file
         public (bool): Whether the dataset is for public release
-        errors (str): How to handle errors. Default to "raise"
     """
 
-    path = Paths(network, errors="ignore")
+    path = Paths(network, errors="ignore", public=public)
+
+    #TODO: Maybe wrap this in a try/except block, so that if the output path doesn't exist, returns
+    out_pth, _ = output_path(network, "_", "_", "_",
+                            public=public,
+                            errors="raise")
 
     # Find all files in output directory
-    network, sub_path, files = data_file_list(network=network,
-                                            sub_path=sub_path,
-                                            errors="ignore")
+    _, _, files = data_file_list(network=network,
+                                sub_path=path.output_path,
+                                errors="ignore")
 
     print(f'Deleting all files in {out_pth}')
 
@@ -50,6 +50,25 @@ def delete_archive(network, out_pth,
                 pth.unlink()
             elif pth.is_dir():
                 rmtree(pth)
+
+
+def create_empty_archive(network, public = True):
+    """Create an empty output zip file or folders
+
+    Args:
+        network (str): Network for output filenames
+        public (bool): Whether the dataset is for public release
+    """
+
+    out_pth, _ = output_path(network, "_", "_", "_",
+                            public=public,
+                            errors="ignore")
+
+    if out_pth.suffix == ".zip" and not out_pth.exists():
+        with ZipFile(out_pth, "w") as f:
+            pass
+    elif out_pth.is_dir():
+        out_pth.mkdir(parents=True, exist_ok=True)
 
 
 def run_timestamp_checks(ds,
@@ -375,37 +394,13 @@ def run_all(network,
     # Check if output_path attribute is available
     if not hasattr(path, "output_path"):
         raise AttributeError("Output path not set in config.yaml")
-    sub_path = path.output_path
-
-    # # Check if output_path_private attribute is available
-    # #TODO: At the moment, need to have some private output path, even if not used
-    # if not hasattr(path, "output_path_private"):
-    #     raise AttributeError("Private output path not set in config.yaml")
-    # sub_path_private = path.output_path_private
-    
-
-TODO: Replace all these calls to data_file_path, Paths, etc. with the newly edited output_path function
-
-    out_pth = data_file_path("", network=network, sub_path=sub_path, errors="ignore")
-#    out_pth_private = data_file_path("", network=network, sub_path=sub_path_private, errors="ignore")
-
-    # if public:
-    #     out_pth = out_pth_public
-    # else:
-    #     out_pth = out_pth_private
 
     if delete:
-        delete_archive(network, out_pth,
-            sub_path = sub_path, public=public, errors="ignore")
+        delete_archive(network, public=public)
         
     # If either out_pth is a zip file that doesn't exist, create
-    if out_pth.suffix == ".zip" and not out_pth.exists():
-        with ZipFile(out_pth, "w") as f:
-            pass
-    # if out_pth_private.suffix == ".zip" and not out_pth_private.exists():
-    #     with ZipFile(out_pth_private, "w") as f:
-    #         pass
-    
+    create_empty_archive(network, public=public)
+
     # Must run combined instruments first
     if combined:
         run_combined_instruments(network,
@@ -433,7 +428,7 @@ TODO: Replace all these calls to data_file_path, Paths, etc. with the newly edit
     try:
         readme_file = data_file_path(filename='README.md',
                                     network=network)
-        copy_to_archive(readme_file, out_pth)
+        copy_to_archive(readme_file, network, public=public)
     except FileNotFoundError:
         print("No README file found")
 
@@ -449,9 +444,9 @@ if __name__ == "__main__":
     print("####################################")
     print("#####Processing public archive######")
     print("####################################")
-    run_all("agage", species = ["ch4"], public=True)
+    run_all("agage", species = ["cfc-11"], public=True)
 
-    # print("####################################")
-    # print("#####Processing private archive#####")
-    # print("####################################")
-    # run_all("agage", species = ["ch4"], public=False)
+    print("####################################")
+    print("#####Processing private archive#####")
+    print("####################################")
+    run_all("agage", species = ["cfc-11"], public=False)
