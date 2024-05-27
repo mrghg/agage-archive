@@ -104,6 +104,13 @@ class Paths():
                 if not (full_path.is_dir() or full_path.suffix == ".zip"):
                     raise FileNotFoundError(f"{full_path} is not a folder or zip archive")
 
+        # Don't need to do the remaining checks if errors is set to ignore_outputs
+        if "output_path" not in config["paths"][network]:
+            if errors == "raise" or errors == "ignore_inputs":
+                raise KeyError(f"Output path not found in config file")
+            else:
+                return
+            
         # Set OUTPUT path
         if public:
             self.output_path = config["paths"][network]["output_path"]
@@ -329,7 +336,7 @@ def open_data_file(filename,
 
 def output_path(network, species, site, instrument,
                 extra = "", version="", public=True,
-                errors="raise"):
+                errors="raise", network_out = ""):
     '''Determine output path and filename
 
     Args:
@@ -341,6 +348,7 @@ def output_path(network, species, site, instrument,
         version (str, optional): Version number. Defaults to "".
         public (bool, optional): Whether the dataset is for public release. Default to True.
         errors (str, optional): How to handle errors if path doesn't exist. Defaults to "raise".
+        network_out (str, optional): Network for filename. Defaults to "".
 
     Raises:
         FileNotFoundError: Can't find output path
@@ -361,7 +369,12 @@ def output_path(network, species, site, instrument,
                                 errors=errors)
     
     # Create filename
-    filename = f"{network.upper()}-{instrument}_{site}_{species}{extra}{version_str}.nc"
+    if network_out:
+        network_str = network_out.upper()
+    else:
+        network_str = network.upper()
+
+    filename = f"{network_str}-{instrument}_{site}_{species}{extra}{version_str}.nc"
 
     return output_path, filename
 

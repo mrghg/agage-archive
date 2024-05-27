@@ -843,7 +843,8 @@ def output_dataset(ds, network,
                    extra = "",
                    version = True,
                    public = True,
-                   verbose = False):
+                   verbose = False,
+                   network_out = ""):
     '''Output dataset to netCDF file
 
     Args:
@@ -857,6 +858,7 @@ def output_dataset(ds, network,
             Defaults to using the version number from global attributes.
         public (bool, optional): Whether the dataset is for public release. Default to True.
         verbose (bool, optional): Print verbose output. Defaults to False.
+        network_out (str, optional): Network to use for filename. Defaults to "".
     '''
     if version:
         version_str = f"{ds.attrs['version']}"
@@ -867,7 +869,8 @@ def output_dataset(ds, network,
                                      format_species(ds.attrs["species"]),
                                      ds.attrs["site_code"],
                                      instrument,
-                                     extra=extra, version=version_str, public=public)
+                                     extra=extra, version=version_str, public=public,
+                                     network_out=network_out)
 
     ds_out = ds.copy(deep = True)
 
