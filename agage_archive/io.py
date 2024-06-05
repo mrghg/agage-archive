@@ -6,7 +6,8 @@ from zipfile import ZipFile
 from io import StringIO
 import json
 
-from agage_archive.config import Paths, open_data_file, data_file_list, data_file_path
+from agage_archive.config import Paths, open_data_file, data_file_list, \
+    output_path
 from agage_archive.convert import scale_convert
 from agage_archive.convert import resample as resample_function
 from agage_archive.formatting import format_species, \
@@ -797,48 +798,6 @@ def combine_baseline(network, species, site,
     return ds_combined
 
 
-def output_path(network, species, site, instrument,
-                extra = "", version="", public=True):
-    '''Determine output path and filename
-
-    Args:
-        network (str): Network
-        species (str): Species
-        site (str): Site
-        instrument (str): Instrument
-        extra (str, optional): Extra string to add to filename. Defaults to "".
-        version (str, optional): Version number. Defaults to "".
-        public (bool, optional): Whether the dataset is for public release. Default to True.
-
-    Raises:
-        FileNotFoundError: Can't find output path
-
-    Returns:
-        pathlib.Path: Path to output directory
-        str: Filename
-    '''
-
-    paths = Paths(network)
-
-    version_str = f"_{version.replace(' ','')}" if version else ""
-
-    if public:
-        sub_path =  paths.output_path
-    else:
-        sub_path =  paths.output_path_private
-        
-    output_path = data_file_path("", network = network, sub_path = sub_path)
-
-    # Check if the output path exists
-    if not output_path.exists():
-        raise FileNotFoundError(f"Can't find output path {output_path}")
-    
-    # Create filename
-    filename = f"{network.upper()}-{instrument}_{site}_{format_species(species)}{extra}{version_str}.nc"
-
-    return output_path, filename
-
-
 def output_write(ds, out_path, filename,
                 output_subpath = "",
                 verbose = False):
@@ -884,7 +843,8 @@ def output_dataset(ds, network,
                    extra = "",
                    version = True,
                    public = True,
-                   verbose = False):
+                   verbose = False,
+                   network_out = ""):
     '''Output dataset to netCDF file
 
     Args:
@@ -898,14 +858,19 @@ def output_dataset(ds, network,
             Defaults to using the version number from global attributes.
         public (bool, optional): Whether the dataset is for public release. Default to True.
         verbose (bool, optional): Print verbose output. Defaults to False.
+        network_out (str, optional): Network to use for filename. Defaults to "".
     '''
     if version:
         version_str = f"{ds.attrs['version']}"
     else:
         version_str = ""
         
-    out_path, filename = output_path(network, ds.attrs["species"], ds.attrs["site_code"], instrument,
-                                     extra=extra, version=version_str, public=public)
+    out_path, filename = output_path(network,
+                                     format_species(ds.attrs["species"]),
+                                     ds.attrs["site_code"],
+                                     instrument,
+                                     extra=extra, version=version_str, public=public,
+                                     network_out=network_out)
 
     ds_out = ds.copy(deep = True)
 

@@ -25,15 +25,10 @@ def file_search_species(network, frequency, species, public = True):
         list: List of files containing species        
     """
     
-    paths = Paths(network, errors="ignore_inputs")
-
-    if public:
-        output_path = paths.output_path
-    else:
-        output_path = paths.output_path_private
+    paths = Paths(network, errors="ignore_inputs", public=public)
 
     files = data_file_list(network,
-                           sub_path=f"{output_path}",
+                           sub_path=f"{paths.output_path}",
                            pattern=f"{frequency}/{species}/*.nc",
                            errors="ignore_inputs")[2]
 
@@ -174,16 +169,11 @@ def load_datasets(network, filenames, public = True):
         list: List of datasets
     """
 
-    paths = Paths(network, errors="ignore_inputs")
-
-    if public:
-        output_path = paths.output_path
-    else:
-        output_path = paths.output_path_private
+    paths = Paths(network, errors="ignore_inputs", public=public)
 
     datasets = []
     for filename in filenames:
-        with open_data_file(filename, network, output_path, errors="ignore_inputs") as f:
+        with open_data_file(filename, network, paths.output_path, errors="ignore_inputs") as f:
             with xr.open_dataset(f) as ds:
                 ds_species = ds.load()
 
