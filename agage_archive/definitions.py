@@ -53,6 +53,18 @@ species_translator_flask = {"c2f6": "PFC-116",
                             "ccl4": "CCl4"
                             }
 
+instrument_number = {"UNDEFINED": -1,
+                    "ALE": 0,
+                    "GAGE": 1,
+                    "GCMD": 2,
+                    "GCMS-ADS": 3,
+                    "GCMS-Medusa": 4,
+                    "GCECD": 5,
+                    "GCTOFMS": 6,
+                    "Picarro": 7,
+                    "LGR": 8,
+                    "GCMS-MteCimone": 9}
+
 minimum_averaging_period = {"Picarro": "1H"}
 
 
@@ -62,18 +74,6 @@ def instrument_type_definition():
     Returns:
         str: Instrument type definition
     '''
-
-    instrument_number = {"UNDEFINED": -1,
-                        "ALE": 0,
-                        "GAGE": 1,
-                        "GCMD": 2,
-                        "GCMS-ADS": 3,
-                        "GCMS-Medusa": 4,
-                        "GCECD": 5,
-                        "GCTOFMS": 6,
-                        "Picarro": 7,
-                        "LGR": 8,
-                        "GCMS-MteCimone": 9}
     
     # Create string from dictionary defining instrument numbers
     instrument_number_string = ", ".join([f"{k}={v}" for k, v in instrument_number.items()])

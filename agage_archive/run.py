@@ -9,6 +9,7 @@ from agage_archive.io import combine_datasets, combine_baseline, \
     read_nc, read_baseline, read_ale_gage, read_gcwerks_flask, \
     output_dataset
 from agage_archive.convert import monthly_baseline
+from agage_archive.definitions import instrument_number
 
 
 def delete_archive(network, public = True):
@@ -77,8 +78,22 @@ def run_timestamp_checks(ds,
                         site=""):
 
     # Check for duplicate time stamps
-    if ds["time"].to_series().duplicated().any():
-        raise ValueError(f"Duplicate timestamps in {species} at {site}")
+    timestamps = ds["time"].to_series()
+    if timestamps.duplicated().any():
+        # Create list of duplicated timestamps
+        duplicated = timestamps[timestamps.duplicated()].unique()
+        duplicated_str = ", ".join([str(d) for d in duplicated])
+
+        # List of instrument types that have duplicate timestamps
+        instrument_types = ds["instrument_type"].to_series()
+        instrument_types = instrument_types[timestamps.duplicated()].unique()
+
+        # find instrument name in instrument_number
+        instrument_names = [k for k, v in instrument_number.items() if v in instrument_types]
+        instrument_names = ", ".join(instrument_names)
+
+        raise ValueError(f"Duplicate timestamps in {species} at {site}: {duplicated_str} for instrument {instrument_names}")
+
     if ds_baseline:
         if ds_baseline["time"].to_series().duplicated().any():
             raise ValueError(f"Duplicate timestamps in baseline for {species} at {site}")
@@ -444,9 +459,9 @@ if __name__ == "__main__":
     print("####################################")
     print("#####Processing public archive######")
     print("####################################")
-    run_all("agage", public=True)
+    run_all("agage", public=True, species=["hfc-125"])
 
-    print("####################################")
-    print("#####Processing private archive#####")
-    print("####################################")
+    # print("####################################")
+    # print("#####Processing private archive#####")
+    # print("####################################")
 #    run_all("agage", species = ["cfc-11"], public=False)

@@ -747,6 +747,27 @@ def combine_datasets(network, species, site,
     if len(np.unique(ds_combined.instrument_type.values)) == 1:
         ds_combined = ds_combined.drop_vars("instrument_type")
 
+    # Check for duplicate timestamps
+    # Since duplicates are removed from the individual datasets
+    # this can only happen if both measurements are at the same time
+    # In this case, use the instrument with the latest start date
+    if len(ds_combined.time) != len(ds_combined.time.drop_duplicates(dim="time")):
+
+        timestamps = ds_combined.time.to_series()
+        duplicated_timestamps = timestamps[timestamps.duplicated(keep="first")]
+
+        for timestamp in duplicated_timestamps:
+
+            # find instrument types associated with this timestamp and remove the one with the earliest start date
+            duplicate_instrument_number = ds_combined.instrument_type.sel(time=timestamp).values
+            duplicate_instrument_name = [k for k, v in instrument_types.items() if v in duplicate_instrument_number]
+            duplicate_instrument_date = [inst["instrument_date"] for inst in instrument_rec if inst["instrument"] in duplicate_instrument_name]
+            duplicate_instrument_to_remove = duplicate_instrument_number[np.argmin(duplicate_instrument_date)]
+            
+            ds_mask = (ds_combined.instrument_type == duplicate_instrument_to_remove) * \
+                (ds_combined.time == timestamp)
+            ds_combined = ds_combined.where(~ds_mask, drop=True)
+
     # Update network attribute
     ds_combined.attrs["network"] = "/".join(set(networks))
 
@@ -794,6 +815,12 @@ def combine_baseline(network, species, site,
 
     # Sort by time
     ds_combined = ds_combined.sortby("time")
+
+    # Remove duplicates
+    # There's a danger that this is removing different points to the mole fraction dataset
+    # but we don't have access to the instrument type. Impact should be minimal
+    if len(ds_combined.time) != len(ds_combined.time.drop_duplicates(dim="time")):
+        ds_combined = ds_combined.drop_duplicates(dim="time")
 
     return ds_combined
 
