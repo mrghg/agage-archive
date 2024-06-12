@@ -107,6 +107,10 @@ def read_release_schedule(network, instrument,
     df.set_index("Species", inplace=True)
 
     if species is not None:
+
+        if format_species(species) not in df.index.str.lower():
+            raise ValueError(f"No release schedule found for {species} at {site}")
+
         if df.loc[species, site] == "x":
             # Return a value before any data was collected, to remove everything
             return "1970-01-01"
