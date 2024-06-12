@@ -1,6 +1,8 @@
 import pandas as pd
 from shutil import rmtree
 from zipfile import ZipFile
+from multiprocessing import Pool
+import time
 
 from agage_archive.config import Paths, open_data_file, data_file_list, data_file_path, \
     copy_to_archive, output_path
@@ -9,6 +11,10 @@ from agage_archive.io import combine_datasets, combine_baseline, \
     read_nc, read_baseline, read_ale_gage, read_gcwerks_flask, \
     output_dataset
 from agage_archive.convert import monthly_baseline
+
+
+# Set number of threads for multiprocessing
+nthreads = 4
 
 
 def delete_archive(network, public = True):
@@ -89,6 +95,98 @@ def run_timestamp_checks(ds,
             raise ValueError(f"Data and baseline files for {species} at {site} have different timestamps")
         
 
+def run_individual_site(site, species, network, instrument,
+                        rs, read_function, read_baseline_function, instrument_out,
+                        baseline=False,
+                        monthly=False,
+                        verbose=False,
+                        public=True,
+                        resample=True,):
+    """Process individual data files for a given site.
+    Reads the release schedule for the site
+
+    Args:
+        site (str): Site to process. Must match sheet names in release schedule, e.g.:
+            "MHD", "MLO", "SMO", ...
+        species (str): species to process. If empty, process all species
+        network (str): Network for output filenames
+        instrument (str): Instrument to process. Must match sheet names in release schedule, e.g.:
+            "AGAGE", "ALE", "GAGE", "GCMD", ...
+        rs (pd.DataFrame): Release schedule
+        read_function (function): Function to read data files
+        read_baseline_function (function): Function to read baseline files
+        instrument_out (str): Instrument name for output filenames
+        baseline (bool): Process baselines. Boolean as only one baseline flag is available (GIT)
+        monthly (bool): Produce monthly baseline files
+        verbose (bool): Print progress to screen
+        public (bool, optional): Whether the dataset is for public release. Default to True.
+        resample (bool, optional): Whether to resample the data, if needed. Default to True.
+    """
+
+    try:
+
+        if rs.loc[species, site].lower() != "x":
+
+            ds = read_function(network, species, site, instrument,
+                            public = public, verbose=verbose, resample=resample)
+
+            if baseline:
+                ds_baseline = read_baseline_function(network, species, site, instrument,
+                                            flag_name = baseline,
+                                            verbose = verbose)
+            else:
+                ds_baseline = None
+                
+            run_timestamp_checks(ds, ds_baseline, species, site)
+
+            # If multiple instruments, store individual file in subdirectory
+            instrument_dates = read_data_combination(network, species, site,
+                                                    verbose=False)
+            if len(instrument_dates) > 1:
+                output_subpath = f"event/{species}/individual"
+            else:
+                output_subpath = f"event/{species}"
+
+            output_dataset(ds, network, instrument=instrument_out,
+                        output_subpath=output_subpath,
+                        end_date=rs.loc[species, site],
+                        public=public,
+                        verbose=verbose)
+
+            if baseline:
+                if (ds_baseline.time != ds.time).any():
+                    raise ValueError(f"Baseline and data files for {species} at {site} have different timestamps")
+                output_dataset(ds_baseline, network, instrument=instrument_out,
+                        output_subpath=output_subpath + "/baseline_flags",
+                        end_date=rs.loc[species, site],
+                        extra="-git-baseline",
+                        public=public,
+                        verbose=verbose)
+                
+                if monthly:
+                    ds_baseline_monthly = monthly_baseline(ds, ds_baseline)
+                    output_dataset(ds_baseline_monthly, network, instrument=instrument_out,
+                        output_subpath=output_subpath.replace("event", "monthly"),
+                        end_date=rs.loc[species, site],
+                        extra="-monthly",
+                        public=public,
+                        verbose=verbose)
+
+            else:
+                if monthly:
+                    raise NotImplementedError("Monthly baseline files can only be produced if baseline flag is specified")
+
+            return site, species, ""
+        
+        else:
+
+            return site, species, ""
+
+    except Exception as e:
+
+        return site, species, e
+
+
 def run_individual_instrument(network, instrument,
                               verbose = False,
                               baseline = "",
@@ -138,63 +236,13 @@ def run_individual_instrument(network, instrument,
 
     # Process for all species and sites
     for sp in species_to_process:
-        for site in rs.columns:
 
-            try:
+        with Pool(processes=nthreads) as p:
+            result = p.starmap_async(run_individual_site, [(site, sp, network, instrument, rs, read_function, read_baseline_function, instrument_out, baseline, monthly, verbose, public, resample) for site in rs.columns])
 
-                if rs.loc[sp, site].lower() != "x":
-
-                    ds = read_function(network, sp, site, instrument,
-                                    public = public, verbose=verbose, resample=resample)
-
-                    if baseline:
-                        ds_baseline = read_baseline_function(network, sp, site, instrument,
-                                                    flag_name = baseline,
-                                                    verbose = verbose)
-                    else:
-                        ds_baseline = None
-                        
-                    run_timestamp_checks(ds, ds_baseline, sp, site)
-
-                    # If multiple instruments, store individual file in subdirectory
-                    instrument_dates = read_data_combination(network, sp, site,
-                                                            verbose=False)
-                    if len(instrument_dates) > 1:
-                        output_subpath = f"event/{sp}/individual"
-                    else:
-                        output_subpath = f"event/{sp}"
-
-                    output_dataset(ds, network, instrument=instrument_out,
-                                output_subpath=output_subpath,
-                                end_date=rs.loc[sp, site],
-                                public=public,
-                                verbose=verbose)
-
-                    if baseline:
-                        if (ds_baseline.time != ds.time).any():
-                            raise ValueError(f"Baseline and data files for {sp} at {site} have different timestamps")
-                        output_dataset(ds_baseline, network, instrument=instrument_out,
-                                output_subpath=output_subpath + "/baseline_flags",
-                                end_date=rs.loc[sp, site],
-                                extra="-git-baseline",
-                                public=public,
-                                verbose=verbose)
-                        
-                        if monthly:
-                            ds_baseline_monthly = monthly_baseline(ds, ds_baseline)
-                            output_dataset(ds_baseline_monthly, network, instrument=instrument_out,
-                                output_subpath=output_subpath.replace("event", "monthly"),
-                                end_date=rs.loc[sp, site],
-                                extra="-monthly",
-                                public=public,
-                                verbose=verbose)
-
-                    else:
-                        if monthly:
-                            raise NotImplementedError("Monthly baseline files can only be produced if baseline flag is specified")
-
-            except Exception as e:
-                error_log.append((site, sp, e))
+            for r in result.get():
+                if r[2]:
+                    error_log.append(r)
 
     if error_log:
         # save errors to file
@@ -205,6 +253,110 @@ def run_individual_instrument(network, instrument,
                 f.write(f"{error[0]} {error[1]}: {error[2]}\n")
         
         print("!!! Errors occurred during processing. See error_log_individual.txt for details")
+
+
+def run_combined_site(site, species, network, 
+                    baseline=False,
+                    monthly=False,
+                    verbose=False,
+                    public=True,
+                    resample=True):
+    """Process combined data files for a given site.
+    Reads the data selection file to determine which species to process
+
+    Args:
+        site (str): Site to process. Must match sheet names in data selection file
+        species (list): List of species to process. If empty, process all species
+        network (str): Network for output filenames
+        baseline (bool): Process baselines. Boolean as only one baseline flag is available (GIT)
+        monthly (bool): Produce monthly baseline files
+        verbose (bool): Print progress to screen
+        public (bool, optional): Whether the dataset is for public release. Default to True.
+        resample (bool, optional): Whether to resample the data, if needed. Default to True.
+    """
+
+    print(f"Processing files for {site}")
+
+    # Read data selection file
+    with open_data_file("data_combination.xlsx", network=network) as f:
+        df = pd.read_excel(f,
+                        comment="#",
+                        sheet_name=site,
+                        index_col="Species")
+
+    # Determine species to process
+    if species:
+        # Process only those species that are in the data selection file
+        species_to_process = [sp for sp in species if sp in df.index.values]
+        if not species_to_process:
+            print(f"No species to process for {site}, skipping...")
+            return site, "None", ""
+    else:
+        # Process all species in the data selection file
+        species_to_process = df.index.values
+
+    # Loop through species in index
+    for sp in species_to_process:
+
+        try:
+
+            # Produce combined dataset
+            if verbose:
+                print(f"... combining datasets for {sp} at {site}")
+            ds = combine_datasets(network, sp, site,
+                                verbose=verbose, public=public, resample=resample)
+
+            if baseline:
+                if verbose:
+                    print(f"... combining baselines for {sp} at {site}")
+                # Note that GIT baselines is hard-wired here because Met Office not available for ALE/GAGE
+                ds_baseline = combine_baseline(network, sp, site,
+                                            verbose=verbose, public=public)
+
+            else:
+                ds_baseline = None
+
+            # Check for duplicate time stamps
+            run_timestamp_checks(ds, ds_baseline, sp, site)
+
+            output_subpath = f"event/{sp}"
+
+            if verbose:
+                print(f"... outputting combined dataset for {sp} at {site}")
+            output_dataset(ds, network,
+                        output_subpath=output_subpath,
+                        instrument="combined",
+                        public=public,
+                        verbose=verbose)
+            
+            if baseline:
+                if verbose:
+                    print(f"... outputting combined baseline for {sp} at {site}")
+                output_dataset(ds_baseline, network,
+                            output_subpath=output_subpath + "/baseline_flags",
+                            instrument="combined",
+                            extra="-git-baseline",
+                            public=public,
+                            verbose=verbose)
+
+                if monthly:
+                    ds_baseline_monthly = monthly_baseline(ds, ds_baseline)
+                    output_dataset(ds_baseline_monthly, network,
+                            output_subpath=output_subpath.replace("event", "monthly"),
+                            instrument="combined",
+                            extra="-monthly",
+                            public=public,
+                            verbose=verbose)
+
+            else:
+                if monthly:
+                    raise NotImplementedError("Monthly baseline files can only be produced if baseline flag is specified")
+
+            return site, sp, ""
+
+        except Exception as e:
+
+            return site, sp, e
 
 
 def run_combined_instruments(network,
@@ -233,91 +385,14 @@ def run_combined_instruments(network,
     with open_data_file("data_combination.xlsx", network=network) as data_selection_path:
         sites = pd.ExcelFile(data_selection_path).sheet_names
 
-    # Create error log
-    error_log = []
-
-    for site in sites:
-
-        print(f"Processing files for {site}")
-
-        # Read data selection file
-        with open_data_file("data_combination.xlsx", network=network) as f:
-            df = pd.read_excel(f,
-                            comment="#",
-                            sheet_name=site,
-                            index_col="Species")
-
-        # Determine species to process
-        if species:
-            # Process only those species that are in the data selection file
-            species_to_process = [sp for sp in species if sp in df.index.values]
-            if not species_to_process:
-                print(f"No species to process for {site}, skipping...")
-                continue
-        else:
-            # Process all species in the data selection file
-            species_to_process = df.index.values
-
-        # Loop through species in index
-        for sp in species_to_process:
-
-            try:
-
-                # Produce combined dataset
-                if verbose:
-                    print(f"... combining datasets for {sp} at {site}")
-                ds = combine_datasets(network, sp, site,
-                                    verbose=verbose, public=public, resample=resample)
-
-                if baseline:
-                    if verbose:
-                        print(f"... combining baselines for {sp} at {site}")
-                    # Note that GIT baselines is hard-wired here because Met Office not available for ALE/GAGE
-                    ds_baseline = combine_baseline(network, sp, site,
-                                                verbose=verbose, public=public)
-
-                else:
-                    ds_baseline = None
-
-                # Check for duplicate time stamps
-                run_timestamp_checks(ds, ds_baseline, sp, site)
-
-                output_subpath = f"event/{sp}"
-
-                if verbose:
-                    print(f"... outputting combined dataset for {sp} at {site}")
-                output_dataset(ds, network,
-                            output_subpath=output_subpath,
-                            instrument="combined",
-                            public=public,
-                            verbose=verbose)
-                
-                if baseline:
-                    if verbose:
-                        print(f"... outputting combined baseline for {sp} at {site}")
-                    output_dataset(ds_baseline, network,
-                                output_subpath=output_subpath + "/baseline_flags",
-                                instrument="combined",
-                                extra="-git-baseline",
-                                public=public,
-                                verbose=verbose)
-
-                    if monthly:
-                        ds_baseline_monthly = monthly_baseline(ds, ds_baseline)
-                        output_dataset(ds_baseline_monthly, network,
-                                output_subpath=output_subpath.replace("event", "monthly"),
-                                instrument="combined",
-                                extra="-monthly",
-                                public=public,
-                                verbose=verbose)
-
-                else:
-                    if monthly:
-                        raise NotImplementedError("Monthly baseline files can only be produced if baseline flag is specified")
-
-            except Exception as e:
-                error_log.append((site, sp, e))
+    with Pool(processes=nthreads) as p:
+        result = p.starmap_async(run_combined_site, [(site, species, network, baseline, monthly, verbose, public, resample) for site in sites])
     
+        error_log = []
+        for r in result.get():
+            if r[2]:
+                error_log.append(r)
+
     if error_log:
         # save errors to file
         with open(data_file_path("error_log_combined.txt", network=network, errors="ignore"), "w") as f:
@@ -441,12 +516,16 @@ def run_all(network,
 
 if __name__ == "__main__":
 
+    start_time = time.time()
+
     print("####################################")
     print("#####Processing public archive######")
     print("####################################")
-    run_all("agage", species = ["cfc-11"], public=True)
+    run_all("agage", public=True)
 
-    print("####################################")
-    print("#####Processing private archive#####")
-    print("####################################")
-    run_all("agage", species = ["cfc-11"], public=False)
+    # print("####################################")
+    # print("#####Processing private archive#####")
+    # print("####################################")
+    # run_all("agage", species = ["cfc-11"], public=False)
+
+    print(f"Time taken: {time.time() - start_time:.2f} seconds")
