@@ -28,19 +28,20 @@ def file_search_species(network, frequency, species, public = True):
     paths = Paths(network, errors="ignore_inputs", public=public)
 
     if frequency == "high-frequency":
-        frequency_str = ""
+        pattern = f"{species}/*.nc"
     elif frequency == "monthly-baseline":
-        frequency_str = "monthly-baseline/"
+        pattern = f"{species}/monthly-baseline/*.nc"
     else:
         raise ValueError("Frequency must be 'high-frequency' or 'monthly-baseline'")
 
     files = data_file_list(network,
                            sub_path=f"{paths.output_path}",
-                           pattern=f"{frequency_str}{species}/*.nc",
-                           errors="ignore_inputs")[2]
+                           pattern=pattern,
+                           errors="ignore_inputs",
+                           sub_directories=False)[2]
 
-    # Remove baseline files
-    files = [f for f in files if "baseline" not in f]
+    # # Remove baseline files
+    # files = [f for f in files if "baseline" not in f]
 
     return sorted(files)
 

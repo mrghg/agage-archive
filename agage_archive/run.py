@@ -14,7 +14,7 @@ from agage_archive.convert import monthly_baseline
 
 
 # Set number of threads for multiprocessing
-nthreads = 4
+nthreads = 1
 
 
 def delete_archive(network, public = True):
@@ -145,41 +145,53 @@ def run_individual_site(site, species, network, instrument,
             # If multiple instruments, store individual file in subdirectory
             instrument_dates = read_data_combination(network, species, site,
                                                     verbose=False)
-            if len(instrument_dates) > 1:
-                output_subpath = f"event/{species}/individual"
-            else:
-                output_subpath = f"event/{species}"
+            # if len(instrument_dates) > 1:
+            #     output_subpath = f"{species}/individual-instruments"
+            # else:
+            #     output_subpath = f"{species}"
 
-            output_dataset(ds, network, instrument=instrument_out,
-                        output_subpath=output_subpath,
-                        end_date=rs.loc[species, site],
-                        public=public,
-                        verbose=verbose)
+            folders = [f"{species}/individual-instruments"]
+            # if there is no combined data file, also store individual file in top-level directory
+            if len(instrument_dates) <= 1:
+                folders.append(f"{species}")
+            
+            for output_subpath in folders:
 
-            if baseline:
-                if (ds_baseline.time != ds.time).any():
-                    raise ValueError(f"Baseline and data files for {species} at {site} have different timestamps")
-                output_dataset(ds_baseline, network, instrument=instrument_out,
-                        output_subpath=output_subpath + "/baseline_flags",
-                        end_date=rs.loc[species, site],
-                        extra="-git-baseline",
-                        public=public,
-                        verbose=verbose)
-                
-                if monthly:
-                    ds_baseline_monthly = monthly_baseline(ds, ds_baseline)
-                    output_dataset(ds_baseline_monthly, network, instrument=instrument_out,
-                        output_subpath=output_subpath.replace("event", "monthly"),
-                        end_date=rs.loc[species, site],
-                        extra="-monthly",
-                        public=public,
-                        verbose=verbose)
+                if "individual" in output_subpath:
+                    instrument_str = instrument_out
+                else:
+                    instrument_str = ""
 
-            else:
-                if monthly:
-                    raise NotImplementedError("Monthly baseline files can only be produced if baseline flag is specified")
+                output_dataset(ds, network, instrument=instrument_str,
+                            output_subpath=output_subpath,
+                            end_date=rs.loc[species, site],
+                            public=public,
+                            verbose=verbose)
 
-            return site, species, ""
+                if baseline:
+                    if (ds_baseline.time != ds.time).any():
+                        raise ValueError(f"Baseline and data files for {species} at {site} have different timestamps")
+                    output_dataset(ds_baseline, network, instrument=instrument_str,
+                            output_subpath=output_subpath + "/baseline-flags",
+                            end_date=rs.loc[species, site],
+                            extra="_git-baseline",
+                            public=public,
+                            verbose=verbose)
+                    
+                    if monthly:
+                        ds_baseline_monthly = monthly_baseline(ds, ds_baseline)
+                        output_dataset(ds_baseline_monthly, network, instrument=instrument_str,
+                            output_subpath=output_subpath + "/monthly-baseline",
+                            end_date=rs.loc[species, site],
+                            extra="_monthly-baseline",
+                            public=public,
+                            verbose=verbose)
+
+                else:
+                    if monthly:
+                        raise NotImplementedError("Monthly baseline files can only be produced if baseline flag is specified")
+
+                return site, species, ""
         
         else:
 
@@ -241,7 +253,9 @@ def run_individual_instrument(network, instrument,
     for sp in species_to_process:
 
         with Pool(processes=nthreads) as p:
-            result = p.starmap_async(run_individual_site, [(site, sp, network, instrument, rs, read_function, read_baseline_function, instrument_out, baseline, monthly, verbose, public, resample) for site in rs.columns])
+            result = p.starmap_async(run_individual_site, [(site, sp, network, instrument,
+                                                            rs, read_function, read_baseline_function, instrument_out,
+                                                            baseline, monthly, verbose, public, resample) for site in rs.columns])
 
             for r in result.get():
                 if r[2]:
