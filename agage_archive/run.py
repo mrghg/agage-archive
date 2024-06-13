@@ -27,10 +27,13 @@ def delete_archive(network, public = True):
 
     path = Paths(network, errors="ignore", public=public)
 
-    #TODO: Maybe wrap this in a try/except block, so that if the output path doesn't exist, returns
-    out_pth, _ = output_path(network, "_", "_", "_",
-                            public=public,
-                            errors="raise")
+    try:
+        out_pth, _ = output_path(network, "_", "_", "_",
+                                public=public,
+                                errors="raise")
+    except FileNotFoundError:
+        print(f"Output directory or archive for does not exist, continuing")
+        return
 
     # Find all files in output directory
     _, _, files = data_file_list(network=network,
