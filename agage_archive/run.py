@@ -115,14 +115,14 @@ def run_individual_instrument(network, instrument,
     if instrument.upper() == "ALE" or instrument.upper() == "GAGE":
         read_function = read_ale_gage
         read_baseline_function = read_baseline
-        instrument_out = instrument.upper() + "-GCMD"
+        instrument_out = instrument.lower() + "-gcmd"
     elif instrument.upper() == "GCMS-MEDUSA-FLASK":
         read_function = read_gcwerks_flask
-        instrument_out = "GCMS-MEDUSA-FLASK"
+        instrument_out = "gcms-medusa-flask"
     else:
         read_function = read_nc
         read_baseline_function = read_baseline
-        instrument_out = instrument.upper()
+        instrument_out = instrument.lower()
 
     if species:
         # Process only those species that are in the release schedule
@@ -160,9 +160,9 @@ def run_individual_instrument(network, instrument,
                     instrument_dates = read_data_combination(network, sp, site,
                                                             verbose=False)
                     if len(instrument_dates) > 1:
-                        output_subpath = f"event/{sp}/individual"
+                        output_subpath = f"{sp}/individual"
                     else:
-                        output_subpath = f"event/{sp}"
+                        output_subpath = f"{sp}"
 
                     output_dataset(ds, network, instrument=instrument_out,
                                 output_subpath=output_subpath,
@@ -174,18 +174,18 @@ def run_individual_instrument(network, instrument,
                         if (ds_baseline.time != ds.time).any():
                             raise ValueError(f"Baseline and data files for {sp} at {site} have different timestamps")
                         output_dataset(ds_baseline, network, instrument=instrument_out,
-                                output_subpath=output_subpath + "/baseline_flags",
+                                output_subpath=output_subpath + "/baseline-flags",
                                 end_date=rs.loc[sp, site],
-                                extra="-git-baseline",
+                                extra="_git-baseline",
                                 public=public,
                                 verbose=verbose)
                         
                         if monthly:
                             ds_baseline_monthly = monthly_baseline(ds, ds_baseline)
                             output_dataset(ds_baseline_monthly, network, instrument=instrument_out,
-                                output_subpath=output_subpath.replace("event", "monthly"),
+                                output_subpath=output_subpath + "/monthly-baseline",
                                 end_date=rs.loc[sp, site],
-                                extra="-monthly",
+                                extra="_monthly-baseline",
                                 public=public,
                                 verbose=verbose)
 
@@ -282,13 +282,13 @@ def run_combined_instruments(network,
                 # Check for duplicate time stamps
                 run_timestamp_checks(ds, ds_baseline, sp, site)
 
-                output_subpath = f"event/{sp}"
+                output_subpath = f"{sp}"
 
                 if verbose:
                     print(f"... outputting combined dataset for {sp} at {site}")
                 output_dataset(ds, network,
                             output_subpath=output_subpath,
-                            instrument="combined",
+                            instrument="",
                             public=public,
                             verbose=verbose)
                 
@@ -296,18 +296,18 @@ def run_combined_instruments(network,
                     if verbose:
                         print(f"... outputting combined baseline for {sp} at {site}")
                     output_dataset(ds_baseline, network,
-                                output_subpath=output_subpath + "/baseline_flags",
-                                instrument="combined",
-                                extra="-git-baseline",
+                                output_subpath=output_subpath + "/baseline-flags",
+                                instrument="",
+                                extra="_git-baseline",
                                 public=public,
                                 verbose=verbose)
 
                     if monthly:
                         ds_baseline_monthly = monthly_baseline(ds, ds_baseline)
                         output_dataset(ds_baseline_monthly, network,
-                                output_subpath=output_subpath.replace("event", "monthly"),
-                                instrument="combined",
-                                extra="-monthly",
+                                output_subpath=output_subpath + "/monthly-baseline",
+                                instrument="",
+                                extra="_monthly-baseline",
                                 public=public,
                                 verbose=verbose)
 
@@ -446,7 +446,7 @@ if __name__ == "__main__":
     print("####################################")
     run_all("agage", species = ["cfc-11"], public=True)
 
-    print("####################################")
-    print("#####Processing private archive#####")
-    print("####################################")
-    run_all("agage", species = ["cfc-11"], public=False)
+    # print("####################################")
+    # print("#####Processing private archive#####")
+    # print("####################################")
+    # run_all("agage", species = ["cfc-11"], public=False)

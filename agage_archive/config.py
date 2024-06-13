@@ -372,11 +372,16 @@ def output_path(network, species, site, instrument,
     
     # Create filename
     if network_out:
-        network_str = network_out.upper()
+        network_str = network_out.lower()
     else:
-        network_str = network.upper()
+        network_str = network.lower()
 
-    filename = f"{network_str}-{instrument}_{site}_{species}{extra}{version_str}.nc"
+    if instrument:
+        instrument_str = f"_{instrument}"
+    else:
+        instrument_str = ""
+
+    filename = f"{network_str}{instrument_str}_{site.lower()}_{species}{extra}{version_str}.nc"
 
     return output_path, filename
 

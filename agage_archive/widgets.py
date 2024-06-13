@@ -27,9 +27,16 @@ def file_search_species(network, frequency, species, public = True):
     
     paths = Paths(network, errors="ignore_inputs", public=public)
 
+    if frequency == "high-frequency":
+        frequency_str = ""
+    elif frequency == "monthly-baseline":
+        frequency_str = "monthly-baseline/"
+    else:
+        raise ValueError("Frequency must be 'high-frequency' or 'monthly-baseline'")
+
     files = data_file_list(network,
                            sub_path=f"{paths.output_path}",
-                           pattern=f"{frequency}/{species}/*.nc",
+                           pattern=f"{frequency_str}{species}/*.nc",
                            errors="ignore_inputs")[2]
 
     # Remove baseline files
@@ -249,7 +256,7 @@ def show_netcdf_info(sender, network, frequency, instrument_site, public,
 
 
 def dashboard(network,
-            frequencies = ["event", "monthly"],
+            frequencies = ["high-frequency", "monthly-baseline"],
             mode="lines"):
     """ Create dashboard for visualising data
 
@@ -266,7 +273,7 @@ def dashboard(network,
     species = []
     for f in data_file_list(network, paths.output_path, errors="ignore_inputs")[2]:
         if "/" in f:
-            species.append(f.split("/")[1])
+            species.append(f.split("/")[0])
         else:
             continue
 
