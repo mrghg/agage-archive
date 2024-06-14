@@ -72,7 +72,7 @@ def test_cf_compliance():
 
     # Delete any files in pth
     for f in pth.rglob("*"):
-        if f.is_file():
+        if f.is_file() and not f.name.startswith("."):
             f.unlink()
 
     run_individual_instrument(network=network,
