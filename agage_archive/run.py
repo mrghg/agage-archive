@@ -174,7 +174,7 @@ def run_individual_site(site, species, network, instrument,
                     output_dataset(ds_baseline, network, instrument=instrument_str,
                             output_subpath=output_subpath + "/baseline-flags",
                             end_date=rs.loc[species, site],
-                            extra="_git-baseline",
+                            extra="git-baseline",
                             public=public,
                             verbose=verbose)
                     
@@ -183,7 +183,7 @@ def run_individual_site(site, species, network, instrument,
                         output_dataset(ds_baseline_monthly, network, instrument=instrument_str,
                             output_subpath=output_subpath + "/monthly-baseline",
                             end_date=rs.loc[species, site],
-                            extra="_monthly-baseline",
+                            extra="monthly-baseline",
                             public=public,
                             verbose=verbose)
 
@@ -352,7 +352,7 @@ def run_combined_site(site, species, network,
                 output_dataset(ds_baseline, network,
                             output_subpath=output_subpath + "/baseline-flags",
                             instrument="",
-                            extra="_git-baseline",
+                            extra="git-baseline",
                             public=public,
                             verbose=verbose)
 
@@ -361,7 +361,7 @@ def run_combined_site(site, species, network,
                     output_dataset(ds_baseline_monthly, network,
                             output_subpath=output_subpath + "/monthly-baseline",
                             instrument="",
-                            extra="_monthly-baseline",
+                            extra="monthly-baseline",
                             public=public,
                             verbose=verbose)
 

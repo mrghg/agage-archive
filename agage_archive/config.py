@@ -374,7 +374,16 @@ def output_path(network, species, site, instrument,
     # Get paths. Ignore errors since outputs may not exist at this stage
     paths = Paths(network, public=public, errors="ignore_outputs")
 
-    version_str = f"_{version.replace(' ','')}" if version else ""
+    version_str = f"{version.replace(' ','')}" if version else ""
+
+    if extra:
+        if extra[-1] == "-":
+            pass
+        elif extra[-1] == "_":
+            extra = extra[:-1] + "-"
+        else:
+            extra = extra + "-"
+            
     
     # Can tweak data_file_path to get the output path
     output_path = data_file_path("", network = network,
@@ -388,11 +397,11 @@ def output_path(network, species, site, instrument,
         network_str = network.lower()
 
     if instrument:
-        instrument_str = f"_{instrument}"
+        instrument_str = f"-{instrument}"
     else:
         instrument_str = ""
 
-    filename = f"{network_str}{instrument_str}_{site.lower()}_{species}{extra}{version_str}.nc"
+    filename = f"{network_str}{instrument_str}_{site.lower()}_{species}_{extra}{version_str}.nc"
 
     return output_path, filename
 
