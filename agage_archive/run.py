@@ -145,41 +145,53 @@ def run_individual_site(site, species, network, instrument,
             # If multiple instruments, store individual file in subdirectory
             instrument_dates = read_data_combination(network, species, site,
                                                     verbose=False)
-            if len(instrument_dates) > 1:
-                output_subpath = f"event/{species}/individual"
-            else:
-                output_subpath = f"event/{species}"
+            # if len(instrument_dates) > 1:
+            #     output_subpath = f"{species}/individual-instruments"
+            # else:
+            #     output_subpath = f"{species}"
 
-            output_dataset(ds, network, instrument=instrument_out,
-                        output_subpath=output_subpath,
-                        end_date=rs.loc[species, site],
-                        public=public,
-                        verbose=verbose)
+            folders = [f"{species}/individual-instruments"]
+            # if there is no combined data file, also store individual file in top-level directory
+            if len(instrument_dates) <= 1:
+                folders.append(f"{species}")
+            
+            for output_subpath in folders:
 
-            if baseline:
-                if (ds_baseline.time != ds.time).any():
-                    raise ValueError(f"Baseline and data files for {species} at {site} have different timestamps")
-                output_dataset(ds_baseline, network, instrument=instrument_out,
-                        output_subpath=output_subpath + "/baseline_flags",
-                        end_date=rs.loc[species, site],
-                        extra="-git-baseline",
-                        public=public,
-                        verbose=verbose)
-                
-                if monthly:
-                    ds_baseline_monthly = monthly_baseline(ds, ds_baseline)
-                    output_dataset(ds_baseline_monthly, network, instrument=instrument_out,
-                        output_subpath=output_subpath.replace("event", "monthly"),
-                        end_date=rs.loc[species, site],
-                        extra="-monthly",
-                        public=public,
-                        verbose=verbose)
+                if "individual" in output_subpath:
+                    instrument_str = instrument_out
+                else:
+                    instrument_str = ""
 
-            else:
-                if monthly:
-                    raise NotImplementedError("Monthly baseline files can only be produced if baseline flag is specified")
+                output_dataset(ds, network, instrument=instrument_str,
+                            output_subpath=output_subpath,
+                            end_date=rs.loc[species, site],
+                            public=public,
+                            verbose=verbose)
 
-            return site, species, ""
+                if baseline:
+                    if (ds_baseline.time != ds.time).any():
+                        raise ValueError(f"Baseline and data files for {species} at {site} have different timestamps")
+                    output_dataset(ds_baseline, network, instrument=instrument_str,
+                            output_subpath=output_subpath + "/baseline-flags",
+                            end_date=rs.loc[species, site],
+                            extra="git-baseline",
+                            public=public,
+                            verbose=verbose)
+                    
+                    if monthly:
+                        ds_baseline_monthly = monthly_baseline(ds, ds_baseline)
+                        output_dataset(ds_baseline_monthly, network, instrument=instrument_str,
+                            output_subpath=output_subpath + "/monthly-baseline",
+                            end_date=rs.loc[species, site],
+                            extra="monthly-baseline",
+                            public=public,
+                            verbose=verbose)
+
+                else:
+                    if monthly:
+                        raise NotImplementedError("Monthly baseline files can only be produced if baseline flag is specified")
+
+                return site, species, ""
         
         else:
 
@@ -216,14 +228,14 @@ def run_individual_instrument(network, instrument,
     if instrument.upper() == "ALE" or instrument.upper() == "GAGE":
         read_function = read_ale_gage
         read_baseline_function = read_baseline
-        instrument_out = instrument.upper() + "-GCMD"
+        instrument_out = instrument.lower() + "-gcmd"
     elif instrument.upper() == "GCMS-MEDUSA-FLASK":
         read_function = read_gcwerks_flask
-        instrument_out = "GCMS-MEDUSA-FLASK"
+        instrument_out = "gcms-medusa-flask"
     else:
         read_function = read_nc
         read_baseline_function = read_baseline
-        instrument_out = instrument.upper()
+        instrument_out = instrument.lower()
 
     if species:
         # Process only those species that are in the release schedule
@@ -241,7 +253,9 @@ def run_individual_instrument(network, instrument,
     for sp in species_to_process:
 
         with Pool(processes=nthreads) as p:
-            result = p.starmap_async(run_individual_site, [(site, sp, network, instrument, rs, read_function, read_baseline_function, instrument_out, baseline, monthly, verbose, public, resample) for site in rs.columns])
+            result = p.starmap_async(run_individual_site, [(site, sp, network, instrument,
+                                                            rs, read_function, read_baseline_function, instrument_out,
+                                                            baseline, monthly, verbose, public, resample) for site in rs.columns])
 
             for r in result.get():
                 if r[2]:
@@ -322,13 +336,13 @@ def run_combined_site(site, species, network,
             # Check for duplicate time stamps
             run_timestamp_checks(ds, ds_baseline, sp, site)
 
-            output_subpath = f"event/{sp}"
+            output_subpath = f"{sp}"
 
             if verbose:
                 print(f"... outputting combined dataset for {sp} at {site}")
             output_dataset(ds, network,
                         output_subpath=output_subpath,
-                        instrument="combined",
+                        instrument="",
                         public=public,
                         verbose=verbose)
             
@@ -336,18 +350,18 @@ def run_combined_site(site, species, network,
                 if verbose:
                     print(f"... outputting combined baseline for {sp} at {site}")
                 output_dataset(ds_baseline, network,
-                            output_subpath=output_subpath + "/baseline_flags",
-                            instrument="combined",
-                            extra="-git-baseline",
+                            output_subpath=output_subpath + "/baseline-flags",
+                            instrument="",
+                            extra="git-baseline",
                             public=public,
                             verbose=verbose)
 
                 if monthly:
                     ds_baseline_monthly = monthly_baseline(ds, ds_baseline)
                     output_dataset(ds_baseline_monthly, network,
-                            output_subpath=output_subpath.replace("event", "monthly"),
-                            instrument="combined",
-                            extra="-monthly",
+                            output_subpath=output_subpath + "/monthly-baseline",
+                            instrument="",
+                            extra="monthly-baseline",
                             public=public,
                             verbose=verbose)
 

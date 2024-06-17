@@ -12,12 +12,12 @@ from agage_archive.visualise import plot_datasets
 instrument_site_filenames = {}
 
 
-def file_search_species(network, frequency, species, public = True):
+def file_search_species(network, file_type, species, public = True):
     """ Search for files containing species
     
     Args:
         network (str): Network
-        frequency (str): Frequency ("event" or "monthly")
+        file_type (str): File type ("high-frequency", "monthly-baseline" or "individual-instruments")
         species (str): Species to search for
         public (bool): Search public or private archive
 
@@ -27,13 +27,20 @@ def file_search_species(network, frequency, species, public = True):
     
     paths = Paths(network, errors="ignore_inputs", public=public)
 
+    if file_type == "high-frequency":
+        pattern = f"{species}/*.nc"
+    elif file_type == "monthly-baseline":
+        pattern = f"{species}/monthly-baseline/*.nc"
+    elif file_type == "individual-instruments":
+        pattern = f"{species}/individual-instruments/*.nc"
+    else:
+        raise ValueError("File type must be 'high-frequency', 'monthly-baseline' or 'individual-instruments'")
+
     files = data_file_list(network,
                            sub_path=f"{paths.output_path}",
-                           pattern=f"{frequency}/{species}/*.nc",
-                           errors="ignore_inputs")[2]
-
-    # Remove baseline files
-    files = [f for f in files if "baseline" not in f]
+                           pattern=pattern,
+                           errors="ignore_inputs",
+                           sub_directories=False)[2]
 
     return sorted(files)
 
@@ -50,22 +57,17 @@ def instruments_sites(files):
 
     instruments = []
     sites = []
-    individual = []
 
     for file in files:
-        if "individual" in file:
-            individual = "*"
-        else:
-            individual = ""
         filename = file.split('/')[-1]
-        instruments.append(individual + filename.split('_')[0])
+        instruments.append(filename.split('_')[0])
         sites.append(filename.split('_')[1])
 
     return instruments, sites
 
 
 def update_instrument_site(species,
-                        frequency,
+                        file_type,
                         network,
                         public,
                         instrument_site_dropdown):
@@ -73,7 +75,7 @@ def update_instrument_site(species,
 
     Args:
         species (str): Species
-        frequency (str): Frequency ("event" or "monthly")
+        file_type (str): File type ("high-frequency", "monthly-baseline" or "individual-instruments")
         network (str): Network
         public (str): Load from public or private archive (public or private)
         instrument_site_dropdown (ipywidgets.Dropdown): Dropdown widget
@@ -101,32 +103,23 @@ def update_instrument_site(species,
     # Clear contents of instrument_site_filenames
     instrument_site_filenames.clear()
 
-    files = file_search_species(network, frequency, species,
+    files = file_search_species(network, file_type, species,
                                 public = {"public": True, "private": False}[public])
     instruments, sites = instruments_sites(files)
 
     options = []
     options_files = []
-    options_individual = []
-    options_individual_files = []
 
     for f, i, s in zip(files, instruments, sites):
-        if "*" in i:
-            options_individual.append(f"{s}, {i}")
-            options_individual_files.append(f)
-        else:
-            options.append(f"{s}, {i}")
-            options_files.append(f)
+        options.append(f"{s}, {i}")
+        options_files.append(f)
 
     # Check for duplicates and raise an error if found
     find_duplicates(options)
-    find_duplicates(options_individual)
     
     # Populate dictionary with instrument/site strings as keys and filenames as values
     for option in sorted(options):
         instrument_site_filenames[option] = options_files[options.index(option)]
-    for option in sorted(options_individual):
-        instrument_site_filenames[option] = options_individual_files[options_individual.index(option)]
 
     # Update dropdown widget if passed as kwarg, otherwise return options list
     if instrument_site_dropdown:
@@ -135,11 +128,10 @@ def update_instrument_site(species,
         return instrument_site_filenames.keys()
 
 
-def get_filenames(frequency, instrument_sites):
+def get_filenames(instrument_sites):
     """ Get filenames from species and network/site
     
     Args:
-        frequency (str): Frequency
         instrument_sites (list): List of instrument/site strings
 
     Returns:
@@ -148,13 +140,7 @@ def get_filenames(frequency, instrument_sites):
 
     global instrument_site_filenames
 
-    # Extract everything in file path from frequency onwards
-    filenames = []
-    for instrument_site in instrument_sites:
-        filepath = instrument_site_filenames[instrument_site]
-        filenames.append(f"{frequency}/{filepath.split(frequency + '/')[1]}")
-
-    return filenames
+    return [instrument_site_filenames[instrument_site] for instrument_site in instrument_sites]
 
 
 def load_datasets(network, filenames, public = True):
@@ -182,14 +168,13 @@ def load_datasets(network, filenames, public = True):
     return datasets
 
 
-def plot_to_output(sender, network, frequency, species, instrument_site, public,
+def plot_to_output(sender, network, species, instrument_site, public,
                    output_widget, mode="lines"):
     """ Plot to output widget
 
     Args:
         sender (ipywidgets.Button): Button widget
         network (str): Network
-        frequency (str): Frequency
         species (str): Species
         network_site (str): Network and site
         output_widget (ipywidgets.Output): Output widget
@@ -202,7 +187,7 @@ def plot_to_output(sender, network, frequency, species, instrument_site, public,
             clear_output(True)
             print("Please select a network and site") 
 
-    filenames = get_filenames(frequency, instrument_site)
+    filenames = get_filenames(instrument_site)
 
     datasets = load_datasets(network, filenames,
                             public = {"public": True, "private": False}[public])
@@ -217,14 +202,13 @@ def plot_to_output(sender, network, frequency, species, instrument_site, public,
         fig.show(renderer=renderer)
 
 
-def show_netcdf_info(sender, network, frequency, instrument_site, public,
+def show_netcdf_info(sender, network, instrument_site, public,
                     output_widget):
     """ Show NetCDF info to output widget
 
     Args:
         sender (ipywidgets.Button): Button widget
         species (str): Species
-        frequency (str): Frequency ("event" or "monthly")
         network_site (str): Network and site
         public (str): Load from public or private archive (public or private)
         output_widget (ipywidgets.Output): Output widget
@@ -235,7 +219,7 @@ def show_netcdf_info(sender, network, frequency, instrument_site, public,
             clear_output(True)
             print("Please select a network and site") 
 
-    filenames = get_filenames(frequency, instrument_site)
+    filenames = get_filenames(instrument_site)
     datasets = load_datasets(network, filenames,
                             public = {"public": True, "private": False}[public])
 
@@ -249,15 +233,14 @@ def show_netcdf_info(sender, network, frequency, instrument_site, public,
 
 
 def dashboard(network,
-            frequencies = ["event", "monthly"],
+            file_types = ["high-frequency", "monthly-baseline", "individual-instruments"],
             mode="lines"):
     """ Create dashboard for visualising data
 
     Args:
         network (str): Network
-        frequencies (list): List of frequencies ("event" or "monthly")
+        file_types (list): List of file types to visualise. Defaults to ["high-frequency", "monthly-baseline", "individual-instruments"]
         mode (str) : how to plot the data. Defaults to "line", but can be set to "markers" if desired
-
     """
     
     paths = Paths(network, errors="ignore_inputs")    
@@ -266,7 +249,7 @@ def dashboard(network,
     species = []
     for f in data_file_list(network, paths.output_path, errors="ignore_inputs")[2]:
         if "/" in f:
-            species.append(f.split("/")[1])
+            species.append(f.split("/")[0])
         else:
             continue
 
@@ -292,17 +275,17 @@ def dashboard(network,
         )
 
     # Create file_type widget
-    frequency_dropdown = widgets.Dropdown(
-        options=frequencies,
-        description='Frequency:',
+    file_type_dropdown = widgets.Dropdown(
+        options=file_types,
+        description='File type:',
         disabled=False,
-        default=frequencies[0]
+        default=file_types[0]
     )
 
     # Selection widget for network and site
     instrument_site = widgets.SelectMultiple(
         options=update_instrument_site(species[0],
-                                    frequencies[0],
+                                    file_types[0],
                                     network,
                                     "public",
                                     None),
@@ -325,13 +308,13 @@ def dashboard(network,
     # Update network and site dropdown when species is changed
     species_dropdown.observe(lambda change:
                             update_instrument_site(change["new"],
-                                                frequency_dropdown.value,
+                                                file_type_dropdown.value,
                                                 network,
                                                 public_button.value,
                                                 instrument_site),
                             names="value")
 
-    frequency_dropdown.observe(lambda change:
+    file_type_dropdown.observe(lambda change:
                             update_instrument_site(species_dropdown.value,
                                             change["new"],
                                             network,
@@ -341,7 +324,7 @@ def dashboard(network,
 
     public_button.observe(lambda change:
                         update_instrument_site(species_dropdown.value,
-                                        frequency_dropdown.value,
+                                        file_type_dropdown.value,
                                         network,
                                         change["new"],
                                         instrument_site),
@@ -349,21 +332,19 @@ def dashboard(network,
 
     # Plot to output when button is clicked
     plot_button.on_click(lambda x: plot_to_output(x, network,
-                                                frequency_dropdown.value,
                                                 species_dropdown.value,
                                                 instrument_site.value,
                                                 public_button.value,
                                                 output,
                                                 mode=mode))
     plot_button.on_click(lambda x: show_netcdf_info(x, network,
-                                                    frequency_dropdown.value,
                                                     instrument_site.value,
                                                     public_button.value,
                                                     output_netcdf))
 
     display(public_button)
     display(species_dropdown)
-    display(frequency_dropdown)
+    display(file_type_dropdown)
     display(instrument_site)
     display(asterisk_text)
     display(plot_button)
