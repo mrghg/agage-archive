@@ -145,7 +145,7 @@ def read_nc(network, species, site, instrument,
         # GCMD files don't have sampling time in the file
         # assume it's 1s (Peter Salameh, pers. comm., 2023-07-06)
         sampling_period = 1
-    ds["time"].attrs["comment"] = "Timestamp is the start of the sampling period"
+    ds["time"].attrs["comment"] = "Timestamp is the start of the sampling period in UTC"
 
     # Add sampling time to variables
     ds["sampling_period"] = xr.DataArray(np.ones(len(ds.time)).astype(np.int16)*sampling_period,
@@ -631,7 +631,7 @@ def read_gcwerks_flask(network, species, site, instrument,
     
     return ds
 
-                                          
+
 def combine_datasets(network, species, site, 
                     scale = "default",
                     verbose = True,
@@ -719,10 +719,11 @@ def combine_datasets(network, species, site,
             error_message += f"{instrument}:{sc}, " 
         raise ValueError(error_message)
 
+    # Combine datasets
     ds_combined = xr.concat(dss, dim="time",
                             data_vars="all",
                             coords="all",
-                            combine_attrs="drop_conflicts")
+                            combine_attrs="override")
 
     # Sort by time
     ds_combined = ds_combined.sortby("time")
