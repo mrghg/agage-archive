@@ -135,11 +135,11 @@ def test_output_path():
         config["paths"]["agage_test"]["output_path"]
 
     out_path, filename = output_path("agage_test",
-                                    "cfc-11", "THD", "GCMS-Medusa",
+                                    "cfc-11", "THD", "gcms-medusa",
                                     extra="testing", version="v1",
                                     errors="ignore")
     assert out_path == out_path_true
-    assert filename == "AGAGE_TEST-GCMS-Medusa_THD_cfc-11testing_v1.nc"
+    assert filename == "agage_test-gcms-medusa_thd_cfc-11_testing-v1.nc"
 
     # Next check for a private file
     path = Paths("agage_test", errors="ignore", public=False)
@@ -147,9 +147,9 @@ def test_output_path():
         config["paths"]["agage_test"]["output_path_private"]
 
     out_path, filename = output_path("agage_test",
-                                    "cfc-11", "THD", "GCMS-Medusa",
+                                    "cfc-11", "THD", "gcms-medusa",
                                     extra="testing", version="v1",
                                     public=False,
                                     errors="ignore")
     assert out_path == out_path_true
-    assert filename == "AGAGE_TEST-GCMS-Medusa_THD_cfc-11testing_v1.nc"
+    assert filename == "agage_test-gcms-medusa_thd_cfc-11_testing-v1.nc"

@@ -52,7 +52,7 @@ def test_cf_compliance():
     """
     
     network = 'agage_test'
-    sub_path = 'output/event'
+    sub_path = 'output'
     instrument = "GCMS-Medusa"
     site = "MHD" # data_release_schedule modified so that this is the only site
     species = "nf3"
@@ -72,7 +72,7 @@ def test_cf_compliance():
 
     # Delete any files in pth
     for f in pth.rglob("*"):
-        if f.is_file():
+        if f.is_file() and not f.name.startswith("."):
             f.unlink()
 
     run_individual_instrument(network=network,
@@ -81,9 +81,9 @@ def test_cf_compliance():
                     monthly=False,
                     verbose=False)
     
-    with open_data_file(filename=f'{network.upper()}-{instrument.upper()}_{site}_{species}_{version}.nc',
+    with open_data_file(filename=f'{network.lower()}-{instrument.lower()}_{site}_{species}_{version}.nc',
                         network=network,
-                        sub_path=sub_path + '/nf3',
+                        sub_path=sub_path + '/nf3/individual-instruments',
                         ) as f:
         ds = xr.load_dataset(f)
 

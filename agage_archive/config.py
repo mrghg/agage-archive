@@ -188,7 +188,8 @@ def data_file_list(network = "",
                    sub_path = "",
                    pattern = "*",
                    ignore_hidden = True,
-                   errors="raise"):
+                   errors="raise",
+                   sub_directories = True):
     """List files in data directory. Structure is data/network/sub_path
     sub_path can be a zip archive
 
@@ -198,6 +199,7 @@ def data_file_list(network = "",
         pattern (str, optional): Pattern to match. Defaults to "*".
         ignore_hidden (bool, optional): Ignore hidden files. Defaults to True.
         errors (str, optional): See options in Paths class. Defaults to "raise".
+        sub_directories (bool, optional): If False, will remove sub-directories. Defaults to True.
 
     Returns:
         tuple: Tuple containing network, sub-path and list of files
@@ -212,6 +214,11 @@ def data_file_list(network = "",
                 pth = p + "/" + pth
         return pth
 
+    def remove_sub_directories(files):
+        nslash = [f.count("/") for f in files]
+        max_slash = min(nslash)
+        return [f for f in files if f.count("/") == max_slash]
+
     pth = data_file_path("", network=network, sub_path=sub_path, errors=errors)
 
     if pth.suffix == ".zip":
@@ -225,6 +232,8 @@ def data_file_list(network = "",
             for f in z.filelist:
                 if fnmatch(f.filename, pattern) and not (ignore_hidden and f.filename.startswith(".")):
                     files.append(f.filename)
+            if not sub_directories:
+                files = remove_sub_directories(files)
             return network, return_sub_path(pth), files
     else:
         files = []
@@ -236,6 +245,8 @@ def data_file_list(network = "",
                     files.append(str(f.relative_to(pth)) + "/")
                 else:
                     files.append(str(f.relative_to(pth)))
+        if not sub_directories:
+            files = remove_sub_directories(files)
         return network, return_sub_path(pth), files
 
 
@@ -363,7 +374,16 @@ def output_path(network, species, site, instrument,
     # Get paths. Ignore errors since outputs may not exist at this stage
     paths = Paths(network, public=public, errors="ignore_outputs")
 
-    version_str = f"_{version.replace(' ','')}" if version else ""
+    version_str = f"{version.replace(' ','')}" if version else ""
+
+    if extra:
+        if extra[-1] == "-":
+            pass
+        elif extra[-1] == "_":
+            extra = extra[:-1] + "-"
+        else:
+            extra = extra + "-"
+            
     
     # Can tweak data_file_path to get the output path
     output_path = data_file_path("", network = network,
@@ -372,11 +392,16 @@ def output_path(network, species, site, instrument,
     
     # Create filename
     if network_out:
-        network_str = network_out.upper()
+        network_str = network_out.lower()
     else:
-        network_str = network.upper()
+        network_str = network.lower()
 
-    filename = f"{network_str}-{instrument}_{site}_{species}{extra}{version_str}.nc"
+    if instrument:
+        instrument_str = f"-{instrument}"
+    else:
+        instrument_str = ""
+
+    filename = f"{network_str}{instrument_str}_{site.lower()}_{species}_{extra}{version_str}.nc"
 
     return output_path, filename
 

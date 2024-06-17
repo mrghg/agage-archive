@@ -147,7 +147,7 @@ def test_timestamp():
     assert np.all(ds_original.time.values == ds.time.values + pd.Timedelta(seconds=time_offset)/2)
 
     assert ds.time.attrs["long_name"] == "time"
-    assert ds.time.attrs["comment"] == "Timestamp is the start of the sampling period"
+    assert ds.time.attrs["comment"] == "Timestamp is the start of the sampling period in UTC"
 
 
 def test_picarro():
@@ -178,8 +178,8 @@ def test_picarro():
 
     # Check that the time variable has the correct attributes
     assert ds.time.attrs["long_name"] == "time"
-    assert "Timestamp is the start of the sampling period" in ds.time.attrs["comment"]
-    assert "Resampled" in ds.time.attrs["comment"]
+    assert "Timestamp is the start of the sampling period in UTC" in ds.time.attrs["comment"]
+    assert "Resampled" in ds.time.attrs["comment"]  
 
 
 def test_read_gcwerks_flask():
