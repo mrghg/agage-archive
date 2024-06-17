@@ -14,7 +14,7 @@ from agage_archive.convert import monthly_baseline
 
 
 # Set number of threads for multiprocessing
-nthreads = 4
+nthreads = 1
 
 
 def delete_archive(network, public = True):
@@ -524,7 +524,7 @@ if __name__ == "__main__":
     print("####################################")
     print("#####Processing public archive######")
     print("####################################")
-    run_all("agage", species = ["cfc-11"], public=True)
+    run_all("agage", species = ["ch3ccl3"], public=True)
 
     # print("####################################")
     # print("#####Processing private archive#####")
