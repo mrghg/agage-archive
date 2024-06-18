@@ -36,6 +36,7 @@ chcl3,SIO-98,ppt
 ch3ccl3,SIO-05,ppt
 chclccl2,UB-98,ppt
 ccl2ccl2,NOAA-2003B,ppt
+clch2ch2cl,METAS-2021,ppt
 ccl4,SIO-05,ppt
 sf6,SIO-05,ppt
 so2f2,SIO-07,ppt
@@ -45,4 +46,16 @@ cf4,SIO-05,ppt
 c2f6,SIO-07,ppt
 c3f8,SIO-07,ppt
 c4f8,SIO-14,ppt
-pce,NOAA-2003B,ppt
+hfo-1234yf,METAS-2017,ppt
+hfo-1234zee,Empa-2013,ppt
+hcfo-1233zde,Empa-2013,ppt
+ch3i,NOAA-2004,ppt
+ch2br2,NOAA-2003,ppt
+chbr3,NOAA-2003,ppt
+c2h6,SIO-p,ppt
+c3h8,Empa-2015-p,ppt
+c3h6,Empa-2015-p,ppt
+c6h6,UB-p,ppt
+c6h5ch3,Empa-p,ppt
+cos,NOAA-SIO-p1,ppt
+c2h2,R1,ppt

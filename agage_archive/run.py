@@ -3,6 +3,7 @@ from shutil import rmtree
 from zipfile import ZipFile
 from multiprocessing import Pool
 import time
+import traceback
 
 from agage_archive.config import Paths, open_data_file, data_file_list, data_file_path, \
     copy_to_archive, output_path
@@ -16,6 +17,22 @@ from agage_archive.definitions import instrument_number
 
 # Set number of threads for multiprocessing
 nthreads = 1
+
+
+def get_error(e):
+    """Get error message from exception
+
+    Args:
+        e (Exception): Exception object
+
+    Returns:
+        str: Error message
+    """
+    tb = traceback.extract_tb(e.__traceback__)
+    error_file = tb[1].filename # TODO: Just guessing that the error is in the second-to-top frame... Not very clever
+    error_line = tb[1].lineno
+    error_type = type(e).__name__
+    return f"{error_type} in {error_file} at line {error_line}: {str(e)}"
 
 
 def delete_archive(network, public = True):
@@ -160,10 +177,6 @@ def run_individual_site(site, species, network, instrument,
             # If multiple instruments, store individual file in subdirectory
             instrument_dates = read_data_combination(network, species, site,
                                                     verbose=False)
-            # if len(instrument_dates) > 1:
-            #     output_subpath = f"{species}/individual-instruments"
-            # else:
-            #     output_subpath = f"{species}"
 
             folders = [f"{species}/individual-instruments"]
             # if there is no combined data file, also store individual file in top-level directory
@@ -214,7 +227,7 @@ def run_individual_site(site, species, network, instrument,
 
     except Exception as e:
 
-        return site, species, e
+        return site, species, get_error(e)
 
 
 def run_individual_instrument(network, instrument,
@@ -388,7 +401,7 @@ def run_combined_site(site, species, network,
 
         except Exception as e:
 
-            return site, sp, e
+            return site, sp, get_error(e)
 
 
 def run_combined_instruments(network,
@@ -418,9 +431,11 @@ def run_combined_instruments(network,
         sites = pd.ExcelFile(data_selection_path).sheet_names
 
     with Pool(processes=nthreads) as p:
+        args = [(site, species, network, baseline, monthly, verbose, public, resample) for site in sites]
         result = p.starmap_async(run_combined_site, [(site, species, network, baseline, monthly, verbose, public, resample) for site in sites])
     
         error_log = []
+
         for r in result.get():
             if r[2]:
                 error_log.append(r)
@@ -553,7 +568,7 @@ if __name__ == "__main__":
     print("####################################")
     print("#####Processing public archive######")
     print("####################################")
-    run_all("agage", species = ["ch3ccl3"], public=True)
+    run_all("agage", species = ["cfc-12"], public=True)
 
     # print("####################################")
     # print("#####Processing private archive#####")

@@ -20,7 +20,16 @@ from agage_archive.util import tz_local_to_utc
 
 gcwerks_species = {"c2f6": "pfc-116",
                    "c3f8": "pfc-218",
-                   "c4f8": "pfc-318"}
+                   "c4f8": "pfc-318",
+                   "ccl2ccl2": "pce",
+                   "chclccl2": "tce",
+                   "c6h6": "benzene",
+                   "c6h5ch3": "toluene",
+                   "c3h8": "propane",
+                   "c2h6": "ethane",
+                   "c2h2": "ethyne",
+                   "c3h6": "c-propane",
+                   }
 
 baseline_attrs = {"git_pollution_flag":{
                     "comment": "Baseline flag from the Georgia Tech statistical filtering algorithm.",
@@ -61,7 +70,7 @@ def read_nc_path(network, species, site, instrument):
         species_search = gcwerks_species[species_search]
 
     gcmd_instruments = ["GCMD", "GCECD", "Picarro", "LGR"]
-    gcms_instruments = ["GCMS-ADS", "GCMS-Medusa", "GCMS-MteCimone"]
+    gcms_instruments = ["GCMS-ADS", "GCMS-Medusa", "GCMS-MteCimone", "GCTOFMS"]
 
     # Determine sub-path within data directory
     sub_path = None
@@ -659,7 +668,7 @@ def combine_datasets(network, species, site,
 
     instrument_types, instrument_number_str = instrument_type_definition()
 
-    # Combine datasets    
+    # Combine datasets
     dss = []
     comments = []
     attrs = []
