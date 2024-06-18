@@ -568,7 +568,7 @@ if __name__ == "__main__":
     print("####################################")
     print("#####Processing public archive######")
     print("####################################")
-    run_all("agage", species = ["cfc-12"], public=True)
+    run_all("agage", species = ["sf6"], public=True)
 
     # print("####################################")
     # print("#####Processing private archive#####")
