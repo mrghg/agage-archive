@@ -26,12 +26,21 @@ unit_translator = {"ppm": "1e-6",
 
 species_translator = {"pfc-116": "c2f6",
                       "pfc-218": "c3f8",
-                      "pfc-318": "c4f8"}
+                      "pfc-318": "c4f8",
+                      "pce": "ccl2ccl2",
+                      "tce": "chclccl2",
+                      "benzene": "c6h6",
+                      "propane": "c3h8",
+                      "ethane": "c2h6",
+                      "ethyne": "c2h2",
+                      "c-propane": "c3h6",
+                      "toluene": "c6h5ch3",
+                      }
 
 species_translator_flask = {"c2f6": "PFC-116",
                             "c3f8": "PFC-218",
                             "c4f8": "PFC-318",
-                            "benzene": "benzene",
+                            "c6h6": "benzene",
                             "hfc-134a": "HFC-134a",
                             "hfc-152a": "HFC-152a",
                             "hfc-143a": "HFC-143a",
@@ -53,6 +62,18 @@ species_translator_flask = {"c2f6": "PFC-116",
                             "ccl4": "CCl4"
                             }
 
+instrument_number = {"UNDEFINED": -1,
+                    "ALE": 0,
+                    "GAGE": 1,
+                    "GCMD": 2,
+                    "GCMS-ADS": 3,
+                    "GCMS-Medusa": 4,
+                    "GCECD": 5,
+                    "GCTOFMS": 6,
+                    "Picarro": 7,
+                    "LGR": 8,
+                    "GCMS-MteCimone": 9}
+
 minimum_averaging_period = {"Picarro": "1H"}
 
 
@@ -62,18 +83,6 @@ def instrument_type_definition():
     Returns:
         str: Instrument type definition
     '''
-
-    instrument_number = {"UNDEFINED": -1,
-                        "ALE": 0,
-                        "GAGE": 1,
-                        "GCMD": 2,
-                        "GCMS-ADS": 3,
-                        "GCMS-Medusa": 4,
-                        "GCECD": 5,
-                        "GCTOFMS": 6,
-                        "Picarro": 7,
-                        "LGR": 8,
-                        "GCMS-MteCimone": 9}
     
     # Create string from dictionary defining instrument numbers
     instrument_number_string = ", ".join([f"{k}={v}" for k, v in instrument_number.items()])
