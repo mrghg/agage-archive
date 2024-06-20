@@ -54,7 +54,7 @@
         "resample_method": "",
         "remove_flagged": "True"
     },
-    "mf_N": {
+    "mf_count": {
         "attrs": {
             "long_name": "Number of data points in mean",
             "units": ""

@@ -206,7 +206,7 @@ def read_nc(network, species, site, instrument,
 
     # Rename some variables, so that they can be resampled properly
     if "mf_mean_N" in ds:
-        ds = ds.rename({"mf_mean_N": "mf_N"})
+        ds = ds.rename({"mf_mean_N": "mf_count"})
     if "mf_mean_stdev" in ds:
         ds = ds.rename({"mf_mean_stdev": "mf_variability"})
 
@@ -605,7 +605,7 @@ def read_gcwerks_flask(network, species, site, instrument,
             "mf_repeatability": ("time", ds_raw[f"{species_flask}_std_stdev"].values),
             "inlet_height": ("time", np.repeat(inlet_height, len(ds_raw[f"{species_flask}_C"]))),
             "sampling_period": ("time", np.repeat(sampling_period, len(ds_raw[f"{species_flask}_C"]))),
-            "mf_N": ("time", np.repeat(1, len(ds_raw[f"{species_flask}_C"]))),
+            "mf_count": ("time", np.repeat(1, len(ds_raw[f"{species_flask}_C"]))),
         },
         # Sampling time is the middle of the sampling period, so offset to the start
         coords={"time": xr.coding.times.decode_cf_datetime(ds_raw["sample_time"].values - sampling_period/2,
@@ -619,10 +619,10 @@ def read_gcwerks_flask(network, species, site, instrument,
 
     # Find duplicate timestamps and average those points
     if len(ds.time) != len(ds.time.drop_duplicates(dim="time")):
-        # For mf_N, just sum, otherwise average
-        mf_N = ds.mf_N.groupby("time").sum()
+        # For mf_count, just sum, otherwise average
+        mf_count = ds.mf_count.groupby("time").sum()
         ds = ds.groupby("time").mean()
-        ds["mf_N"] = mf_N
+        ds["mf_count"] = mf_count
 
     # Get cal scale from scale_defaults file
     scale = calibration_scale_default(network, species)

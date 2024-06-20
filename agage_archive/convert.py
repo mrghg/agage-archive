@@ -103,11 +103,11 @@ def resample(ds,
 
         # Add in number of samples variable
         # If this variable is already in the dataset, it should have been resampled apprioriately
-        if not "mf_N" in variables:
-            ds["mf_N"] = xr.DataArray(df_resample["mf"].count().values, dims=["time"],
+        if not "mf_count" in variables:
+            ds["mf_count"] = xr.DataArray(df_resample["mf"].count().values, dims=["time"],
                                     coords={"time": ds.time})
-            ds["mf_N"].attrs = variable_defaults["mf_N"]["attrs"].copy()
-            ds["mf_N"].attrs["units"] = ""
+            ds["mf_count"].attrs = variable_defaults["mf_count"]["attrs"].copy()
+            ds["mf_count"].attrs["units"] = ""
         
         # Append to comments saying that the data has been resampled
         if "comment" not in ds.attrs:
