@@ -136,3 +136,4 @@ dmypy.json
 agage-gdrive.json
 data-nc
 data-gcms-nc
+error_log*.txt
