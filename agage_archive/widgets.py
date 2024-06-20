@@ -105,6 +105,7 @@ def update_instrument_site(species,
 
     files = file_search_species(network, file_type, species,
                                 public = {"public": True, "private": False}[public])
+
     instruments, sites = instruments_sites(files)
 
     options = []

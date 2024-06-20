@@ -19,7 +19,7 @@ def read_data_combination(network, species, site,
         dict: Dictionary of instrument dates
     '''
 
-    warning_message = f"WARNING: No instrument dates found for {species} at {site.upper()}. Assuming GCMS-Medusa"
+    warning_message = f"WARNING: No instrument dates found for {species} at {site.upper()}."
 
     default_output = {"GCMS-Medusa": [None, None]}
 
@@ -60,6 +60,14 @@ def read_data_combination(network, species, site,
 
         if "x" not in dates:
             instrument_dates[instrument] = [date if date != "nan" else None for date in dates]
+
+    if len(instrument_dates) == 0:
+        if verbose:
+            print(warning_message)
+        return default_output
+    
+    if len(instrument_dates) == 1:
+        raise ValueError(f"Only one instrument found in data_combination.xlsx for {species} at {site.upper()}. Must have at least two instruments.")
 
     return instrument_dates
 

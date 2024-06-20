@@ -11,6 +11,7 @@ from agage_archive.data_selection import read_release_schedule, read_data_combin
 from agage_archive.io import combine_datasets, combine_baseline, \
     read_nc, read_baseline, read_ale_gage, read_gcwerks_flask, \
     output_dataset
+from agage_archive.formatting import format_species
 from agage_archive.convert import monthly_baseline
 from agage_archive.definitions import instrument_number
 
@@ -29,10 +30,16 @@ def get_error(e):
         str: Error message
     """
     tb = traceback.extract_tb(e.__traceback__)
-    error_file = tb[1].filename # TODO: Just guessing that the error is in the second-to-top frame... Not very clever
-    error_line = tb[1].lineno
+
+    stack_files_and_lines = []
+    
+    for t in tb:
+        if "_archive" in t.filename:
+            # Only include the filename and line no, not the full path
+            stack_files_and_lines.append(f"{t.filename.split('/')[-1].split('.')[0]} (line {t.lineno})")
+
     error_type = type(e).__name__
-    return f"{error_type} in {error_file} at line {error_line}: {str(e)}"
+    return f"{error_type} in stack: {' / '.join(stack_files_and_lines)}. {str(e)}"
 
 
 def delete_archive(network, public = True):
@@ -158,6 +165,10 @@ def run_individual_site(site, species, network, instrument,
         resample (bool, optional): Whether to resample the data, if needed. Default to True.
     """
 
+    paths = Paths(network, public=public, errors="ignore_outputs")
+
+    error_log = []
+
     try:
 
         if rs.loc[species, site].lower() != "x":
@@ -179,16 +190,30 @@ def run_individual_site(site, species, network, instrument,
                                                     verbose=False)
 
             folders = [f"{species}/individual-instruments"]
+
             # if there is no combined data file, also store individual file in top-level directory
             if len(instrument_dates) <= 1:
+
+                # Add to top-level directory
                 folders.append(f"{species}")
             
+
             for output_subpath in folders:
 
                 if "individual" in output_subpath:
                     instrument_str = instrument_out
                 else:
                     instrument_str = ""
+
+                # Check if file already exists in the top-level directory. 
+                # This can happen if only one instrument is specified in data_combination.xlsx
+                if output_subpath == f"{species}":
+                    if data_file_list(network=network,
+                                    sub_path=paths.output_path,
+                                    pattern = f"{format_species(species)}/{network.lower()}_{site.lower()}_{format_species(species)}*.nc",
+                                    errors="ignore")[2]:
+                        raise FileExistsError(f"Top-level file already exists for {species} at {site} (now trying to add instrument {instrument_out}). "\
+                                            "Add to data_combination.xlsx to tell me how to combine the data.")
 
                 output_dataset(ds, network, instrument=instrument_str,
                             output_subpath=output_subpath,
@@ -219,15 +244,17 @@ def run_individual_site(site, species, network, instrument,
                     if monthly:
                         raise NotImplementedError("Monthly baseline files can only be produced if baseline flag is specified")
 
-                return site, species, ""
-        
+            error_log.append("")
+
         else:
 
-            return site, species, ""
+            error_log.append("")
 
     except Exception as e:
 
-        return site, species, get_error(e)
+        error_log.append(get_error(e))
+    
+    return (site, species, error_log[0])
 
 
 def run_individual_instrument(network, instrument,
@@ -286,18 +313,18 @@ def run_individual_instrument(network, instrument,
                                                             baseline, monthly, verbose, public, resample) for site in rs.columns])
 
             for r in result.get():
-                if r[2]:
-                    error_log.append(r)
+                error_log.append(r)
 
-    if error_log:
+    has_errors = any([error[2] for error in error_log])
+
+    if has_errors:
         # save errors to file
         with open(data_file_path("error_log_individual.txt", network=network, errors="ignore"), "w") as f:
             # write the date and time of the error
             f.write("Processing attempted on " + pd.Timestamp.now().strftime("%Y-%m-%d %H:%M:%S") + "\n")
             for error in error_log:
-                f.write(f"{error[0]} {error[1]}: {error[2]}\n")
-        
-        print("!!! Errors occurred during processing. See error_log_individual.txt for details")
+                if error[2]:
+                    f.write(f"{error[0]} {error[1]}: {error[2]}\n")
 
 
 def run_combined_site(site, species, network, 
@@ -335,10 +362,12 @@ def run_combined_site(site, species, network,
         species_to_process = [sp for sp in species if sp in df.index.values]
         if not species_to_process:
             print(f"No species to process for {site}, skipping...")
-            return site, "None", ""
+            return [(site, "None", "")]
     else:
         # Process all species in the data selection file
         species_to_process = df.index.values
+
+    error_log = []
 
     # Loop through species in index
     for sp in species_to_process:
@@ -397,11 +426,13 @@ def run_combined_site(site, species, network,
                 if monthly:
                     raise NotImplementedError("Monthly baseline files can only be produced if baseline flag is specified")
 
-            return site, sp, ""
+            error_log.append("")
 
         except Exception as e:
 
-            return site, sp, get_error(e)
+            error_log.append(get_error(e))
+
+    return [(site, sp, error) for sp, error in zip(species_to_process, error_log)]
 
 
 def run_combined_instruments(network,
@@ -437,18 +468,18 @@ def run_combined_instruments(network,
         error_log = []
 
         for r in result.get():
-            if r[2]:
-                error_log.append(r)
+            error_log.extend(r)
 
-    if error_log:
+    has_errors = any([error[2] for error in error_log])
+
+    if has_errors:
         # save errors to file
         with open(data_file_path("error_log_combined.txt", network=network, errors="ignore"), "w") as f:
             # write the date and time of the error
             f.write("Processing attempted on " + pd.Timestamp.now().strftime("%Y-%m-%d %H:%M:%S") + "\n")
             for error in error_log:
-                f.write(f"{error[0]} {error[1]}: {error[2]}\n")
-        
-        print("!!! Errors occurred during processing. See error_log_combined.txt for details")
+                if error[2]:
+                    f.write(f"{error[0]} {error[1]}: {error[2]}\n")
 
 
 def run_all(network,
@@ -568,7 +599,7 @@ if __name__ == "__main__":
     print("####################################")
     print("#####Processing public archive######")
     print("####################################")
-    run_all("agage", species = ["sf6"], public=True)
+    run_all("agage", species=["cfc-11"], public=True)
 
     # print("####################################")
     # print("#####Processing private archive#####")
