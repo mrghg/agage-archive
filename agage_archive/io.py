@@ -692,6 +692,10 @@ def combine_datasets(network, species, site,
                         public=public,
                         resample = resample)
 
+        # Run data_exclude again, to remove any data that should be excluded for the combined dataset
+        ds = read_data_exclude(ds, format_species(species), site, instrument,
+                               combined=True)
+
         # Store attributes
         attrs.append(ds.attrs)
 
