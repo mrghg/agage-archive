@@ -69,7 +69,8 @@ def read_nc_path(network, species, site, instrument):
     if species_search in gcwerks_species:
         species_search = gcwerks_species[species_search]
 
-    gcmd_instruments = ["GCMD", "GCECD", "Picarro", "LGR"]
+    gcmd_instruments = ["GCMD", "GCECD"]
+    optical_instruments = ["Picarro", "LGR"]
     gcms_instruments = ["GCMS-ADS", "GCMS-Medusa", "GCMS-MteCimone", "GCTOFMS"]
 
     # Determine sub-path within data directory
@@ -78,6 +79,10 @@ def read_nc_path(network, species, site, instrument):
     for gcmd_instrument in gcmd_instruments:
         if gcmd_instrument in instrument:
             sub_path = paths.md_path
+            break
+    for optical_instrument in optical_instruments:
+        if optical_instrument in instrument:
+            sub_path = paths.optical_path
             break
     for gcms_instrument in gcms_instruments:
         if gcms_instrument in instrument:
