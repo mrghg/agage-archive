@@ -152,7 +152,8 @@ def calibration_scale_default(network, species):
         return scale_defaults.loc[format_species(species), "calibration_scale"]
 
 
-def read_data_exclude(ds, species, site, instrument):
+def read_data_exclude(ds, species, site, instrument,
+                      combined=False):
     '''Read data_exclude file and return start and end date for exclusion
 
     Args:
@@ -160,6 +161,8 @@ def read_data_exclude(ds, species, site, instrument):
         species (str): Species
         site (str): Site code
         instrument (str): Instrument
+        combined (bool): If True, only exclude data if combined_only is set to 'y'. 
+            Used for excluding data in combined data file
 
     Returns:
         xr.Dataset: Dataset with NaNs between start and end dates
@@ -188,7 +191,15 @@ def read_data_exclude(ds, species, site, instrument):
     # Remove whitespace from strings
     data_exclude = data_exclude.map(lambda x: x.strip() if isinstance(x, str) else x)
 
-    # columns are Species, Instrument, Start, End
+    # columns are Species, Instrument, Start, End, combined_only
+    # See if there is a combined_only column (case insensitive)
+    if "combined_only" in data_exclude.columns.str.lower():
+        combined_only_col = data_exclude.columns[data_exclude.columns.str.lower() == "combined_only"][0]
+        if combined:
+            data_exclude = data_exclude[data_exclude[combined_only_col].str.lower() == "y"]
+        else:
+            data_exclude = data_exclude[data_exclude[combined_only_col].str.lower() != "y"]
+
     # Find rows that match species and instrument and then extract start and end dates
     data_exclude = data_exclude[(data_exclude["Species"] == format_species(species)) &
                                 (data_exclude["Instrument"] == instrument)][["Start", "End"]]
@@ -213,3 +224,5 @@ def read_data_exclude(ds, species, site, instrument):
                     raise ValueError(f"Unknown remove_flagged value for {var}. Check in variables.json or variables_not_public.json")
 
         return ds
+    
+
