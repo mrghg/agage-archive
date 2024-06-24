@@ -92,6 +92,10 @@ def read_release_schedule(network, instrument,
     with open_data_file("data_release_schedule.xlsx", network=network) as f:
         df_all = pd.read_excel(f, sheet_name=instrument)
 
+        # Remove whitespace and convert to string
+        df_all = df_all.map(str)
+        df_all = df_all.map(lambda x: x.strip() if isinstance(x, str) else x)
+
         # Get index of row that contains "General release date"
         idx = df_all[df_all.iloc[:, 0] == "General release date"].index[0]
         general_end_date = df_all.iloc[idx, 1]
@@ -99,6 +103,7 @@ def read_release_schedule(network, instrument,
         # Determine if general_end_date is a string
         if not isinstance(general_end_date, str):
             print(f"WARNING: No general end date found for {instrument}. Assuming no limit.")
+            general_end_date = "2100-01-01 00:00"
 
         df = pd.read_excel(f, sheet_name=instrument, skiprows=idx+2)
 

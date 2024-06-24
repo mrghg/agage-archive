@@ -69,7 +69,8 @@ def read_nc_path(network, species, site, instrument):
     if species_search in gcwerks_species:
         species_search = gcwerks_species[species_search]
 
-    gcmd_instruments = ["GCMD", "GCECD", "Picarro", "LGR"]
+    gcmd_instruments = ["GCMD", "GCECD"]
+    optical_instruments = ["Picarro", "LGR"]
     gcms_instruments = ["GCMS-ADS", "GCMS-Medusa", "GCMS-MteCimone", "GCTOFMS"]
 
     # Determine sub-path within data directory
@@ -78,6 +79,10 @@ def read_nc_path(network, species, site, instrument):
     for gcmd_instrument in gcmd_instruments:
         if gcmd_instrument in instrument:
             sub_path = paths.md_path
+            break
+    for optical_instrument in optical_instruments:
+        if optical_instrument in instrument:
+            sub_path = paths.optical_path
             break
     for gcms_instrument in gcms_instruments:
         if gcms_instrument in instrument:
@@ -720,7 +725,16 @@ def combine_datasets(network, species, site,
         scales.append(ds.attrs["calibration_scale"])
 
         # Add instrument_type to dataset as variable
-        ds["instrument_type"] = xr.DataArray(np.repeat(instrument_types[instrument], len(ds.time)),
+        if instrument in instrument_types:
+            # First try to find an exact match
+            instrument_type = instrument_types[instrument]
+        else:
+            # If not, try to find a partial match (e.g., Picarro-1 -> Picarro)
+            for k, v in instrument_types.items():
+                if k in instrument:
+                    instrument_type = v
+                    break
+        ds["instrument_type"] = xr.DataArray(np.repeat(instrument_type, len(ds.time)),
                                         dims="time", coords={"time": ds.time})
 
         dss.append(ds)
@@ -774,13 +788,22 @@ def combine_datasets(network, species, site,
 
             # find instrument types associated with this timestamp and remove the one with the earliest start date
             duplicate_instrument_number = ds_combined.instrument_type.sel(time=timestamp).values
-            duplicate_instrument_name = [k for k, v in instrument_types.items() if v in duplicate_instrument_number]
-            duplicate_instrument_date = [inst["instrument_date"] for inst in instrument_rec if inst["instrument"] in duplicate_instrument_name]
-            duplicate_instrument_to_remove = duplicate_instrument_number[np.argmin(duplicate_instrument_date)]
-            
-            ds_mask = (ds_combined.instrument_type == duplicate_instrument_to_remove) * \
-                (ds_combined.time == timestamp)
-            ds_combined = ds_combined.where(~ds_mask, drop=True)
+            if len(set(duplicate_instrument_number)) > 1:
+                duplicate_instrument_name = [k for k, v in instrument_types.items() if v in duplicate_instrument_number]
+                duplicate_instrument_date = [inst["instrument_date"] for inst in instrument_rec if inst["instrument"] in duplicate_instrument_name]
+                duplicate_instrument_to_remove = duplicate_instrument_number[np.argmin(duplicate_instrument_date)]
+                
+                ds_mask = (ds_combined.instrument_type == duplicate_instrument_to_remove) * \
+                    (ds_combined.time == timestamp)
+                ds_combined = ds_combined.where(~ds_mask, drop=True)
+            else:
+                # This means that both instruments are of the same type (e.g., Picarro-1, Picarro-2)
+                # In this case, find index of the first instrument and remove it
+                # Not ideal, but we've lost the finer detail of the instrument number
+                indices_to_remove = range(timestamps.index.get_loc(timestamp).start, timestamps.index.get_loc(timestamp).stop)[1:]
+                ds_mask = xr.full_like(ds_combined.time, True, dtype=bool)
+                ds_mask[indices_to_remove] = False
+                ds_combined = ds_combined.where(ds_mask, drop=True)
 
     # Update network attribute
     ds_combined.attrs["network"] = "/".join(set(networks))

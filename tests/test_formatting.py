@@ -81,7 +81,7 @@ def test_cf_compliance():
                     monthly=False,
                     verbose=False)
     
-    with open_data_file(filename=f'{network.lower()}-{instrument.lower()}_{site}_{species}_{version}.nc',
+    with open_data_file(filename=f'{network.lower()}-{instrument.lower()}_{site.lower()}_{species}_{version}.nc',
                         network=network,
                         sub_path=sub_path + '/nf3/individual-instruments',
                         ) as f:

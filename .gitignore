@@ -131,9 +131,10 @@ dmypy.json
 # User defined
 **/config.yaml
 .vscode
-.DS_store
+*.DS_Store
 ~$*
 agage-gdrive.json
 data-nc
+data-optical-nc
 data-gcms-nc
 error_log*.txt

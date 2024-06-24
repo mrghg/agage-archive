@@ -151,6 +151,7 @@ def setup():
         "agage_test":
             {
                 "md_path": "data-nc",
+                "optical_path": "data-optical",
                 "gcms_path": "data-gcms-nc",
                 "gcms_flask_path": "data-gcms-flask-nc",
                 "ale_path": "ale",
@@ -160,9 +161,10 @@ def setup():
             },
         "agage":
             {
-                "md_path": "data-nc.zip",
-                "gcms_path": "data-gcms-nc.zip",
-                "gcms_flask_path": "data-gcms-flask-nc.zip",
+                "md_path": "data-nc",
+                "optical_path": "data-optical-nc",
+                "gcms_path": "data-gcms-nc",
+                "gcms_flask_path": "data-gcms-flask-nc",
                 "ale_path": "ale_gage_sio1993/ale",
                 "gage_path": "ale_gage_sio1993/gage",
                 "output_path": "agage-public-archive.zip",

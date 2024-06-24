@@ -252,6 +252,8 @@ def run_individual_site(site, species, network, instrument,
 
     except Exception as e:
 
+        raise e
+
         error_log.append(get_error(e))
     
     return (site, species, error_log[0])
@@ -599,7 +601,7 @@ if __name__ == "__main__":
     print("####################################")
     print("#####Processing public archive######")
     print("####################################")
-    run_all("agage", species=["hfc-125"], public=True)
+    run_all("agage", species=["ch4"], public=True)
 
     # print("####################################")
     # print("#####Processing private archive#####")
