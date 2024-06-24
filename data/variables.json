@@ -54,6 +54,20 @@
         "resample_method": "",
         "remove_flagged": "True"
     },
+    "mf_std": {
+        "attrs": {
+            "long_name": "Mole fraction standard deviation of %",
+            "comment": "Standard deviation of replicate samples, if more than two samples are avaialble.",
+            "units": ""
+        },
+        "encoding": {
+            "dtype": "f4",
+            "_FillValue": -9999
+        },
+        "optional": "True",
+        "resample_method": "",
+        "remove_flagged": "True"
+    },
     "mf_count": {
         "attrs": {
             "long_name": "Number of data points in mean",
