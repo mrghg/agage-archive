@@ -286,6 +286,7 @@ def run_individual_instrument(network, instrument,
         instrument_out = instrument.lower() + "-gcmd"
     elif instrument.upper() == "GCMS-MEDUSA-FLASK":
         read_function = read_gcwerks_flask
+        read_baseline_function = None
         instrument_out = "gcms-medusa-flask"
     else:
         read_function = read_nc
