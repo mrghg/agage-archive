@@ -252,8 +252,6 @@ def run_individual_site(site, species, network, instrument,
 
     except Exception as e:
 
-        raise e
-
         error_log.append(get_error(e))
     
     return (site, species, error_log[0])
