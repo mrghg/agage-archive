@@ -624,10 +624,16 @@ def read_gcwerks_flask(network, species, site, instrument,
 
     # Find duplicate timestamps and average those points
     if len(ds.time) != len(ds.time.drop_duplicates(dim="time")):
-        # For mf_count, just sum, otherwise average
-        mf_count = ds.mf_count.groupby("time").sum()
-        ds = ds.groupby("time").mean()
+        # For mf_count, just sum, otherwise average, if mf isn't NaN
+        mf_count = ds.mf.to_series().groupby("time").apply(lambda x: x.dropna().count())
+
+        # If there are more than two points at the same time, calculate a standard deviation. Otherwise, set to 0
+        mf_std = ds.mf.to_series().groupby("time").apply(lambda x: x.dropna().std() if len(x.dropna()) > 2 else 0.)
+
+        # Average other variables
+        ds = ds.groupby("time").mean(skipna=True)
         ds["mf_count"] = mf_count
+        ds["mf_std"] = mf_std
 
     # Get cal scale from scale_defaults file
     scale = calibration_scale_default(network, species)

@@ -143,7 +143,8 @@ def run_individual_site(site, species, network, instrument,
                         monthly=False,
                         verbose=False,
                         public=True,
-                        resample=True,):
+                        resample=True,
+                        top_level_only=False):
     """Process individual data files for a given site.
     Reads the release schedule for the site
 
@@ -163,6 +164,8 @@ def run_individual_site(site, species, network, instrument,
         verbose (bool): Print progress to screen
         public (bool, optional): Whether the dataset is for public release. Default to True.
         resample (bool, optional): Whether to resample the data, if needed. Default to True.
+        top_level_only (bool, optional): Whether to only output to the top-level directory, 
+            and ignore the individual instrument folder. Default to False.
     """
 
     paths = Paths(network, public=public, errors="ignore_outputs")
@@ -189,13 +192,18 @@ def run_individual_site(site, species, network, instrument,
             instrument_dates = read_data_combination(network, species, site,
                                                     verbose=False)
 
-            folders = [f"{species}/individual-instruments"]
+            if top_level_only:
+                folders = []
+            else:
+                folders = [f"{species}/individual-instruments"]
 
             # if there is no combined data file, also store individual file in top-level directory
             if len(instrument_dates) <= 1:
-
                 # Add to top-level directory
                 folders.append(f"{species}")
+            else:
+                if top_level_only:
+                    raise ValueError(f"Looks like combined instruments has been run for {species} at {site}, but top_level_only is set to True")
             
 
             for output_subpath in folders:
@@ -263,7 +271,8 @@ def run_individual_instrument(network, instrument,
                               monthly = False,
                               species = [],
                               public=True,
-                              resample=True):
+                              resample=True,
+                              top_level_only=False):
     """Process individual data files for a given instrument.
     Reads the release schedule for the instrument
 
@@ -276,6 +285,8 @@ def run_individual_instrument(network, instrument,
         species (list): List of species to process. If empty, process all species
         public (bool, optional): Whether the dataset is for public release. Default to True.
         resample (bool, optional): Whether to resample the data, if needed. Default to True.
+        top_level_only (bool, optional): Whether to only output to the top-level directory,
+            and ignore the individual instrument folder. Default to False.
     """
     
     rs = read_release_schedule(network, instrument, public=public)
@@ -311,7 +322,7 @@ def run_individual_instrument(network, instrument,
         with Pool(processes=nthreads) as p:
             result = p.starmap_async(run_individual_site, [(site, sp, network, instrument,
                                                             rs, read_function, read_baseline_function, instrument_out,
-                                                            baseline, monthly, verbose, public, resample) for site in rs.columns])
+                                                            baseline, monthly, verbose, public, resample, top_level_only) for site in rs.columns])
 
             for r in result.get():
                 error_log.append(r)
@@ -492,7 +503,8 @@ def run_all(network,
             instrument_exclude = ["GCPDD"],
             species = [],
             public = True,
-            resample=True):
+            resample=True,
+            top_level_only=False,):
     """Process data files for multiple instruments. Reads the release schedule to determine which
     instruments to process
 
@@ -507,6 +519,8 @@ def run_all(network,
         species (list): List of species to process. If empty, process all species
         public (bool, optional): Whether the dataset is for public release. Default to True.
         resample (bool, optional): Whether to resample the data, if needed. Default to True.
+        top_level_only (bool, optional): Whether to only output to the top-level directory,
+            and ignore the individual instrument folder. Default to False.
     """
 
     if not network:
@@ -576,7 +590,7 @@ def run_all(network,
             run_individual_instrument(network, instrument, 
                                     baseline=baseline_flag, verbose=True,
                                     monthly=monthly, species=species,
-                                    public=public, resample=resample)
+                                    public=public, resample=resample, top_level_only=top_level_only)
 
     # Incorporate README file into output directory or zip file
     try:
