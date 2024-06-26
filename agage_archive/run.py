@@ -55,7 +55,7 @@ def delete_archive(network, public = True):
     try:
         out_pth, _ = output_path(network, "_", "_", "_",
                                 public=public,
-                                errors="raise")
+                                errors="ignore_inputs")
     except FileNotFoundError:
         print(f"Output directory or archive for does not exist, continuing")
         return
@@ -168,7 +168,12 @@ def run_individual_site(site, species, network, instrument,
             and ignore the individual instrument folder. Default to False.
     """
 
-    paths = Paths(network, public=public, errors="ignore_outputs")
+    if read_function.__name__ == "read_gcwerks_flask":
+        site_str = site.lower()
+    else:
+        site_str = ""
+
+    paths = Paths(network, public=public, errors="ignore_outputs", site = site_str)
 
     error_log = []
 
@@ -578,7 +583,7 @@ def run_all(network,
 
     # If include is empty, process all instruments in release schedule
     if len(instrument_include) == 0:
-        with open_data_file("data_release_schedule.xlsx", network=network) as frs:
+        with open_data_file("data_release_schedule.xlsx", network=network, errors = "ignore") as frs:
             instruments = pd.ExcelFile(frs).sheet_names
     else:
         instruments = instrument_include
@@ -595,7 +600,7 @@ def run_all(network,
     # Incorporate README file into output directory or zip file
     try:
         readme_file = data_file_path(filename='README.md',
-                                    network=network)
+                                    network=network, errors = "ignore_inputs")
         copy_to_archive(readme_file, network, public=public)
     except FileNotFoundError:
         print("No README file found")

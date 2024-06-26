@@ -88,3 +88,5 @@ def test_cf_compliance():
         ds = xr.load_dataset(f)
 
     assert check_cf_compliance(dataset=ds) == True
+
+test_cf_compliance()

@@ -12,8 +12,9 @@ class Paths():
     def __init__(self,
                 network = "",
                 this_repo = False,
-                errors = "raise",
-                public = True):
+                errors = "ignore",
+                public = True,
+                site = ""):
         """Class to store paths to data folders
         
         Args:
@@ -96,17 +97,41 @@ class Paths():
             if "output_path" in key:
                 continue
 
-            self.__setattr__(key, value)
-
+            # If a site is set, it means that the value is a dictionary because species data are in a sub-directory
+            if isinstance(value, dict):
+                if not site:
+                    if errors == "raise":
+                        print(f"WARNING: Site not set for {key}... skipping")
+                else:
+                    if site not in value.keys():
+                        if errors == "raise":
+                            print(f"WARNING: Site {site} not found in {key}... skipping")
+                    else:
+                        self.__setattr__(key, value[site])
+            else:
+                self.__setattr__(key, value)
+            
             # Test that path exists
             if errors == "raise" or errors == "ignore_outputs":
-                full_path = self.data / network / value
+                if isinstance(value, dict):
+                    if not site:
+                        print(f"WARNING: Site not set for {key}... skipping")
+                        continue
+                    else:
+                        if site not in value.keys():
+                            print(f"WARNING: Site {site} not found in {key}... skipping")
+                            continue
+                        full_path = self.data / network / value[site]
+                else:
+                    full_path = self.data / network / value
+
                 if not (full_path).exists():
                     raise FileNotFoundError(f"Folder or zip archive {full_path} doesn't exist")
                 if not (full_path.is_dir() or full_path.suffix == ".zip"):
                     raise FileNotFoundError(f"{full_path} is not a folder or zip archive")
 
         # Don't need to do the remaining checks if errors is set to ignore_outputs
+        #TODO: Shouldn't this check whether public is set to True or False?
         if "output_path" not in config["paths"][network]:
             if errors == "raise" or errors == "ignore_inputs":
                 raise KeyError(f"Output path not found in config file")
@@ -206,8 +231,9 @@ def data_file_list(network = "",
                    sub_path = "",
                    pattern = "*",
                    ignore_hidden = True,
-                   errors="raise",
-                   sub_directories = True):
+                   errors="ignore",
+                   sub_directories = True,
+                   site = ""):
     """List files in data directory. Structure is data/network/sub_path
     sub_path can be a zip archive
 
@@ -237,7 +263,7 @@ def data_file_list(network = "",
         max_slash = min(nslash)
         return [f for f in files if f.count("/") == max_slash]
 
-    pth = data_file_path("", network=network, sub_path=sub_path, errors=errors)
+    pth = data_file_path("", network=network, sub_path=sub_path, errors=errors, site=site)
 
     if pth.suffix == ".zip":
         
@@ -272,7 +298,8 @@ def data_file_path(filename,
                    network = "",
                    sub_path = "",
                    this_repo = False,
-                   errors = "raise"):
+                   errors = "ignore",
+                   site = ""):
     """Get path to data file. Structure is data/network/sub_path
     sub_path can be a zip archive, in which case the path to the zip archive is returned
 
@@ -296,7 +323,8 @@ def data_file_path(filename,
 
     paths = Paths(network,
                   this_repo=this_repo,
-                  errors=errors)
+                  errors=errors,
+                  site = site)
 
     if network:
         pth = paths.data / network
@@ -329,7 +357,8 @@ def open_data_file(filename,
                    sub_path = "",
                    verbose = False,
                    this_repo = False,
-                   errors = "raise"):
+                   errors = "ignore",
+                   site = ""):
     """Open data file. Structure is data/network/sub_path
     sub_path can be a zip archive
 
@@ -351,7 +380,8 @@ def open_data_file(filename,
     pth = data_file_path("", network=network,
                          sub_path=sub_path,
                          this_repo=this_repo,
-                         errors=errors)
+                         errors=errors,
+                         site=site)
     
     if verbose:
         print(f"... opening {pth / filename}")
@@ -367,7 +397,7 @@ def open_data_file(filename,
 
 def output_path(network, species, site, instrument,
                 extra = "", version="", public=True,
-                errors="raise", network_out = ""):
+                errors="ignore_inputs", network_out = ""):
     '''Determine output path and filename
 
     Args:
@@ -390,7 +420,7 @@ def output_path(network, species, site, instrument,
     '''
 
     # Get paths. Ignore errors since outputs may not exist at this stage
-    paths = Paths(network, public=public, errors="ignore_outputs")
+    paths = Paths(network, public=public, errors="ignore")
 
     version_str = f"{version.replace(' ','')}" if version else ""
 
@@ -441,7 +471,7 @@ def copy_to_archive(src_file, network, public = True):
     """
 
     archive_path, _ = output_path(network, "_", "_", "_",
-                                public=public)
+                                public=public, errors = "ignore_inputs")
 
     if archive_path.suffix == ".zip":
         with ZipFile(archive_path, "a") as z:

@@ -59,7 +59,9 @@ species_translator_flask = {"c2f6": "PFC-116",
                             "ch2cl2": "CH2Cl2",
                             "chcl3": "CHCl3",
                             "ch3ccl3": "CH3CCl3",
-                            "ccl4": "CCl4"
+                            "ccl4": "CCl4",
+                            "ccl2ccl2": "PCE",
+                            "chclccl2": "TCE",
                             }
 
 instrument_number = {"UNDEFINED": -1,

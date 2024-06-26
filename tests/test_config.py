@@ -47,7 +47,7 @@ def test_paths():
 
     # If we try to retrieve a path that doesn't exist, it should raise a KeyError
     try:
-        path = Paths("non_existent_network")
+        path = Paths("non_existent_network", errors = "raise")
     except KeyError:
         pass
     else:
