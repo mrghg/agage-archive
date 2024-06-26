@@ -67,6 +67,8 @@ class Paths():
         # Check if config file exists
         self.config_file = self.root / "config.yaml"
         if not self.config_file.exists():
+            if errors == "ignore":
+                return
             raise FileNotFoundError(
                 "Config file not found. Try running config.setup first")
 
@@ -126,14 +128,15 @@ class Paths():
                 raise FileNotFoundError(f"{full_path} is not a folder or zip archive")
 
 
-def setup():
+def setup(network = ""):
     """ Setup the config.yml file for the agage_archive package.
     """
 
     #TODO: this_repo could cause confusion in the case that someone uses this script
     # to set up a config file in another repository
     # However, setting it for now, so that it doesn't look for config file before it's created
-    paths = Paths(this_repo=True)
+#    paths = Paths(this_repo=True)
+    paths = Paths(errors="ignore")
 
     header = '''# Use this file to store configuration settings
 # All paths are relative to the network subfolder in the data directory
@@ -147,30 +150,43 @@ def setup():
     usr = input("Name (press enter for system ID):") or ""
     config["user"] = {"name": usr}
 
-    config["paths"] = {
-        "agage_test":
-            {
-                "md_path": "data-nc",
-                "optical_path": "data-optical",
-                "gcms_path": "data-gcms-nc",
-                "gcms_flask_path": "data-gcms-flask-nc",
-                "ale_path": "ale",
-                "gage_path": "gage",
-                "output_path": "output",
-                "output_path_private": "output-private"
-            },
-        "agage":
-            {
-                "md_path": "data-nc",
-                "optical_path": "data-optical-nc",
-                "gcms_path": "data-gcms-nc",
-                "gcms_flask_path": "data-gcms-flask-nc",
-                "ale_path": "ale_gage_sio1993/ale",
-                "gage_path": "ale_gage_sio1993/gage",
-                "output_path": "agage-public-archive.zip",
-                "output_path_private" : "agage-private-archive.zip"
+    if not network:
+        config["paths"] = {
+            "agage_test":
+                {
+                    "md_path": "data-nc",
+                    "optical_path": "data-optical",
+                    "gcms_path": "data-gcms-nc",
+                    "gcms_flask_path": "data-gcms-flask-nc",
+                    "ale_path": "ale",
+                    "gage_path": "gage",
+                    "output_path": "output",
+                    "output_path_private": "output-private"
+                },
+            "agage":
+                {
+                    "md_path": "data-nc",
+                    "optical_path": "data-optical-nc",
+                    "gcms_path": "data-gcms-nc",
+                    "gcms_flask_path": "data-gcms-flask-nc",
+                    "ale_path": "ale_gage_sio1993/ale",
+                    "gage_path": "ale_gage_sio1993/gage",
+                    "output_path": "agage-public-archive.zip",
+                    "output_path_private" : "agage-private-archive.zip"
+            }
         }
-    }
+    else:
+        config["paths"] = {
+            network:
+                {
+                    "md_path": "",
+                    "optical_path": "",
+                    "gcms_path": "",
+                    "gcms_flask_path": "",
+                    "output_path": "output",
+                    "output_path_private": "output-private"
+                }
+        }
 
     with open(paths.root / 'config.yaml', 'w') as configfile:
         # Write header lines
