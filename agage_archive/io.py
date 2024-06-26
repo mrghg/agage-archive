@@ -570,8 +570,11 @@ def read_gcwerks_flask(network, species, site, instrument,
     '''
 
     # Need to get some information from the attributes_site.json file
-    with open_data_file("attributes_site.json", network=network) as f:
-        site_info = json.load(f)[site]
+    with open_data_file("attributes_site.json", network=network, errors = "ignore") as f:
+        site_info_all = json.load(f)
+    if site not in site_info_all:
+        raise ValueError(f"Site {site} not found in attributes_site.json")
+    site_info = site_info_all[site]
 
     if "sampling_period" not in site_info:
         raise ValueError(f"Sampling period not found in attributes_site.json for {site}")
@@ -589,9 +592,9 @@ def read_gcwerks_flask(network, species, site, instrument,
     species_search = format_species(species)
     species_flask = format_species_flask(species)
 
-    sub_path = Paths(network).gcms_flask_path
+    sub_path = Paths(network, site=site.lower()).gcms_flask_path
     
-    network_out, sub_path, nc_files = data_file_list(network, sub_path, f"{species_flask.lower()}_air.nc")
+    network_out, sub_path, nc_files = data_file_list(network, sub_path, f"{species_flask.lower()}_air.nc", site=site.lower())
 
     if len(nc_files) == 0:
         raise ValueError(f"No files found for {species_search} in {network} network")
@@ -600,7 +603,7 @@ def read_gcwerks_flask(network, species, site, instrument,
     else:
         nc_file = nc_files[0]
 
-    with open_data_file(nc_file, network, sub_path=sub_path, verbose=verbose) as f:
+    with open_data_file(nc_file, network, sub_path=sub_path, verbose=verbose, site=site.lower()) as f:
         with xr.open_dataset(f, engine="h5netcdf") as ds_file:
             ds_raw = ds_file.load()
 

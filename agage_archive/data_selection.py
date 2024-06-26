@@ -89,7 +89,7 @@ def read_release_schedule(network, instrument,
         pd.DataFrame: Release schedule
     '''
 
-    with open_data_file("data_release_schedule.xlsx", network=network) as f:
+    with open_data_file("data_release_schedule.xlsx", network=network, errors = "ignore") as f:
         df_all = pd.read_excel(f, sheet_name=instrument)
 
         # Remove whitespace and convert to string
