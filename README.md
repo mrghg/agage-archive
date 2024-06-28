@@ -11,8 +11,8 @@ Alternatively, if avoiding conda, install a virtual environment using ```python 
 
 Make sure that you have installed the required dependencies (see ```requirements.txt```), which can be done using ```pip install -r requirements.txt```.
 
-Allow the package to be callable using ```pip install --no-build-isolation --no-deps -e . 
-If using conda, you can use ```conda develop .``` but note that this functionality is now depricated.
+Allow the package to be callable using ```pip install --no-build-isolation --no-deps -e ```. 
+If using conda, you can use ```conda develop ```, but note that this functionality is now depricated.
 
 ## Configuration
 Before beginning, run the configuration setup script, which can be accessed as:
