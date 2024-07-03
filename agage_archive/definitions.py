@@ -90,3 +90,61 @@ def instrument_type_definition():
     instrument_number_string = ", ".join([f"{k}={v}" for k, v in instrument_number.items()])
 
     return instrument_number, instrument_number_string
+
+
+def get_instrument_type(instrument_numbers):
+    '''Get instrument type name from instrument number
+
+    Args:
+        instrument_number (int or list): Instrument number(s)
+
+    Returns:
+        str or list: Instrument type name(s)
+    '''
+
+    # If instrument_numbers is an int, return a single string
+    if isinstance(instrument_numbers, int):
+        instrument_type = [k for k, v in instrument_number.items() if v == instrument_numbers][0]
+    # If instrument_numbers is a list, return a list of strings
+    elif isinstance(instrument_numbers, list):
+        instrument_type = [k for k, v in instrument_number.items() if v in instrument_numbers]
+    else:
+        raise ValueError("instrument_numbers must be an int or list")
+
+    return instrument_type
+
+
+def get_instrument_number(instrument):
+    '''Get instrument number from instrument type name
+
+    Args:
+        instrument (str): Instrument type name
+
+    Returns:
+        int: Instrument number
+    '''
+
+    if isinstance(instrument, int):
+        raise ValueError("instrument cannot be an int")
+
+    if len(instrument) <= 1:
+        raise ValueError("instrument cannot be a single character or empty string")
+
+    instrument_type = -999
+
+    if instrument in instrument_number:
+            # First try to find an exact match
+        instrument_type = instrument_number[instrument]
+    else:
+        # If not, try to find a partial match (e.g., Picarro-1 -> Picarro)
+        for k, v in instrument_number.items():
+            if k in instrument:
+                instrument_type = v
+                break
+    
+    # If instrument_type hasn't been defined, raise an error
+    if instrument_type == -999:
+        raise KeyError(f"Could not find instrument number for {instrument}")
+    
+    return instrument_type
+

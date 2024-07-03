@@ -30,7 +30,7 @@ def format_attributes_global_instrument(ds,
         attrs["instrument_comment"] = ""
 
     if return_attributes:
-        return {key: attrs[key] for key in attrs if "instrument" in key}
+        return {key: attrs[key] for key in attrs if ("instrument" in key) and (key != "instrument_type")}
     else:
         ds_out = ds.copy(deep=True)
         ds_out.attrs = attrs.copy()
@@ -53,7 +53,7 @@ def format_attributes_global_instruments(ds,
     # If no instruments specified, check if they are in the dataset attributes
     if len(instruments) == 0:
         if "instrument" in ds.attrs:
-            instruments = [{key: ds.attrs[key] for key in ds.attrs if "instrument" in key}]
+            instruments = [{key: ds.attrs[key] for key in ds.attrs if ("instrument" in key) and (key != "instrument_type")}]
         else:
             raise ValueError("No instrument* attributes specified and none found in dataset attributes. " + \
                              "As a minimum, set keyword instrument = [{'instrument': 'INSTRUMENT_NAME'}]")
@@ -68,6 +68,8 @@ def format_attributes_global_instruments(ds,
     # Remove instrument attributes so that we can repopulate them
     for attr in ds.attrs:
         if "instrument" not in attr:
+            attrs[attr] = ds.attrs[attr]
+        elif attr == "instrument_type":
             attrs[attr] = ds.attrs[attr]
 
     dates = []
@@ -130,7 +132,7 @@ def format_attributes_global_instruments(ds,
             instrument_count += 1
 
     if return_attributes:
-        return {key: attrs[key] for key in attrs if "instrument" in key}
+        return {key: attrs[key] for key in attrs if ("instrument" in key) and (key != "instrument_type")}
     else:
         ds_out = ds.copy(deep=True)
         ds_out.attrs = attrs.copy()
@@ -374,7 +376,7 @@ def format_attributes(ds, instruments = [],
 
     for attr in attributes_default:
 
-        if "instrument" in attr:
+        if "instrument" in attr and attr != "instrument_type":
             # Update instrument attributes
             attrs.update(format_attributes_global_instruments(ds,
                                                         instruments,
