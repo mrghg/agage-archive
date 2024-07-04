@@ -1,24 +1,36 @@
 import pandas as pd
 import xarray as xr
 import numpy as np
+import json
 
 from agage_archive.config import Paths, open_data_file
 from agage_archive.io import read_ale_gage, read_nc, combine_datasets, read_nc_path, \
     read_baseline, combine_baseline, output_dataset, read_gcwerks_flask
 from agage_archive.convert import scale_convert
+from agage_archive.definitions import nc4_types
 
 
 paths = Paths("agage_test")
+
+
+def type_test(var, var_name):
+
+    with open_data_file("variables.json") as f:
+        variables_defs = json.load(f)
+
+    assert type(var).__name__ == nc4_types[variables_defs[var_name]["encoding"]["dtype"]]
+
 
 def test_read_ale_gage():
 
     species = "ch3ccl3"
 
-    ds_ale = read_ale_gage("agage_test", species, "CGO", "ALE")
+    ds_ale = read_ale_gage("agage_test", species, "CGO", "ALE",
+                           dropna=False)
 
     # test UTC conversion
     ds_ale_local = read_ale_gage("agage_test", species, "CGO", "ALE",
-                                 utc=False, data_exclude=False)
+                                 utc=False, data_exclude=False, dropna=False)
     
     # check that all df_ale_local timestamps are 10 hours ahead of df_ale (CGO is UTC+10)
     assert ((ds_ale_local.time.to_series().index - ds_ale.time.to_series().index) == pd.Timedelta("10h")).all()
@@ -27,13 +39,22 @@ def test_read_ale_gage():
     assert ds_ale.mf.to_series().isnull().sum() > ds_ale_local.mf.to_series().isnull().sum()
 
     ds_ale_noscale = read_ale_gage("agage_test", species, "CGO", "ALE",
-                                scale=None)
+                                scale=None, dropna=False)
 
     # Check that the scale conversion has been applied (ch3ccl3 factors from openghg_calscales)
     assert np.isclose(np.nanmean(ds_ale.mf.values / ds_ale_noscale.mf.values), 0.9957*1.0184)
 
     # Check that an instrument_type attribute has been added
     assert ds_ale.attrs["instrument_type"] == "ALE"
+
+    # check that dropna works
+    ds_ale_dropna = read_ale_gage("agage_test", species, "CGO", "ALE",
+                                  dropna=True)
+    assert ds_ale_dropna.mf.notnull().all()
+
+    # Check that types are all as specified in variables.json
+    for var_name in ds_ale.data_vars.keys():
+        type_test(ds_ale[var_name].values[0], var_name)
 
 
 def test_combine_datasets():
@@ -62,6 +83,10 @@ def test_combine_datasets():
 
     # Test that the instrument_type attribute has been added
     assert ds.attrs["instrument_type"] == "ALE/GAGE/GCMD/GCMS-Medusa"
+
+    # Check that types are all as specified in variables.json
+    for var_name in ds.data_vars.keys():
+        type_test(ds[var_name].values[0], var_name)
 
 
 def test_read_nc_path():
@@ -111,7 +136,7 @@ def test_read_baseline():
             output_subpath="baselines/",
             extra = "-git-baseline",
             verbose=False)
-        
+
 
 def test_combine_baseline():
 
@@ -147,7 +172,7 @@ def test_timestamp():
     with open_data_file(filename, network="agage_test", sub_path=sub_path) as f:
         ds_original = xr.open_dataset(f).load()
         
-    ds = read_nc("agage_test", "CH3CCl3", "CGO", "GCMS-Medusa")
+    ds = read_nc("agage_test", "CH3CCl3", "CGO", "GCMS-Medusa", dropna=False)
 
     time_offset = int(ds_original.time.attrs["sampling_time_seconds"])
     assert np.all(ds_original.time.values == ds.time.values + pd.Timedelta(seconds=time_offset)/2)
@@ -189,6 +214,10 @@ def test_picarro():
 
     # Check that instrument_type has been added
     assert ds.attrs["instrument_type"] == "Picarro"
+
+    # Check that NaNs are removed
+    assert ds.mf.notnull().all()
+
 
 def test_read_gcwerks_flask():
 
