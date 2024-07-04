@@ -5,7 +5,7 @@ import json
 
 from agage_archive.config import Paths, open_data_file
 from agage_archive.io import read_ale_gage, read_nc, combine_datasets, read_nc_path, \
-    read_baseline, combine_baseline, output_dataset, read_gcwerks_flask
+    read_baseline, combine_baseline, output_dataset, read_gcwerks_flask, drop_duplicates
 from agage_archive.convert import scale_convert
 from agage_archive.definitions import nc4_types
 
@@ -237,3 +237,50 @@ def test_read_gcwerks_flask():
     assert "sampling_period" in ds.attrs.keys()
     assert ds.attrs["inlet_latitude"] == 2
 
+
+def test_drop_duplicates():
+
+    n = 100
+    # Create a dataset with some duplicate timestamps
+    time = pd.date_range("2023-01-01", periods=n, freq="H")
+    mf = xr.DataArray(np.random.rand(n), dims="time", coords={"time": time})
+    mf_repeatability = xr.DataArray(np.random.rand(n), dims="time", coords={"time": time})
+    instrument_type = xr.DataArray(np.repeat(1, n), dims="time", coords={"time": time})
+    ds = xr.Dataset(data_vars={"mf": mf, "mf_repeatability": mf_repeatability, "instrument_type": instrument_type})
+
+    # Add 3 duplicate timestamps
+    ds_duplicated = ds.isel(time=slice(10, 13), drop=True).copy(deep=True)
+    ds_duplicated["instrument_type"].values = np.repeat(2, len(ds_duplicated.time))
+
+    # The first duplicate should remove instrument 2, because it's NaN
+    ds_duplicated["mf"].values[0] = np.nan
+
+    # The second duplicate should keep instrument 1, because it appears earlier
+    # Therefore, the value "10" should be removed
+    ds_duplicated["mf"].values[1] = 10
+    
+    # The third duplicate should keep instrument 2, because we'll make instrument 1 a NaN
+    # Therefore, the value "20" should be removed
+    ds_duplicated["mf"].values[2] = 20
+    ds.mf.values[12] = np.nan
+
+    # Create the dataset with duplicates
+    ds = xr.concat([ds, ds_duplicated], dim="time")
+    ds = ds.sortby("time")
+
+    # Drop duplicates
+    ds = drop_duplicates(ds)
+
+    # Check that there are no duplicate timestamps
+    assert len(ds.time) == len(ds.time.drop_duplicates(dim="time"))
+
+    # Check that the new dataset is the same length as the original
+    assert len(ds.time) == n
+
+    # Check that the first duplicate has been removed
+    assert 10 not in ds.mf.values
+    assert 20 in ds.mf.values
+    assert ds.mf.values[11] != 10
+    assert ds.instrument_type.values[11] == 1
+    assert ds.mf.values[12] == 20
+    assert ds.instrument_type.values[12] == 2

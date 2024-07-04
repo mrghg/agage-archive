@@ -46,6 +46,69 @@ baseline_attrs = {"git_pollution_flag":{
                 }
 
 
+def drop_duplicates(ds):
+    """Drop duplicate timestamps in a dataset
+    Preferentially removes NaNs, and then removes duplicates based on the order of instrument types
+
+    Args:
+        ds (xarray.Dataset): Dataset
+
+    Returns:
+        xarray.Dataset: Dataset with duplicates removed
+    """
+
+    # Return if there are no duplicates
+    if len(ds.time) == len(ds.time.drop_duplicates(dim="time")):
+        return ds
+
+    # Find list of instrument_types, and sort them by the order in which they appeared
+    instrument_types = []
+    for instrument in ds.instrument_type.values:
+        if instrument not in instrument_types:
+            instrument_types.append(instrument)
+
+    # Create a column to drop duplicates
+    ds["drop"] = xr.full_like(ds.time, 1., dtype=float)
+    ds["i"] = xr.full_like(ds.time, 0, dtype=int)
+    ds["i"].values = np.arange(0, len(ds.time), 1)
+
+    timestamps = ds.time.to_series()
+    duplicated_timestamps = timestamps[timestamps.duplicated(keep="first")]
+
+    for timestamp in duplicated_timestamps:
+
+        ds_duplicates = ds.sel(time=timestamp)
+        
+        # Is the mf a NaN for any of these?
+        i_nan = ds_duplicates["i"][np.isnan(ds_duplicates.mf.values)].values
+
+        # If they are all NaN, drop all but the first
+        if len(i_nan) == len(ds_duplicates["i"]):
+            ds["drop"].values[i_nan[1:]] = np.nan
+        elif len(i_nan) > 0:
+            # If there are one or more NaNs, drop them
+            ds["drop"].values[i_nan] = np.nan
+        else:
+            pass
+        
+        # If there is more than one remaining value that isn't a NaN, 
+        # drop the one which appears first in the instrument_types list
+        i_not_nan = ds_duplicates["i"][~np.isnan(ds_duplicates.mf.values)].values
+        if len(i_not_nan) > 1:
+            instruments_not_nan = [ds["instrument_type"].values[i] for i in i_not_nan]
+            instrument_to_keep = instrument_types[min([instrument_types.index(instrument) for instrument in instruments_not_nan])]
+            i_to_keep = [i for i in i_not_nan if ds["instrument_type"].values[i] == instrument_to_keep][0]
+            i_to_drop = [i for i in i_not_nan if i != i_to_keep]
+            ds["drop"].values[i_to_drop] = np.nan
+
+    ds = ds.dropna(dim="time", subset=["drop"])
+
+    # Remove the i and drop variables
+    ds = ds.drop_vars(["i", "drop"])
+
+    return ds
+
+
 def read_nc_path(network, species, site, instrument):
     """Find path to netCDF file
 
@@ -800,39 +863,12 @@ def combine_datasets(network, species, site,
     # Format variables
     ds_combined = format_variables(ds_combined)
 
+    # Drop duplicates, which may have been introduced by overlapping instruments
+    ds_combined = drop_duplicates(ds_combined)
+
     # Remove all time points where mf is NaN
     if dropna:
         ds_combined = ds_combined.dropna(dim="time", subset = ["mf"])
-
-    # Check for duplicate timestamps
-    # Since duplicates are removed from the individual datasets
-    # this can only happen if both measurements are at the same time
-    # In this case, use the instrument with the latest start date
-    if len(ds_combined.time) != len(ds_combined.time.drop_duplicates(dim="time")):
-
-        timestamps = ds_combined.time.to_series()
-        duplicated_timestamps = timestamps[timestamps.duplicated(keep="first")]
-
-        for timestamp in duplicated_timestamps:
-
-            # find instrument types associated with this timestamp and remove the one with the earliest start date
-            duplicate_instrument_number = ds_combined.instrument_type.sel(time=timestamp).values
-            if len(set(duplicate_instrument_number)) > 1:
-                duplicate_instrument_name = get_instrument_type(duplicate_instrument_number)
-                duplicate_instrument_date = [inst["instrument_date"] for inst in instrument_rec if inst["instrument"] in duplicate_instrument_name]
-                duplicate_instrument_to_remove = duplicate_instrument_number[np.argmin(duplicate_instrument_date)]
-                
-                ds_mask = (ds_combined.instrument_type == duplicate_instrument_to_remove) * \
-                    (ds_combined.time == timestamp)
-                ds_combined = ds_combined.where(~ds_mask, drop=True)
-            else:
-                # This means that both instruments are of the same type (e.g., Picarro-1, Picarro-2)
-                # In this case, find index of the first instrument and remove it
-                # Not ideal, but we've lost the finer detail of the instrument number
-                indices_to_remove = range(timestamps.index.get_loc(timestamp).start, timestamps.index.get_loc(timestamp).stop)[1:]
-                ds_mask = xr.full_like(ds_combined.time, True, dtype=bool)
-                ds_mask[indices_to_remove] = False
-                ds_combined = ds_combined.where(ds_mask, drop=True)
 
     # Summarise instrument types in attributes
     # and remove instrument_type variable if all the same
