@@ -111,7 +111,8 @@ def read_nc(network, species, site, instrument,
             baseline = None,
             resample = True,
             scale = "default",
-            public = True):
+            public = True,
+            dropna = True):
     """Read GCWerks netCDF files
 
     Args:
@@ -124,6 +125,7 @@ def read_nc(network, species, site, instrument,
         scale (str, optional): Scale to convert to. Defaults to "default". If None, will keep original scale.
         public (bool, optional): Whether the dataset is for public release. Default to True.
         resample (bool, optional): Whether to resample the data, if needed. Default to True.
+        dropna (bool, optional): Drop NaN values. Default to True.
         
     Raises:
         FileNotFoundError: Can't find netCDF file
@@ -229,6 +231,10 @@ def read_nc(network, species, site, instrument,
     if len(ds.time) != len(ds.time.drop_duplicates(dim="time")):
         ds = ds.drop_duplicates(dim="time")
 
+    # Remove all time points where mf is NaN
+    if dropna:
+        ds = ds.dropna(dim="time", subset = ["mf"])
+
     # If baseline is not None, return baseline dataset
     if baseline:
         ds_baseline = ds.baseline.copy(deep=True).to_dataset(name="baseline")
@@ -239,7 +245,7 @@ def read_nc(network, species, site, instrument,
     ds = format_variables(ds)
 
     # Convert scale, if needed
-    ds = scale_convert(ds, scale)
+    ds = scale_convert(ds, scale)    
 
     return ds
 
@@ -247,7 +253,8 @@ def read_nc(network, species, site, instrument,
 def read_baseline(network, species, site, instrument,
                 flag_name = "git_pollution_flag",
                 verbose = False,
-                public = True):
+                public = True,
+                dropna = True):
     """Read GCWerks netCDF files
 
     Args:
@@ -273,7 +280,8 @@ def read_baseline(network, species, site, instrument,
         ds_out = read_nc(network, species, site, instrument,
                         verbose=verbose,
                         baseline = flag_name,
-                        public=public)
+                        public=public,
+                        dropna=dropna)
 
     else:
 
@@ -283,7 +291,8 @@ def read_baseline(network, species, site, instrument,
         ds_out = read_ale_gage(network, species, site, instrument,
                            baseline = True,
                            verbose=verbose,
-                           public=public)
+                           public=public,
+                           dropna=dropna)
 
     # Add attributes
     ds_out.baseline.attrs = {
@@ -345,7 +354,8 @@ def read_ale_gage(network, species, site, instrument,
                   scale = "default",
                   baseline = False,
                   public=True,
-                  resample = False):
+                  resample = False,
+                  dropna = True):
     """Read GA Tech ALE/GAGE files, process and clean
 
     Args:
@@ -362,6 +372,7 @@ def read_ale_gage(network, species, site, instrument,
         baseline (bool, optional): Return baseline dataset. Defaults to False.
         public (bool, optional): Whether the dataset is for public release. Default to True.
         resample (bool, optional): Not used (see run_individual_instrument). Defaults to False.
+        dropna (bool, optional): Drop NaN values. Defaults to True.
 
     Returns:
         pd.DataFrame: Pandas dataframe containing file contents
@@ -540,6 +551,10 @@ def read_ale_gage(network, species, site, instrument,
                             public=public)
     ds = ds.sel(time=slice(None, rs))
 
+    # Remove all time points where mf is NaN
+    if dropna:
+        ds = ds.dropna(dim="time", subset = ["mf"])
+    
     # Remove pollution flag
     ds_baseline = ds.baseline.copy(deep=True).to_dataset(name="baseline")
     ds = ds.drop_vars("baseline")
@@ -561,7 +576,7 @@ def read_ale_gage(network, species, site, instrument,
 def read_gcwerks_flask(network, species, site, instrument,
                        verbose = True,
                        public = True,
-                       resample=True):
+                       dropna=True):
     '''Read GCWerks flask data
 
     Args:
@@ -571,7 +586,7 @@ def read_gcwerks_flask(network, species, site, instrument,
         instrument (str): Instrument
         verbose (bool, optional): Print verbose output. Defaults to False.
         public (bool, optional): Whether the dataset is for public release. Default to True.
-        resample (bool, optional): Whether to resample the data. Default to True, but actually doesn't do anything here
+        dropna (bool, optional): Drop NaN values. Default to True.
 
     Returns:
         xr.Dataset: Dataset containing data
@@ -660,6 +675,10 @@ def read_gcwerks_flask(network, species, site, instrument,
                         units="ppt",
                         calibration_scale = scale)
     
+    # Remove all time points where mf is NaN
+    if dropna:
+        ds = ds.dropna(dim="time", subset = ["mf"])
+
     return ds
 
 
@@ -667,7 +686,8 @@ def combine_datasets(network, species, site,
                     scale = "default",
                     verbose = True,
                     public = True,
-                    resample = True):
+                    resample = True,
+                    dropna = True):
     '''Combine ALE/GAGE/AGAGE datasets for a given species and site
 
     Args:
@@ -810,6 +830,10 @@ def combine_datasets(network, species, site,
                 ds_mask[indices_to_remove] = False
                 ds_combined = ds_combined.where(ds_mask, drop=True)
 
+    # Remove all time points where mf is NaN
+    if dropna:
+        ds_combined = ds_combined.dropna(dim="time", subset = ["mf"])
+
     # Summarise instrument types in attributes
     # and remove instrument_type variable if all the same
     instrument_numbers = list(np.unique(ds_combined.instrument_type.values))
@@ -828,7 +852,8 @@ def combine_datasets(network, species, site,
 
 
 def combine_baseline(network, species, site,
-                     verbose = True, public = True):
+                     verbose = True, public = True,
+                     dropna = True):
     '''Combine ALE/GAGE/AGAGE baseline datasets for a given species and site
 
     Args:
@@ -836,6 +861,8 @@ def combine_baseline(network, species, site,
         species (str): Species
         site (str): Site
         verbose (bool, optional): Print verbose output. Defaults to False.
+        public (bool, optional): Whether the dataset is for public release. Default to True.
+        dropna (bool, optional): Drop all time points where mf is NaN. Default to
 
     Returns:
         xr.Dataset: Dataset containing data
@@ -853,7 +880,7 @@ def combine_baseline(network, species, site,
         ds = read_baseline(network, species, site, instrument,
                            verbose=verbose,
                            flag_name="git_pollution_flag",
-                           public=public)
+                           public=public, dropna=dropna)
 
         # Subset date
         ds = ds.sel(time=slice(*date))
