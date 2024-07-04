@@ -1,4 +1,4 @@
-
+import numpy as np
 
 nc4_types = {"f4": "float32",
             "f8": "float64",
@@ -103,7 +103,7 @@ def get_instrument_type(instrument_numbers):
     '''
 
     # If instrument_numbers is an int, return a single string
-    if isinstance(instrument_numbers, int):
+    if isinstance(instrument_numbers, (int, np.integer)) and instrument_numbers in instrument_number.values():
         instrument_type = [k for k, v in instrument_number.items() if v == instrument_numbers][0]
     # If instrument_numbers is a list, return a list of strings
     elif isinstance(instrument_numbers, list):

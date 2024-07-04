@@ -1,4 +1,5 @@
 import pytest
+import numpy as np
 
 from agage_archive.definitions import get_instrument_type, get_instrument_number
 
@@ -19,6 +20,14 @@ def test_get_instrument_type():
     instrument_number = "1"
     with pytest.raises(ValueError):
         instrument_type = get_instrument_type(instrument_number)
+
+    # Test for numpy integer
+    instrument_number = np.int64(1)
+    instrument_type = get_instrument_type(instrument_number)
+
+    # Test for numpy integer
+    instrument_number = np.int8(1)
+    instrument_type = get_instrument_type(instrument_number)
 
 
 def test_get_instrument_number():
