@@ -14,7 +14,7 @@ from agage_archive.formatting import format_species, \
     format_variables, format_attributes, format_species_flask
 from agage_archive.data_selection import read_release_schedule, read_data_exclude, \
     read_data_combination, calibration_scale_default
-from agage_archive.definitions import instrument_type_definition
+from agage_archive.definitions import instrument_type_definition, get_instrument_type, get_instrument_number
 from agage_archive.util import tz_local_to_utc
 
 
@@ -196,6 +196,10 @@ def read_nc(network, species, site, instrument,
                         network=network,
                         species=species,
                         public=public)
+
+    # Set the instrument_type attribute
+    # slightly convoluted method, but ensures consistency with combined files
+    ds.attrs["instrument_type"] = get_instrument_type(get_instrument_number(instrument))
 
     # Remove any excluded data
     if data_exclude:
@@ -513,6 +517,10 @@ def read_ale_gage(network, species, site, instrument,
                         calibration_scale=species_info["scale"],
                         public=public)
 
+    # Set the instrument_type attribute
+    # slightly convoluted method, but ensures consistency with combined files
+    ds.attrs["instrument_type"] = get_instrument_type(get_instrument_number(instrument))
+
     ds = format_variables(ds, units=species_info["units"])
 
     # Add pollution flag back in temporarily with dimension time
@@ -734,15 +742,7 @@ def combine_datasets(network, species, site,
         scales.append(ds.attrs["calibration_scale"])
 
         # Add instrument_type to dataset as variable
-        if instrument in instrument_types:
-            # First try to find an exact match
-            instrument_type = instrument_types[instrument]
-        else:
-            # If not, try to find a partial match (e.g., Picarro-1 -> Picarro)
-            for k, v in instrument_types.items():
-                if k in instrument:
-                    instrument_type = v
-                    break
+        instrument_type = get_instrument_number(instrument)
         ds["instrument_type"] = xr.DataArray(np.repeat(instrument_type, len(ds.time)),
                                         dims="time", coords={"time": ds.time})
 
@@ -780,10 +780,6 @@ def combine_datasets(network, species, site,
     # Format variables
     ds_combined = format_variables(ds_combined)
 
-    # Remove instrument_type variable if all the same    
-    if len(np.unique(ds_combined.instrument_type.values)) == 1:
-        ds_combined = ds_combined.drop_vars("instrument_type")
-
     # Check for duplicate timestamps
     # Since duplicates are removed from the individual datasets
     # this can only happen if both measurements are at the same time
@@ -798,7 +794,7 @@ def combine_datasets(network, species, site,
             # find instrument types associated with this timestamp and remove the one with the earliest start date
             duplicate_instrument_number = ds_combined.instrument_type.sel(time=timestamp).values
             if len(set(duplicate_instrument_number)) > 1:
-                duplicate_instrument_name = [k for k, v in instrument_types.items() if v in duplicate_instrument_number]
+                duplicate_instrument_name = get_instrument_type(duplicate_instrument_number)
                 duplicate_instrument_date = [inst["instrument_date"] for inst in instrument_rec if inst["instrument"] in duplicate_instrument_name]
                 duplicate_instrument_to_remove = duplicate_instrument_number[np.argmin(duplicate_instrument_date)]
                 
@@ -813,6 +809,17 @@ def combine_datasets(network, species, site,
                 ds_mask = xr.full_like(ds_combined.time, True, dtype=bool)
                 ds_mask[indices_to_remove] = False
                 ds_combined = ds_combined.where(ds_mask, drop=True)
+
+    # Summarise instrument types in attributes
+    # and remove instrument_type variable if all the same
+    instrument_numbers = list(np.unique(ds_combined.instrument_type.values))
+    if len(instrument_numbers) == 1:
+        instrument_name = get_instrument_type(instrument_numbers[0])
+        ds_combined.attrs["instrument_type"] = instrument_name
+        ds_combined = ds_combined.drop_vars("instrument_type")
+    else:
+        instrument_name = get_instrument_type(instrument_numbers)
+        ds_combined.attrs["instrument_type"] = "/".join(instrument_name)
 
     # Update network attribute
     ds_combined.attrs["network"] = "/".join(set(networks))

@@ -32,6 +32,9 @@ def test_read_ale_gage():
     # Check that the scale conversion has been applied (ch3ccl3 factors from openghg_calscales)
     assert np.isclose(np.nanmean(ds_ale.mf.values / ds_ale_noscale.mf.values), 0.9957*1.0184)
 
+    # Check that an instrument_type attribute has been added
+    assert ds_ale.attrs["instrument_type"] == "ALE"
+
 
 def test_combine_datasets():
 
@@ -56,6 +59,9 @@ def test_combine_datasets():
     # Test that a version number has been added
     assert "version" in ds.attrs.keys()
     assert ds.attrs["version"] != ""
+
+    # Test that the instrument_type attribute has been added
+    assert ds.attrs["instrument_type"] == "ALE/GAGE/GCMD/GCMS-Medusa"
 
 
 def test_read_nc_path():
@@ -181,6 +187,8 @@ def test_picarro():
     assert "Timestamp is the start of the sampling period in UTC" in ds.time.attrs["comment"]
     assert "Resampled" in ds.time.attrs["comment"]  
 
+    # Check that instrument_type has been added
+    assert ds.attrs["instrument_type"] == "Picarro"
 
 def test_read_gcwerks_flask():
 
