@@ -1,14 +1,25 @@
 import pandas as pd
 import xarray as xr
 import numpy as np
+import json
 
 from agage_archive.config import Paths, open_data_file
 from agage_archive.io import read_ale_gage, read_nc, combine_datasets, read_nc_path, \
     read_baseline, combine_baseline, output_dataset, read_gcwerks_flask
 from agage_archive.convert import scale_convert
+from agage_archive.definitions import nc4_types
 
 
 paths = Paths("agage_test")
+
+
+def type_test(var, var_name):
+
+    with open_data_file("variables.json") as f:
+        variables_defs = json.load(f)
+
+    assert type(var).__name__ == nc4_types[variables_defs[var_name]["encoding"]["dtype"]]
+
 
 def test_read_ale_gage():
 
@@ -41,6 +52,10 @@ def test_read_ale_gage():
                                   dropna=True)
     assert ds_ale_dropna.mf.notnull().all()
 
+    # Check that types are all as specified in variables.json
+    for var_name in ds_ale.data_vars.keys():
+        type_test(ds_ale[var_name].values[0], var_name)
+
 
 def test_combine_datasets():
 
@@ -68,6 +83,10 @@ def test_combine_datasets():
 
     # Test that the instrument_type attribute has been added
     assert ds.attrs["instrument_type"] == "ALE/GAGE/GCMD/GCMS-Medusa"
+
+    # Check that types are all as specified in variables.json
+    for var_name in ds.data_vars.keys():
+        type_test(ds[var_name].values[0], var_name)
 
 
 def test_read_nc_path():
@@ -195,6 +214,10 @@ def test_picarro():
 
     # Check that instrument_type has been added
     assert ds.attrs["instrument_type"] == "Picarro"
+
+    # Check that NaNs are removed
+    assert ds.mf.notnull().all()
+
 
 def test_read_gcwerks_flask():
 
