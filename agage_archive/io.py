@@ -800,6 +800,10 @@ def combine_datasets(network, species, site,
     # Format variables
     ds_combined = format_variables(ds_combined)
 
+    # Remove all time points where mf is NaN
+    if dropna:
+        ds_combined = ds_combined.dropna(dim="time", subset = ["mf"])
+
     # Check for duplicate timestamps
     # Since duplicates are removed from the individual datasets
     # this can only happen if both measurements are at the same time
@@ -829,10 +833,6 @@ def combine_datasets(network, species, site,
                 ds_mask = xr.full_like(ds_combined.time, True, dtype=bool)
                 ds_mask[indices_to_remove] = False
                 ds_combined = ds_combined.where(ds_mask, drop=True)
-
-    # Remove all time points where mf is NaN
-    if dropna:
-        ds_combined = ds_combined.dropna(dim="time", subset = ["mf"])
 
     # Summarise instrument types in attributes
     # and remove instrument_type variable if all the same
