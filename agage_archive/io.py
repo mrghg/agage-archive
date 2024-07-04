@@ -57,6 +57,10 @@ def drop_duplicates(ds):
         xarray.Dataset: Dataset with duplicates removed
     """
 
+    # Return if there are no duplicates
+    if len(ds.time) == len(ds.time.drop_duplicates(dim="time")):
+        return ds
+
     # Find list of instrument_types, and sort them by the order in which they appeared
     instrument_types = []
     for instrument in ds.instrument_type.values:
@@ -68,41 +72,39 @@ def drop_duplicates(ds):
     ds["i"] = xr.full_like(ds.time, 0, dtype=int)
     ds["i"].values = np.arange(0, len(ds.time), 1)
 
-    if len(ds.time) != len(ds.time.drop_duplicates(dim="time")):
+    timestamps = ds.time.to_series()
+    duplicated_timestamps = timestamps[timestamps.duplicated(keep="first")]
 
-        timestamps = ds.time.to_series()
-        duplicated_timestamps = timestamps[timestamps.duplicated(keep="first")]
+    for timestamp in duplicated_timestamps:
 
-        for timestamp in duplicated_timestamps:
+        ds_duplicates = ds.sel(time=timestamp)
+        
+        # Is the mf a NaN for any of these?
+        i_nan = ds_duplicates["i"][np.isnan(ds_duplicates.mf.values)].values
 
-            ds_duplicates = ds.sel(time=timestamp)
-            
-            # Is the mf a NaN for any of these?
-            i_nan = ds_duplicates["i"][np.isnan(ds_duplicates.mf.values)].values
+        # If they are all NaN, drop all but the first
+        if len(i_nan) == len(ds_duplicates["i"]):
+            ds["drop"].values[i_nan[1:]] = np.nan
+        elif len(i_nan) > 0:
+            # If there are one or more NaNs, drop them
+            ds["drop"].values[i_nan] = np.nan
+        else:
+            pass
+        
+        # If there is more than one remaining value that isn't a NaN, 
+        # drop the one which appears first in the instrument_types list
+        i_not_nan = ds_duplicates["i"][~np.isnan(ds_duplicates.mf.values)].values
+        if len(i_not_nan) > 1:
+            instruments_not_nan = [ds["instrument_type"].values[i] for i in i_not_nan]
+            instrument_to_keep = instrument_types[min([instrument_types.index(instrument) for instrument in instruments_not_nan])]
+            i_to_keep = [i for i in i_not_nan if ds["instrument_type"].values[i] == instrument_to_keep][0]
+            i_to_drop = [i for i in i_not_nan if i != i_to_keep]
+            ds["drop"].values[i_to_drop] = np.nan
 
-            # If they are all NaN, drop all but the first
-            if len(i_nan) == len(ds_duplicates["i"]):
-                ds["drop"].values[i_nan[1:]] = np.nan
-            elif len(i_nan) > 0:
-                # If there are one or more NaNs, drop them
-                ds["drop"].values[i_nan] = np.nan
-            else:
-                pass
-            
-            # If there is more than one remaining value that isn't a NaN, 
-            # drop the one which appears first in the instrument_types list
-            i_not_nan = ds_duplicates["i"][~np.isnan(ds_duplicates.mf.values)].values
-            if len(i_not_nan) > 1:
-                instruments_not_nan = [ds["instrument_type"].values[i] for i in i_not_nan]
-                instrument_to_keep = instrument_types[min([instrument_types.index(instrument) for instrument in instruments_not_nan])]
-                i_to_keep = [i for i in i_not_nan if ds["instrument_type"].values[i] == instrument_to_keep][0]
-                i_to_drop = [i for i in i_not_nan if i != i_to_keep]
-                ds["drop"].values[i_to_drop] = np.nan
+    ds = ds.dropna(dim="time", subset=["drop"])
 
-        ds = ds.dropna(dim="time", subset=["drop"])
-
-        # Remove the i and drop variables
-        ds = ds.drop_vars(["i", "drop"])
+    # Remove the i and drop variables
+    ds = ds.drop_vars(["i", "drop"])
 
     return ds
 
@@ -172,7 +174,8 @@ def read_nc(network, species, site, instrument,
             baseline = None,
             resample = True,
             scale = "default",
-            public = True):
+            public = True,
+            dropna = True):
     """Read GCWerks netCDF files
 
     Args:
@@ -185,6 +188,7 @@ def read_nc(network, species, site, instrument,
         scale (str, optional): Scale to convert to. Defaults to "default". If None, will keep original scale.
         public (bool, optional): Whether the dataset is for public release. Default to True.
         resample (bool, optional): Whether to resample the data, if needed. Default to True.
+        dropna (bool, optional): Drop NaN values. Default to True.
         
     Raises:
         FileNotFoundError: Can't find netCDF file
@@ -290,6 +294,10 @@ def read_nc(network, species, site, instrument,
     if len(ds.time) != len(ds.time.drop_duplicates(dim="time")):
         ds = ds.drop_duplicates(dim="time")
 
+    # Remove all time points where mf is NaN
+    if dropna:
+        ds = ds.dropna(dim="time", subset = ["mf"])
+
     # If baseline is not None, return baseline dataset
     if baseline:
         ds_baseline = ds.baseline.copy(deep=True).to_dataset(name="baseline")
@@ -300,7 +308,7 @@ def read_nc(network, species, site, instrument,
     ds = format_variables(ds)
 
     # Convert scale, if needed
-    ds = scale_convert(ds, scale)
+    ds = scale_convert(ds, scale)    
 
     return ds
 
@@ -308,7 +316,8 @@ def read_nc(network, species, site, instrument,
 def read_baseline(network, species, site, instrument,
                 flag_name = "git_pollution_flag",
                 verbose = False,
-                public = True):
+                public = True,
+                dropna = True):
     """Read GCWerks netCDF files
 
     Args:
@@ -334,7 +343,8 @@ def read_baseline(network, species, site, instrument,
         ds_out = read_nc(network, species, site, instrument,
                         verbose=verbose,
                         baseline = flag_name,
-                        public=public)
+                        public=public,
+                        dropna=dropna)
 
     else:
 
@@ -344,7 +354,8 @@ def read_baseline(network, species, site, instrument,
         ds_out = read_ale_gage(network, species, site, instrument,
                            baseline = True,
                            verbose=verbose,
-                           public=public)
+                           public=public,
+                           dropna=dropna)
 
     # Add attributes
     ds_out.baseline.attrs = {
@@ -406,7 +417,8 @@ def read_ale_gage(network, species, site, instrument,
                   scale = "default",
                   baseline = False,
                   public=True,
-                  resample = False):
+                  resample = False,
+                  dropna = True):
     """Read GA Tech ALE/GAGE files, process and clean
 
     Args:
@@ -423,6 +435,7 @@ def read_ale_gage(network, species, site, instrument,
         baseline (bool, optional): Return baseline dataset. Defaults to False.
         public (bool, optional): Whether the dataset is for public release. Default to True.
         resample (bool, optional): Not used (see run_individual_instrument). Defaults to False.
+        dropna (bool, optional): Drop NaN values. Defaults to True.
 
     Returns:
         pd.DataFrame: Pandas dataframe containing file contents
@@ -601,6 +614,10 @@ def read_ale_gage(network, species, site, instrument,
                             public=public)
     ds = ds.sel(time=slice(None, rs))
 
+    # Remove all time points where mf is NaN
+    if dropna:
+        ds = ds.dropna(dim="time", subset = ["mf"])
+    
     # Remove pollution flag
     ds_baseline = ds.baseline.copy(deep=True).to_dataset(name="baseline")
     ds = ds.drop_vars("baseline")
@@ -622,7 +639,7 @@ def read_ale_gage(network, species, site, instrument,
 def read_gcwerks_flask(network, species, site, instrument,
                        verbose = True,
                        public = True,
-                       resample=True):
+                       dropna=True):
     '''Read GCWerks flask data
 
     Args:
@@ -632,7 +649,7 @@ def read_gcwerks_flask(network, species, site, instrument,
         instrument (str): Instrument
         verbose (bool, optional): Print verbose output. Defaults to False.
         public (bool, optional): Whether the dataset is for public release. Default to True.
-        resample (bool, optional): Whether to resample the data. Default to True, but actually doesn't do anything here
+        dropna (bool, optional): Drop NaN values. Default to True.
 
     Returns:
         xr.Dataset: Dataset containing data
@@ -721,6 +738,10 @@ def read_gcwerks_flask(network, species, site, instrument,
                         units="ppt",
                         calibration_scale = scale)
     
+    # Remove all time points where mf is NaN
+    if dropna:
+        ds = ds.dropna(dim="time", subset = ["mf"])
+
     return ds
 
 
@@ -728,7 +749,8 @@ def combine_datasets(network, species, site,
                     scale = "default",
                     verbose = True,
                     public = True,
-                    resample = True):
+                    resample = True,
+                    dropna = True):
     '''Combine ALE/GAGE/AGAGE datasets for a given species and site
 
     Args:
@@ -844,6 +866,10 @@ def combine_datasets(network, species, site,
     # Drop duplicates, which may have been introduced by overlapping instruments
     ds_combined = drop_duplicates(ds_combined)
 
+    # Remove all time points where mf is NaN
+    if dropna:
+        ds_combined = ds_combined.dropna(dim="time", subset = ["mf"])
+
     # Summarise instrument types in attributes
     # and remove instrument_type variable if all the same
     instrument_numbers = list(np.unique(ds_combined.instrument_type.values))
@@ -862,7 +888,8 @@ def combine_datasets(network, species, site,
 
 
 def combine_baseline(network, species, site,
-                     verbose = True, public = True):
+                     verbose = True, public = True,
+                     dropna = True):
     '''Combine ALE/GAGE/AGAGE baseline datasets for a given species and site
 
     Args:
@@ -870,6 +897,8 @@ def combine_baseline(network, species, site,
         species (str): Species
         site (str): Site
         verbose (bool, optional): Print verbose output. Defaults to False.
+        public (bool, optional): Whether the dataset is for public release. Default to True.
+        dropna (bool, optional): Drop all time points where mf is NaN. Default to
 
     Returns:
         xr.Dataset: Dataset containing data
@@ -887,7 +916,7 @@ def combine_baseline(network, species, site,
         ds = read_baseline(network, species, site, instrument,
                            verbose=verbose,
                            flag_name="git_pollution_flag",
-                           public=public)
+                           public=public, dropna=dropna)
 
         # Subset date
         ds = ds.sel(time=slice(*date))
