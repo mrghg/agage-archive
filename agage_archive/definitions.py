@@ -124,7 +124,7 @@ def get_instrument_number(instrument):
         int: Instrument number
     '''
 
-    if isinstance(instrument, int):
+    if isinstance(instrument, (int, np.integer)):
         raise ValueError("instrument cannot be an int")
 
     if len(instrument) <= 1:
