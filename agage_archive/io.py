@@ -132,7 +132,7 @@ def read_nc_path(network, species, site, instrument):
     if species_search in gcwerks_species:
         species_search = gcwerks_species[species_search]
 
-    gcmd_instruments = ["GCMD", "GCECD"]
+    gcmd_instruments = ["GCMD", "GCECD", "GCPDD"]
     optical_instruments = ["Picarro", "LGR"]
     gcms_instruments = ["GCMS-ADS", "GCMS-Medusa", "GCMS-MteCimone", "GCTOFMS"]
 

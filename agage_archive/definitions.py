@@ -74,7 +74,8 @@ instrument_number = {"UNDEFINED": -1,
                     "GCTOFMS": 6,
                     "Picarro": 7,
                     "LGR": 8,
-                    "GCMS-MteCimone": 9}
+                    "GCMS-MteCimone": 9,
+                    "GCPDD": 10,}
 
 minimum_averaging_period = {"Picarro": "1H"}
 
