@@ -639,7 +639,8 @@ def read_ale_gage(network, species, site, instrument,
 def read_gcwerks_flask(network, species, site, instrument,
                        verbose = True,
                        public = True,
-                       dropna=True):
+                       dropna=True,
+                       resample = False):
     '''Read GCWerks flask data
 
     Args:
@@ -650,6 +651,7 @@ def read_gcwerks_flask(network, species, site, instrument,
         verbose (bool, optional): Print verbose output. Defaults to False.
         public (bool, optional): Whether the dataset is for public release. Default to True.
         dropna (bool, optional): Drop NaN values. Default to True.
+        resample (bool, optional): Dummy kwarg, needed for consistency with other functions. Default to False.
 
     Returns:
         xr.Dataset: Dataset containing data
