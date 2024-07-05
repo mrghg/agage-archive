@@ -4,6 +4,8 @@ from zipfile import ZipFile
 from multiprocessing import Pool
 import time
 import traceback
+import os
+import xarray as xr
 
 from agage_archive.config import Paths, open_data_file, data_file_list, data_file_path, \
     copy_to_archive, output_path
@@ -612,7 +614,97 @@ def run_all(network,
         print("!!! Errors occurred during processing. See error_log_individual.txt for details")
 
 
+def read_repeatability(std_file, species):
+    """Read the repeatability values from the standard file
+    """
+
+    # Read the second and third lines of the file
+    with open(std_file) as f:
+        header = f.readline()
+        colnames1 = f.readline()
+        colnames2 = f.readline()
+
+    colnames = [(col1 + col2).replace("-", "") for col1, col2 in  zip(colnames1.split(), colnames2.split())]
+    colnames = [col[:-1].lower() if col[-1] == "C" else col for col in colnames]
+
+    df = pd.read_csv(std_file,
+                skiprows=3, delim_whitespace=True,
+                names=colnames,
+                parse_dates={'datetime': ['date', 'time']},
+                date_format='%y%m%d %H%M',
+                na_values="nan",
+                index_col='datetime')[species.lower()]
+
+    # Take running standard deviation with 48 hour window. Ignore NaNs
+    df = df.rolling(window=24, min_periods=1, center=True).std()
+
+    return df
+
+
+def replace_repeatability_and_height(raw_file, std_file, species, site):
+    """Replace the repeatability values in the raw file with the new values from the std file
+    Also replace the inlet height values for TAC and TOB
+
+    """
+
+    with xr.open_dataset(raw_file, engine="netcdf4") as f:
+        ds = f.load()
+
+    # Read new repeatability file
+    repeatability_df = read_repeatability(std_file, species)
+    original_repeatability = ds['mf_repeatability'].to_series()
+
+    # Replace the values
+    ds['mf_repeatability'] = repeatability_df.reindex(original_repeatability.index, method='nearest')
+
+    if(site == "TAC"):
+        ds['inlet_height'].loc[ds["time"] < pd.to_datetime("2017-03-09 15:00")] = 100
+        ds['inlet_height'].loc[ds["time"] >= pd.to_datetime("2017-03-09 15:00")] = 185
+    elif(site == "TOB"):
+        ds["inlet_height"].values[:] = 12
+
+    # Save the new file
+    ds.to_netcdf(raw_file)
+
+
+def preprocess():
+    """Preprocess data files before running the main script
+    Hopefully this will become redundant in the future
+    
+    """
+
+    paths = Paths("agage")
+
+    # SOME MD DATA IS MISSING AND IN THE WRONG FORMAT
+    sites = {"TAC": ["n2o", "co"],
+            "TOB": ["sf6"]}
+    og_paths = {"TAC": "/agage/summary/netcdf-decc/md/AGAGE-GCMD_TAC_species.nc",
+                "TOB": "/agage/summary/netcdf-other/md/AGAGE-GCECD_TOB_species.nc"}
+
+    for site in sites:
+
+        for sp in sites[site]:
+
+            # Copy MD files from md to md-modified directory, and replace repeatability
+            md_folder = data_file_path("", "agage", sub_path=paths.md_path)
+            og_path = og_paths[site].replace('species', sp.lower())
+            og_file = og_path.split('/')[-1]
+            std_path = og_path.replace(og_file, "") + f"stds/{site.upper()}_GCMD_stds.dat"
+
+            # Copy from to md path
+            os.system(f"cp {og_path} {md_folder}")
+
+            # Replace repeatability
+            replace_repeatability_and_height(md_folder / og_file, std_path, sp, site)
+
+    # For CGO H2 data, the PDD is mis-labelled (Issue #47)
+    if (md_folder / "AGAGE-GCMD_CGO_h2_pdd.nc").exists():
+        os.system(f"cp {md_folder / 'AGAGE-GCMD_CGO_h2_pdd.nc'} {md_folder / 'AGAGE-GCPDD_CGO_h2.nc'}")
+
+
 if __name__ == "__main__":
+
+    preprocess()
 
     start_time = time.time()
 
