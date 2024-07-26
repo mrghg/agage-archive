@@ -70,12 +70,13 @@ instrument_number = {"UNDEFINED": -1,
                     "GCMD": 2,
                     "GCMS-ADS": 3,
                     "GCMS-Medusa": 4,
-                    "GCECD": 5,
-                    "GCTOFMS": 6,
-                    "Picarro": 7,
-                    "LGR": 8,
-                    "GCMS-MteCimone": 9,
-                    "GCPDD": 10,}
+                    "GCMS-Medusa-flask": 5,
+                    "GCECD": 6,
+                    "GCTOFMS": 7,
+                    "Picarro": 8,
+                    "LGR": 9,
+                    "GCMS-MteCimone": 10,
+                    "GCPDD": 11,}
 
 minimum_averaging_period = {"Picarro": "1H"}
 

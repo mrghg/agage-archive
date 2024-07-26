@@ -740,6 +740,10 @@ def read_gcwerks_flask(network, species, site, instrument,
                         units="ppt",
                         calibration_scale = scale)
     
+    # Set the instrument_type attribute
+    # slightly convoluted method, but ensures consistency with combined files
+    ds.attrs["instrument_type"] = get_instrument_type(get_instrument_number(instrument))
+
     # Remove all time points where mf is NaN
     if dropna:
         ds = ds.dropna(dim="time", subset = ["mf"])
