@@ -228,7 +228,7 @@ def show_netcdf_info(sender, network, instrument_site, public,
         clear_output()
         for filename, dataset in zip(filenames, datasets):
             print(filename)
-            print(dataset)
+            print(dataset.info())
             print("-----------------------------------------")
             print("")
 

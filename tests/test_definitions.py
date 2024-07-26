@@ -29,6 +29,11 @@ def test_get_instrument_type():
     instrument_number = np.int8(1)
     instrument_type = get_instrument_type(instrument_number)
 
+    # Test for Medusa flask
+    instrument_number = 5
+    instrument_type = get_instrument_type(instrument_number)
+    assert instrument_type == "GCMS-Medusa-flask"
+
 
 def test_get_instrument_number():
     '''Test get_instrument_number function'''
@@ -46,7 +51,7 @@ def test_get_instrument_number():
     # Test for partial match
     instrument = "Picarro-1"
     instrument_number = get_instrument_number(instrument)
-    assert instrument_number == 7
+    assert instrument_number == 8
 
     # Test for no match
     instrument = "Invalid"
