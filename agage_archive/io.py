@@ -1027,7 +1027,7 @@ def output_dataset(ds, network,
     ds_out = ds_out.sel(time=slice(None, end_date))
 
     if len(ds_out.time) == 0:
-        raise ValueError(f"No data retained for {ds_out.attrs['species']} {ds_out.attrs['site_code']} {instrument} after applying release schedule end dates. " + \
+        raise ValueError(f"No data retained for {ds_out.attrs['species']} when trying write {filename} after applying release schedule end dates. " + \
                         "Check dates in release schedule or omit this instrument.")
 
     output_write(ds_out, out_path, filename,
