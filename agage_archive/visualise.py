@@ -1,4 +1,5 @@
 import plotly.graph_objects as go
+import numpy as np
 
 from agage_archive.definitions import instrument_type_definition, unit_translator
 
@@ -81,7 +82,7 @@ def plot_combined(ds, fig, mode="lines"):
     global colour_counter
 
     # Get unique instrument types
-    instrument_types = set(ds.instrument_type.values)
+    instrument_types = set(ds.instrument_type.values.flatten())
 
     # Remove unidentified instrument type
     instrument_types.discard(-1)
