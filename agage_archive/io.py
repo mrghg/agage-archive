@@ -176,7 +176,7 @@ def read_nc(network, species, site, instrument,
             scale = "default",
             public = True,
             dropna = True,
-            inlet_separate = False):
+            inlet_separate = True):
     """Read GCWerks netCDF files
 
     Args:
@@ -424,7 +424,7 @@ def read_ale_gage(network, species, site, instrument,
                   public=True,
                   resample = False,
                   dropna = True,
-                  inlet_separate = False):
+                  inlet_separate = True):
     """Read GA Tech ALE/GAGE files, process and clean
 
     Args:
@@ -623,7 +623,7 @@ def read_ale_gage(network, species, site, instrument,
 
     # Remove all time points where mf is NaN
     if dropna:
-        ds = ds.dropna(dim="time", subset = ["mf"])
+        ds = ds.dropna(dim="time", subset = ["mf"], how="all")
     
     if inlet_separate:
         ds = separate_inlets(ds)
@@ -888,7 +888,7 @@ def combine_datasets(network, species, site,
 
     # Remove all time points where mf is NaN
     if dropna:
-        ds_combined = ds_combined.dropna(dim="time", subset = ["mf"])
+        ds_combined = ds_combined.dropna(dim="time", subset = ["mf"], how="all")
 
     # Summarise instrument types in attributes
     # and remove instrument_type variable if all the same

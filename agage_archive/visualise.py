@@ -11,6 +11,30 @@ instrument_number, instrument_number_string = instrument_type_definition()
 
 def plot_add_trace(fig, ds,
                 name="", mode="lines"):
+    """ Add a trace to a plot
+
+    Args:
+        fig (plotly.graph_objects.Figure): Figure object
+        ds (xarray.Dataset): Dataset containing AGAGE mole fraction data
+        name (str): Name of the trace
+        mode (str) : how to plot the data. Defaults to "line", but can be set to "markers" if desired
+
+    Returns:
+        plotly.graph_objects.Figure: Figure object
+    """
+
+    def plotter(x, y, name):
+        return go.Scatter(
+            visible=True,
+            mode=mode,
+            marker=dict(color=colours[colour_counter % colour_max], size=5, symbol='cross'),
+            line=dict(color=colours[colour_counter % colour_max], width=2),
+            name=name,
+            x=x,
+            y=y,
+        )
+
+    global colour_counter
 
     # If data density is more than one point every hour, thin the dataset
     time_diff = ds.time.diff(dim="time")
@@ -23,16 +47,20 @@ def plot_add_trace(fig, ds,
     else:
         ds_plot = ds.copy()
 
-    # Add trace
-    fig.add_trace(
-        go.Scatter(
-            visible=True,
-            mode=mode,
-            marker=dict(color=colours[colour_counter % colour_max], size=5, symbol='cross'),
-            line=dict(color=colours[colour_counter % colour_max], width=2),
-            name=name,
-            x=ds_plot.time,
-            y=ds_plot.mf)
+    if "inlet" in ds_plot.dims:
+        for inlet in ds_plot.inlet.values:
+            # Add trace
+            fig.add_trace(
+                plotter(ds_plot.time,
+                        ds_plot.mf.sel(inlet=inlet),
+                        name=f"{name}: {inlet}m")
+            )
+            colour_counter += 1
+    else:
+        fig.add_trace(
+            plotter(ds_plot.time,
+                    ds_plot.mf,
+                    name=name)
         )
 
     return fig

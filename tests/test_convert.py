@@ -62,6 +62,9 @@ def test_resample():
     ds["mf_repeatability"].attrs["calibration_scale"] = "TU-87"
     ds["mf_repeatability"].attrs["long_name"] = "Repeatability"
 
+    # Add some global attributes
+    ds.attrs["version"] = "test"
+
     # Set the baseline variable to 0 once every two hours
     ds.baseline.values[::120] = 0
 
@@ -89,6 +92,9 @@ def test_resample():
     assert ds_resample.mf_variability.attrs["calibration_scale"] == ds_resample.mf.attrs["calibration_scale"]
     assert ds_resample.mf_repeatability.attrs["units"] == ds_resample.mf.attrs["units"]
 
+    assert "version" in ds_resample.attrs.keys()
+    assert ds_resample.attrs["version"] == "test"
+
     # Test again, but this time with all variables defined dimensions [time, inlet]
     inlets = [10, 70]
     data = np.random.rand(len(time), len(inlets))
@@ -104,6 +110,9 @@ def test_resample():
     ds["mf_repeatability"].attrs["units"] = "1e-9"
     ds["mf_repeatability"].attrs["calibration_scale"] = "TU-87"
     ds["mf_repeatability"].attrs["long_name"] = "Repeatability"
+
+    # Add some global attributes
+    ds.attrs["version"] = "test"
 
     # Set the baseline variable to 0 once every two hours
     ds.baseline.values[::120, 0] = 0
@@ -126,6 +135,9 @@ def test_resample():
 
     # Check that mf is the mean of the original data
     assert np.allclose(ds_resample.mf.values[0, 0], data[:60, 0].mean(axis=0))
+
+    assert "version" in ds_resample.attrs.keys()
+    assert ds_resample.attrs["version"] == "test"
 
 
 def test_monthly_baseline():
