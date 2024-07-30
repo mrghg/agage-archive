@@ -2,8 +2,9 @@ import xarray as xr
 import pandas as pd
 import numpy as np
 
-from agage_archive.convert import resample
-from agage_archive.convert import monthly_baseline, scale_convert
+from agage_archive.convert import resample, separate_inlets, \
+    monthly_baseline, scale_convert
+from agage_archive.io import read_nc
 
 
 def test_scale_convert():
@@ -88,6 +89,44 @@ def test_resample():
     assert ds_resample.mf_variability.attrs["calibration_scale"] == ds_resample.mf.attrs["calibration_scale"]
     assert ds_resample.mf_repeatability.attrs["units"] == ds_resample.mf.attrs["units"]
 
+    # Test again, but this time with all variables defined dimensions [time, inlet]
+    inlets = [10, 70]
+    data = np.random.rand(len(time), len(inlets))
+    ds = xr.Dataset({"time": time,
+                    "inlet": inlets,
+                    "mf": (["time", "inlet"], data),
+                    "mf_repeatability": (["time", "inlet"], data * 0.1),
+                    "sampling_period": (["time", "inlet"], np.ones((len(time), len(inlets))) * 60),
+                    "baseline": (["time", "inlet"], np.ones((len(time), len(inlets))) * 1)})
+    ds["mf"].attrs["units"] = "1e-9"
+    ds["mf"].attrs["calibration_scale"] = "TU-87"
+
+    ds["mf_repeatability"].attrs["units"] = "1e-9"
+    ds["mf_repeatability"].attrs["calibration_scale"] = "TU-87"
+    ds["mf_repeatability"].attrs["long_name"] = "Repeatability"
+
+    # Set the baseline variable to 0 once every two hours
+    ds.baseline.values[::120, 0] = 0
+    ds.baseline.values[::120, 1] = 0
+
+    # Test resample function
+    ds_resample = resample(ds, resample_period="3600s", resample_threshold="600s")
+
+    # Check that the dataset has been resampled to hourly
+    assert ds_resample.time.diff("time").median() == np.timedelta64(3600, "s")
+
+    # Check that the baseline variable has been resampled correctly
+    assert np.all(ds_resample.baseline.values[::2, 0] == 0)
+    assert np.all(ds_resample.baseline.values[1::2, 0] == 1)
+    assert np.all(ds_resample.baseline.values[::2, 1] == 0)
+    assert np.all(ds_resample.baseline.values[1::2, 1] == 1)
+
+    # Check that the sampling_period variable has been resampled correctly
+    assert np.all(ds_resample.sampling_period.values == 3600)
+
+    # Check that mf is the mean of the original data
+    assert np.allclose(ds_resample.mf.values[0, 0], data[:60, 0].mean(axis=0))
+
 
 def test_monthly_baseline():
     
@@ -136,3 +175,27 @@ def test_monthly_baseline():
 
     # Check that a version number is present
     assert "version" in ds_monthly.attrs.keys()
+
+
+def test_multi_inlet():
+
+    ds = read_nc("agage_test", "ch3ccl3", "CGO", "GCMD", inlet_separate=False)
+
+    # Test separate_inlets function
+    ds_separated = separate_inlets(ds)
+
+    # Check that the dataset has been separated into inlets
+    assert "inlet" in ds_separated.dims
+    assert ds_separated.inlet.size == 2
+
+    # Check that the data has been separated correctly
+    assert np.all(ds_separated.mf.sel(dict(inlet=10)).dropna(dim="time").values == \
+        ds.mf.where(ds.inlet_height == 10, drop=True).values)
+    assert np.all(ds_separated.mf.sel(dict(inlet=70)).dropna(dim="time").values == \
+        ds.mf.where(ds.inlet_height == 70, drop=True).values)
+
+    ds_separated_a = read_nc("agage_test", "ch3ccl3", "CGO", "GCMD", inlet_separate=True)
+
+    assert ds_separated_a.inlet.size == 2
+    assert np.all(ds_separated_a.mf.sel(dict(inlet=10)).dropna(dim="time").values == \
+        ds.mf.where(ds.inlet_height == 10, drop=True).values)

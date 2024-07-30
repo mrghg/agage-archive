@@ -43,54 +43,77 @@ def resample(ds,
     if pd.to_timedelta(ds.time.diff("time").median().values) < \
             pd.to_timedelta(resample_threshold):
 
-        # Pandas does resampling more efficiently, for some reason
-        df = ds.to_dataframe()
-        df_resample = df.resample(resample_period, closed="left", label="left")
-        df_resample_means = df_resample.mean()
-        df_resample_std = df_resample.std(ddof=0) # Use biased estimator for standard deviation
+        # Pandas resampling is more efficient than xarray resampling, so use that
+        df_resample = {}
+        df_resample_means = {}
+        df_resample_std = {}
+        if "inlet" in ds.dims:
+            inlets = ds.inlet.values
+            for inlet in inlets:
+                df = ds.sel(inlet=inlet).to_dataframe()
+                df_resample[inlet] = df.resample(resample_period, closed="left", label="left")
+                df_resample_means[inlet] = df_resample[inlet].mean()
+                df_resample_std[inlet] = df_resample[inlet].std(ddof=0)
+        else:
+            inlets = [0]
+            df = ds.to_dataframe()
+            df_resample[0] = df.resample(resample_period, closed="left", label="left")
+            df_resample_means[0] = df_resample[0].mean()
+            df_resample_std[0] = df_resample[0].std(ddof=0)
+
+        # Create list of variables from dataset, excluding time and inlet
+        variables = list(ds.variables)
+        variables.remove("time")
+        if "inlet" in variables:
+            variables.remove("inlet")
 
         # Create new dataset to store resampled data
-        ds = ds.isel(time=0)
+        ds = ds.isel(dict(time=0)).copy()
 
         # Expand dimensions to include time
         # This step removes time attributes, so need to store and replace
         time_attrs = ds.time.attrs
-        ds = ds.expand_dims(time=df_resample_means.index)
+        ds = ds.expand_dims(time=df_resample_means[inlets[0]].index).copy(deep=True)
         ds.time.attrs = time_attrs
-
-        # Create list of variables from dataset, excluding time
-        variables = list(ds.variables)
-        variables.remove("time")
 
         # Update variables with resampled data
         for var in variables:
-            if variable_defaults[var]["resample_method"] == "mean":
-                ds[var].values = df_resample_means[var].values
-            elif variable_defaults[var]["resample_method"] == "median":
-                ds[var].values = df_resample[var].median().values
-            elif variable_defaults[var]["resample_method"] == "sum":
-                ds[var].values = df_resample[var].sum().values
-            elif variable_defaults[var]["resample_method"] == "standard_error":
-                ds[var].values = df_resample[var].mean().values / np.sqrt(df_resample[var].count().values)
-                ds[var].attrs["long_name"] = "Standard error in mean of " + ds[var].attrs["long_name"].lower()
-            elif variable_defaults[var]["resample_method"] == "mode":
-                ds[var].values = df_resample[var].apply(lambda x: x.mode()[0] if not x.mode().empty else -1)
-            else:
-                if var == "baseline":
-                    # If any value in a resampled period is not 1, set baseline to 0
-                    ds[var].values = np.where(df_resample[var].prod() != 1, 0, 1)
-                elif var == "sampling_period":
-                    # Set sampling period to resample_period
-                    ds[var].values = np.ones_like(ds.time.values).astype(float) * pd.Timedelta(resample_period).total_seconds()
-                elif var == "mf_variability":
-                    # Overwritten below
-                    pass
+            for inlet in inlets:
+                if "inlet" in ds.dims:
+                    inlet_dict = {"inlet": inlet}
                 else:
-                    raise ValueError(f"Resample method not defined for {var}")
+                    inlet_dict = {}
+                if variable_defaults[var]["resample_method"] == "mean":
+                    ds[var].loc[inlet_dict] = df_resample_means[inlet][var].values.copy()
+                elif variable_defaults[var]["resample_method"] == "median":
+                    ds[var].loc[inlet_dict] = df_resample[inlet][var].median().values
+                elif variable_defaults[var]["resample_method"] == "sum":
+                    ds[var].loc[inlet_dict] = df_resample[inlet][var].sum().values
+                elif variable_defaults[var]["resample_method"] == "standard_error":
+                    ds[var].loc[inlet_dict] = df_resample_means[inlet][var].values / np.sqrt(df_resample[inlet][var].count().values)
+                    ds[var].attrs["long_name"] = "Standard error in mean of " + ds[var].attrs["long_name"].lower()
+                elif variable_defaults[var]["resample_method"] == "mode":
+                    ds[var].loc[inlet_dict] = df_resample[inlet][var].apply(lambda x: x.mode()[0] if not x.mode().empty else -1).values
+                else:
+                    if var == "baseline":
+                        # If any value in a resampled period is not 1, set baseline to 0
+                        ds[var].loc[inlet_dict] = np.where(df_resample[inlet][var].prod() != 1, 0, 1)
+                    elif var == "sampling_period":
+                        # Set sampling period to resample_period
+                        ds[var].loc[inlet_dict] = np.ones_like(ds.time.values).astype(float) * pd.Timedelta(resample_period).total_seconds()
+                    elif var == "mf_variability":
+                        # Overwritten below
+                        pass
+                    else:
+                        raise ValueError(f"Resample method not defined for {var}")
+
+        # Construct mf_variability dataArray to add to dataset
+        mf_variability = np.array([df_resample_std[inlet]["mf"].values for inlet in inlets])
 
         # Add in mole fraction standard deviation variable
-        ds["mf_variability"] = xr.DataArray(df_resample_std["mf"].values, dims=["time"],
-                                            coords={"time": ds.time})
+        ds["mf_variability"] = xr.DataArray(mf_variability.reshape(ds["mf"].shape),
+                                            dims=ds.mf.dims,
+                                            coords=ds.mf.coords)
         ds["mf_variability"].attrs = variable_defaults["mf_variability"]["attrs"].copy()
         ds["mf_variability"].attrs["units"] = ds["mf"].attrs["units"]
         # Copy either "calibration_scale" or "scale" attribute from "mf" variable
@@ -104,8 +127,9 @@ def resample(ds,
         # Add in number of samples variable
         # If this variable is already in the dataset, it should have been resampled apprioriately
         if not "mf_count" in variables:
-            ds["mf_count"] = xr.DataArray(df_resample["mf"].count().values, dims=["time"],
-                                    coords={"time": ds.time})
+            mf_count = np.array([df_resample[inlet]["mf"].count().values for inlet in inlets])
+            ds["mf_count"] = xr.DataArray(mf_count.reshape(ds["mf"].shape),
+                                        dims=ds.mf.dims)
             ds["mf_count"].attrs = variable_defaults["mf_count"]["attrs"].copy()
             ds["mf_count"].attrs["units"] = ""
         
@@ -219,3 +243,31 @@ def scale_convert(ds, scale_new):
             ds_out[var].attrs["scale"] = scale_new
 
     return ds_out
+
+
+def separate_inlets(ds):
+    """Separate dataset into dimension inlets based on inlet_height
+
+    Args:
+        ds (xarray.Dataset): Dataset
+
+    Returns:
+        xarray.Dataset: Dataset with inlet dimension
+    """
+
+    inlets = sorted(np.unique(ds.inlet_height.values))
+
+    # Assign values to the inlet dimension based on inlet_height and replace all other values with NaN or equivalent
+    ds_inlets = []
+    for inlet in inlets:
+        ds_inlet = ds.where(ds.inlet_height == inlet, drop=True)
+        ds_inlet = ds_inlet.assign_coords({"inlet": inlet})
+        ds_inlets.append(ds_inlet)
+
+    ds = xr.concat(ds_inlets, dim="inlet")
+    ds.inlet.attrs = {"long_name": "inlet height", "units": "m"}
+
+    # If all values in one inlet are NaN, drop the inlet
+    ds = ds.dropna(dim="inlet", how="all")
+
+    return ds

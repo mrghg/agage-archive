@@ -13,6 +13,18 @@
         },
         "optional": "False"
     },
+    "inlet": {
+        "attrs": {
+            "long_name": "inlet height",
+            "units": "m",
+            "comment": "Inlet height in metres above inlet_base_elevation_masl"
+        },
+        "encoding": {
+            "dtype": "i2",
+            "_FillValue": -99
+        },
+        "optional": "True"
+    },
     "mf": {
         "attrs": {
             "long_name": "Mole fraction of %",

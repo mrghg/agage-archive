@@ -8,7 +8,7 @@ import json
 
 from agage_archive.config import Paths, open_data_file, data_file_list, \
     output_path
-from agage_archive.convert import scale_convert
+from agage_archive.convert import scale_convert, separate_inlets
 from agage_archive.convert import resample as resample_function
 from agage_archive.formatting import format_species, \
     format_variables, format_attributes, format_species_flask
@@ -175,7 +175,8 @@ def read_nc(network, species, site, instrument,
             resample = True,
             scale = "default",
             public = True,
-            dropna = True):
+            dropna = True,
+            inlet_separate = False):
     """Read GCWerks netCDF files
 
     Args:
@@ -284,10 +285,6 @@ def read_nc(network, species, site, instrument,
     if "mf_mean_stdev" in ds:
         ds = ds.rename({"mf_mean_stdev": "mf_variability"})
 
-    # Resample dataset, if needed and called
-    if resample:
-        ds = resample_function(ds)
-
     # Check that time is monotonic and that there are no duplicate indices
     if not pd.Index(ds.time).is_monotonic_increasing:
         ds.sortby("time", inplace=True)
@@ -296,7 +293,15 @@ def read_nc(network, species, site, instrument,
 
     # Remove all time points where mf is NaN
     if dropna:
-        ds = ds.dropna(dim="time", subset = ["mf"])
+        ds = ds.dropna(dim="time", subset = ["mf"], how="all")
+
+    # Separate into inlet dimensions
+    if inlet_separate:
+        ds = separate_inlets(ds)
+
+    # Resample dataset, if needed and called
+    if resample:
+        ds = resample_function(ds)
 
     # If baseline is not None, return baseline dataset
     if baseline:
@@ -418,7 +423,8 @@ def read_ale_gage(network, species, site, instrument,
                   baseline = False,
                   public=True,
                   resample = False,
-                  dropna = True):
+                  dropna = True,
+                  inlet_separate = False):
     """Read GA Tech ALE/GAGE files, process and clean
 
     Args:
@@ -436,6 +442,7 @@ def read_ale_gage(network, species, site, instrument,
         public (bool, optional): Whether the dataset is for public release. Default to True.
         resample (bool, optional): Not used (see run_individual_instrument). Defaults to False.
         dropna (bool, optional): Drop NaN values. Defaults to True.
+        inlet_separate (bool, optional): Separate inlets into new dimension. Defaults to False.
 
     Returns:
         pd.DataFrame: Pandas dataframe containing file contents
@@ -618,6 +625,9 @@ def read_ale_gage(network, species, site, instrument,
     if dropna:
         ds = ds.dropna(dim="time", subset = ["mf"])
     
+    if inlet_separate:
+        ds = separate_inlets(ds)
+
     # Remove pollution flag
     ds_baseline = ds.baseline.copy(deep=True).to_dataset(name="baseline")
     ds = ds.drop_vars("baseline")
@@ -640,7 +650,8 @@ def read_gcwerks_flask(network, species, site, instrument,
                        verbose = True,
                        public = True,
                        dropna=True,
-                       resample = False):
+                       resample = False,
+                       inlet_separate = False):
     '''Read GCWerks flask data
 
     Args:
@@ -747,6 +758,9 @@ def read_gcwerks_flask(network, species, site, instrument,
     # Remove all time points where mf is NaN
     if dropna:
         ds = ds.dropna(dim="time", subset = ["mf"])
+
+    if inlet_separate:
+        ds = separate_inlets(ds)
 
     return ds
 

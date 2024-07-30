@@ -219,6 +219,8 @@ def read_data_exclude(ds, species, site, instrument,
             for var in ds.variables:
                 if "time" in var:
                     continue
+                elif var == "inlet":
+                    continue
                 elif variable_defaults[var]["remove_flagged"] == "True":
                     ds[var].loc[exclude_dict] = np.nan
                 elif variable_defaults[var]["remove_flagged"] == "False":
