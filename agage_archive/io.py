@@ -80,7 +80,10 @@ def drop_duplicates(ds):
         ds_duplicates = ds.sel(time=timestamp)
         
         # Is the mf a NaN for any of these?
-        i_nan = ds_duplicates["i"][np.isnan(ds_duplicates.mf.values)].values
+        if "inlet" in ds.dims:
+            i_nan = ds_duplicates["i"][np.isnan(ds_duplicates.mf.mean(dim="inlet").values)].values
+        else:
+            i_nan = ds_duplicates["i"][np.isnan(ds_duplicates.mf.values)].values
 
         # If they are all NaN, drop all but the first
         if len(i_nan) == len(ds_duplicates["i"]):
@@ -93,7 +96,10 @@ def drop_duplicates(ds):
         
         # If there is more than one remaining value that isn't a NaN, 
         # drop the one which appears first in the instrument_types list
-        i_not_nan = ds_duplicates["i"][~np.isnan(ds_duplicates.mf.values)].values
+        if "inlet" in ds.dims:
+            i_not_nan = ds_duplicates["i"][~np.isnan(ds_duplicates.mf.mean(dim="inlet").values)].values
+        else:
+            i_not_nan = ds_duplicates["i"][~np.isnan(ds_duplicates.mf.values)].values
         if len(i_not_nan) > 1:
             instruments_not_nan = [ds["instrument_type"].values[i] for i in i_not_nan]
             instrument_to_keep = instrument_types[min([instrument_types.index(instrument) for instrument in instruments_not_nan])]
