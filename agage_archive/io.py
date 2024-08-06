@@ -63,7 +63,12 @@ def drop_duplicates(ds):
 
     # Find list of instrument_types, and sort them by the order in which they appeared
     instrument_types = []
-    for instrument in ds.instrument_type.values:
+    if "inlet" in ds.dims:
+        instrument_type_flattened = ds.instrument_type.stack(i=("time", "inlet")).values
+    else:
+        instrument_type_flattened = ds.instrument_type.values
+
+    for instrument in instrument_type_flattened:
         if instrument not in instrument_types:
             instrument_types.append(instrument)
 
