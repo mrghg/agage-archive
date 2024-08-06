@@ -41,15 +41,22 @@ def plot_add_trace(fig, ds,
 
     global colour_counter
 
-    # If data density is more than one point every hour, thin the dataset
-    time_diff = ds.time.diff(dim="time")
 
-    # Calculate the average time difference in seconds
-    avg_time_diff = time_diff.mean().values / 1e9  
-    if avg_time_diff < 600:
-        print("Thinning dataset")
-        ds_plot = ds.isel(time=slice(None, None, 60))
+    # If data density is more than one point every hour, thin the dataset
+    if ds.time.size >= 2:
+
+        time_diff = ds.time.diff(dim="time")
+
+        # Calculate the average time difference in seconds
+        avg_time_diff = time_diff.mean().values / 1e9  
+        if avg_time_diff < 600:
+            print("Thinning dataset")
+            ds_plot = ds.isel(time=slice(None, None, 60))
+        else:
+            ds_plot = ds.copy()
+    
     else:
+        
         ds_plot = ds.copy()
 
     if "inlet" in ds_plot.dims:

@@ -72,6 +72,9 @@ def drop_duplicates(ds):
         if instrument not in instrument_types:
             instrument_types.append(instrument)
 
+    # Remove any negative numbers in instrument types (these are undefined)
+    instrument_types = [i for i in instrument_types if i >= 0]
+
     # Create a column to drop duplicates
     ds["drop"] = xr.full_like(ds.time, 1., dtype=float)
     ds["i"] = xr.full_like(ds.time, 0, dtype=int)
@@ -83,7 +86,7 @@ def drop_duplicates(ds):
     for timestamp in duplicated_timestamps:
 
         ds_duplicates = ds.sel(time=timestamp)
-        
+
         # Is the mf a NaN for any of these?
         if "inlet" in ds.dims:
             i_nan = ds_duplicates["i"][np.isnan(ds_duplicates.mf.mean(dim="inlet").values)].values
@@ -100,15 +103,16 @@ def drop_duplicates(ds):
             pass
         
         # If there is more than one remaining value that isn't a NaN, 
-        # drop the one which appears first in the instrument_types list
+        # drop the one which appears last in the instrument_types list (likely newest)
         if "inlet" in ds.dims:
             i_not_nan = ds_duplicates["i"][~np.isnan(ds_duplicates.mf.mean(dim="inlet").values)].values
         else:
             i_not_nan = ds_duplicates["i"][~np.isnan(ds_duplicates.mf.values)].values
         if len(i_not_nan) > 1:
-            instruments_not_nan = [ds["instrument_type"].values[i] for i in i_not_nan]
+            # The "max" here is in case there are multiple inlets (negative = undefined)
+            instruments_not_nan = [max(ds["instrument_type"].values[i]) for i in i_not_nan]
             instrument_to_keep = instrument_types[min([instrument_types.index(instrument) for instrument in instruments_not_nan])]
-            i_to_keep = [i for i in i_not_nan if ds["instrument_type"].values[i] == instrument_to_keep][0]
+            i_to_keep = [i for i in i_not_nan if max(ds["instrument_type"].values[i]) == instrument_to_keep][0]
             i_to_drop = [i for i in i_not_nan if i != i_to_keep]
             ds["drop"].values[i_to_drop] = np.nan
 
