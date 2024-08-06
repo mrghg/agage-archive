@@ -225,7 +225,7 @@ def format_variables(ds,
     vars_out = {}
 
     # Loop through standard variable names
-    variables_standardise = [v for v in variables if v != "time"]
+    variables_standardise = [v for v in variables if v not in ["time", "inlet"]]
     for var in variables_standardise:
 
         # Do we need to translate any variable names?
@@ -254,7 +254,7 @@ def format_variables(ds,
             
             var_temp = ds[var_ds].values.copy()
             var_temp[np.isnan(var_temp)] = missing_value
-            vars_out[var] = ("time", var_temp.copy().astype(typ))
+            vars_out[var] = (ds[var_ds].dims, var_temp.copy().astype(typ))
 
             warnings.simplefilter("default")
 
@@ -263,10 +263,9 @@ def format_variables(ds,
                 raise ValueError(f"Variable {var_ds} not found in dataset. " + \
                                 "Use variable_translate to map to a different variable name.")
     
-
     # Create new dataset
     ds = xr.Dataset(vars_out,
-                    coords = {"time": ds.time.copy()}, 
+                    coords = ds.coords,
                     attrs=attrs)
 
     # Add variable attributes and encoding

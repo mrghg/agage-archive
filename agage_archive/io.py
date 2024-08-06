@@ -8,7 +8,7 @@ import json
 
 from agage_archive.config import Paths, open_data_file, data_file_list, \
     output_path
-from agage_archive.convert import scale_convert
+from agage_archive.convert import scale_convert, separate_inlets
 from agage_archive.convert import resample as resample_function
 from agage_archive.formatting import format_species, \
     format_variables, format_attributes, format_species_flask
@@ -63,9 +63,17 @@ def drop_duplicates(ds):
 
     # Find list of instrument_types, and sort them by the order in which they appeared
     instrument_types = []
-    for instrument in ds.instrument_type.values:
+    if "inlet" in ds.dims:
+        instrument_type_flattened = ds.instrument_type.stack(i=("time", "inlet")).values
+    else:
+        instrument_type_flattened = ds.instrument_type.values
+
+    for instrument in instrument_type_flattened:
         if instrument not in instrument_types:
             instrument_types.append(instrument)
+
+    # Remove any negative numbers in instrument types (these are undefined)
+    instrument_types = [i for i in instrument_types if i >= 0]
 
     # Create a column to drop duplicates
     ds["drop"] = xr.full_like(ds.time, 1., dtype=float)
@@ -78,9 +86,12 @@ def drop_duplicates(ds):
     for timestamp in duplicated_timestamps:
 
         ds_duplicates = ds.sel(time=timestamp)
-        
+
         # Is the mf a NaN for any of these?
-        i_nan = ds_duplicates["i"][np.isnan(ds_duplicates.mf.values)].values
+        if "inlet" in ds.dims:
+            i_nan = ds_duplicates["i"][np.isnan(ds_duplicates.mf.mean(dim="inlet").values)].values
+        else:
+            i_nan = ds_duplicates["i"][np.isnan(ds_duplicates.mf.values)].values
 
         # If they are all NaN, drop all but the first
         if len(i_nan) == len(ds_duplicates["i"]):
@@ -92,12 +103,16 @@ def drop_duplicates(ds):
             pass
         
         # If there is more than one remaining value that isn't a NaN, 
-        # drop the one which appears first in the instrument_types list
-        i_not_nan = ds_duplicates["i"][~np.isnan(ds_duplicates.mf.values)].values
+        # drop the one which appears last in the instrument_types list (likely newest)
+        if "inlet" in ds.dims:
+            i_not_nan = ds_duplicates["i"][~np.isnan(ds_duplicates.mf.mean(dim="inlet").values)].values
+        else:
+            i_not_nan = ds_duplicates["i"][~np.isnan(ds_duplicates.mf.values)].values
         if len(i_not_nan) > 1:
-            instruments_not_nan = [ds["instrument_type"].values[i] for i in i_not_nan]
+            # The "max" here is in case there are multiple inlets (negative = undefined)
+            instruments_not_nan = [max(ds["instrument_type"].values[i]) for i in i_not_nan]
             instrument_to_keep = instrument_types[min([instrument_types.index(instrument) for instrument in instruments_not_nan])]
-            i_to_keep = [i for i in i_not_nan if ds["instrument_type"].values[i] == instrument_to_keep][0]
+            i_to_keep = [i for i in i_not_nan if max(ds["instrument_type"].values[i]) == instrument_to_keep][0]
             i_to_drop = [i for i in i_not_nan if i != i_to_keep]
             ds["drop"].values[i_to_drop] = np.nan
 
@@ -175,7 +190,8 @@ def read_nc(network, species, site, instrument,
             resample = True,
             scale = "default",
             public = True,
-            dropna = True):
+            dropna = True,
+            inlet_separate = True):
     """Read GCWerks netCDF files
 
     Args:
@@ -284,10 +300,6 @@ def read_nc(network, species, site, instrument,
     if "mf_mean_stdev" in ds:
         ds = ds.rename({"mf_mean_stdev": "mf_variability"})
 
-    # Resample dataset, if needed and called
-    if resample:
-        ds = resample_function(ds)
-
     # Check that time is monotonic and that there are no duplicate indices
     if not pd.Index(ds.time).is_monotonic_increasing:
         ds.sortby("time", inplace=True)
@@ -296,7 +308,15 @@ def read_nc(network, species, site, instrument,
 
     # Remove all time points where mf is NaN
     if dropna:
-        ds = ds.dropna(dim="time", subset = ["mf"])
+        ds = ds.dropna(dim="time", subset = ["mf"], how="all")
+
+    # Separate into inlet dimensions
+    if inlet_separate:
+        ds = separate_inlets(ds)
+
+    # Resample dataset, if needed and called
+    if resample:
+        ds = resample_function(ds)
 
     # If baseline is not None, return baseline dataset
     if baseline:
@@ -418,7 +438,8 @@ def read_ale_gage(network, species, site, instrument,
                   baseline = False,
                   public=True,
                   resample = False,
-                  dropna = True):
+                  dropna = True,
+                  inlet_separate = True):
     """Read GA Tech ALE/GAGE files, process and clean
 
     Args:
@@ -436,6 +457,7 @@ def read_ale_gage(network, species, site, instrument,
         public (bool, optional): Whether the dataset is for public release. Default to True.
         resample (bool, optional): Not used (see run_individual_instrument). Defaults to False.
         dropna (bool, optional): Drop NaN values. Defaults to True.
+        inlet_separate (bool, optional): Separate inlets into new dimension. Defaults to False.
 
     Returns:
         pd.DataFrame: Pandas dataframe containing file contents
@@ -616,8 +638,11 @@ def read_ale_gage(network, species, site, instrument,
 
     # Remove all time points where mf is NaN
     if dropna:
-        ds = ds.dropna(dim="time", subset = ["mf"])
+        ds = ds.dropna(dim="time", subset = ["mf"], how="all")
     
+    if inlet_separate:
+        ds = separate_inlets(ds)
+
     # Remove pollution flag
     ds_baseline = ds.baseline.copy(deep=True).to_dataset(name="baseline")
     ds = ds.drop_vars("baseline")
@@ -640,7 +665,8 @@ def read_gcwerks_flask(network, species, site, instrument,
                        verbose = True,
                        public = True,
                        dropna=True,
-                       resample = False):
+                       resample = False,
+                       inlet_separate = False):
     '''Read GCWerks flask data
 
     Args:
@@ -748,6 +774,9 @@ def read_gcwerks_flask(network, species, site, instrument,
     if dropna:
         ds = ds.dropna(dim="time", subset = ["mf"])
 
+    if inlet_separate:
+        ds = separate_inlets(ds)
+
     return ds
 
 
@@ -832,8 +861,16 @@ def combine_datasets(network, species, site,
 
         # Add instrument_type to dataset as variable
         instrument_type = get_instrument_number(instrument)
-        ds["instrument_type"] = xr.DataArray(np.repeat(instrument_type, len(ds.time)),
-                                        dims="time", coords={"time": ds.time})
+        if "inlet" in ds.dims:
+            da_shape = (len(ds.time), len(ds.inlet))
+            da_coords = {"time": ds.time, "inlet": ds.inlet}
+            da_dims = ("time", "inlet")
+        else:
+            da_shape = (len(ds.time))
+            da_coords = {"time": ds.time}
+            da_dims = ("time",)
+        ds["instrument_type"] = xr.DataArray(np.full(da_shape, instrument_type),
+                                        coords=da_coords, dims=da_dims)
 
         dss.append(ds)
 
@@ -874,7 +911,7 @@ def combine_datasets(network, species, site,
 
     # Remove all time points where mf is NaN
     if dropna:
-        ds_combined = ds_combined.dropna(dim="time", subset = ["mf"])
+        ds_combined = ds_combined.dropna(dim="time", subset = ["mf"], how="all")
 
     # Summarise instrument types in attributes
     # and remove instrument_type variable if all the same

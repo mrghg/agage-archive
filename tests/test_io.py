@@ -284,3 +284,4 @@ def test_drop_duplicates():
     assert ds.instrument_type.values[11] == 1
     assert ds.mf.values[12] == 20
     assert ds.instrument_type.values[12] == 2
+
