@@ -103,7 +103,7 @@
             "dtype": "i2",
             "_FillValue": -99
         },
-        "optional": "False",
+        "optional": "True",
         "resample_method": "median",
         "remove_flagged": "False"
     },

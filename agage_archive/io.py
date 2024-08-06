@@ -852,8 +852,16 @@ def combine_datasets(network, species, site,
 
         # Add instrument_type to dataset as variable
         instrument_type = get_instrument_number(instrument)
-        ds["instrument_type"] = xr.DataArray(np.repeat(instrument_type, len(ds.time)),
-                                        dims="time", coords={"time": ds.time})
+        if "inlet" in ds.dims:
+            da_shape = (len(ds.time), len(ds.inlet))
+            da_coords = {"time": ds.time, "inlet": ds.inlet}
+            da_dims = ("time", "inlet")
+        else:
+            da_shape = (len(ds.time))
+            da_coords = {"time": ds.time}
+            da_dims = ("time",)
+        ds["instrument_type"] = xr.DataArray(np.full(da_shape, instrument_type),
+                                        coords=da_coords, dims=da_dims)
 
         dss.append(ds)
 

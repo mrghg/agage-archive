@@ -255,6 +255,10 @@ def separate_inlets(ds):
         xarray.Dataset: Dataset with inlet dimension
     """
 
+    # If already separated by inlet, return dataset
+    if "inlet" in ds.dims:
+        return ds
+
     inlets = sorted(np.unique(ds.inlet_height.values))
 
     # Assign values to the inlet dimension based on inlet_height and replace all other values with NaN or equivalent
@@ -269,5 +273,8 @@ def separate_inlets(ds):
 
     # If all values in one inlet are NaN, drop the inlet
     ds = ds.dropna(dim="inlet", how="all")
+
+    # Remove inlet_height variable
+    ds = ds.drop_vars("inlet_height")
 
     return ds
