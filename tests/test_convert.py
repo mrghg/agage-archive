@@ -1,8 +1,9 @@
 import xarray as xr
 import pandas as pd
 import numpy as np
+import warnings
 
-from agage_archive.convert import resample
+from agage_archive.convert import resample, grouper, resampler
 from agage_archive.convert import monthly_baseline, scale_convert
 
 
@@ -42,16 +43,136 @@ def test_scale_convert():
     assert np.allclose(ds_new.mf.values, ds.mf.values * 1.0058 * 0.9962230167482587, rtol=1e-5)
 
 
+def test_resampler():
+
+    # Create test dataset
+    time = pd.date_range(start="2021-01-01", end="2021-01-03", freq="1min")
+    data = np.random.rand(len(time))
+    
+    ds = xr.Dataset({"time": time, 
+                "mf": ("time", data),
+                "mf_repeatability": ("time", data * 0.1),
+                "sampling_period": ("time", np.ones(len(time)) * 60),
+                "baseline": ("time", np.ones(len(time))),
+                "inlet_height": ("time", np.ones(len(time)) * 10)})
+
+    ds["mf"].attrs["units"] = "1e-9"
+    ds["mf"].attrs["calibration_scale"] = "TU-87"
+
+    ds["mf_repeatability"].attrs["units"] = "1e-9"
+    ds["mf_repeatability"].attrs["calibration_scale"] = "TU-87"
+    ds["mf_repeatability"].attrs["long_name"] = "Repeatability"
+
+    # Set the baseline variable to 0 once every two hours
+    ds.baseline.values[::120] = 0
+
+    # Test resample function
+    df_resample = resampler(ds.to_dataframe(), 
+                            resample_period="3600s",
+                            variable_defaults={"mf": {"resample_method": "mean"},
+                                            "mf_repeatability": {"resample_method": "standard_error"},
+                                            "sampling_period": {"resample_method": ""},
+                                            "baseline": {"resample_method": ""},
+                                            "inlet_height": {"resample_method": "median"}})
+
+    # Check that the dataset has been resampled to hourly
+    assert df_resample.index.freq == pd.Timedelta("3600s")
+
+    # Check that the baseline variable has been resampled correctly
+    assert np.all(df_resample.baseline.values[::2] == 0)
+    assert np.all(df_resample.baseline.values[1::2] == 1)
+
+    # Check that the sampling_period variable has been resampled correctly
+    assert np.all(df_resample.sampling_period.values == 3600)
+
+    # Check that mf is the mean of the original data
+    assert np.isclose(df_resample.mf.values[0], data[:60].mean())
+
+    # Check variability has been calculated correctly
+    assert np.isclose(df_resample["mf_variability"].values[0], np.std(data[:60], ddof=1))
+
+
+def test_grouper():
+
+    # Create test dataset
+    time = pd.date_range(start="2021-01-01", end="2021-01-03", freq="1min")
+
+    # Inlet height changes every 20 minutes, starting from some random time point after 2 hours
+    inlet_height = np.ones(len(time))*10.
+    inlet_height_steps = np.tile(np.concatenate([np.ones(20)*10, np.ones(20)*20]), len(time) // 40 + 1)
+    inlet_height[2*60+3:] = inlet_height_steps[:len(inlet_height)-(2*60+3)]
+
+    data = np.random.rand(len(time))
+
+    ds = xr.Dataset({"time": time,
+                    "mf": ("time", data),
+                    "mf_repeatability": ("time", data * 0.1),
+                    "sampling_period": ("time", np.ones(len(time)) * 60),
+                    "baseline": ("time", np.ones(len(time))),
+                    "inlet_height": ("time", inlet_height)})
+    
+    ds["mf"].attrs["units"] = "1e-9"
+    ds["mf"].attrs["calibration_scale"] = "TU-87"
+
+    ds["mf_repeatability"].attrs["units"] = "1e-9"
+    ds["mf_repeatability"].attrs["calibration_scale"] = "TU-87"
+    ds["mf_repeatability"].attrs["long_name"] = "Repeatability"
+
+    # Set the baseline variable to 0 once every two hours
+    ds.baseline.values[::120] = 0
+
+    # Test resample function
+    df_grouped = grouper(ds.to_dataframe(),
+                    variable_defaults={"mf": {"resample_method": "mean"},
+                                    "mf_repeatability": {"resample_method": "standard_error"},
+                                    "sampling_period": {"resample_method": ""},
+                                    "baseline": {"resample_method": ""},
+                                    "inlet_height": {"resample_method": "median"}},
+                    resample_period="3600s")
+
+    # Check that the difference between each timestamp is equal to the sampling period
+    for i in range(1, len(df_grouped.index)):
+        assert (df_grouped.index[i] - df_grouped.index[i-1]).seconds == \
+            df_grouped.loc[df_grouped.index[i-1], "sampling_period"]
+    
+    # Check that the baseline variable has been resampled correctly
+    for i in range(0, len(df_grouped)):
+        ds_slice = ds.sel(time=slice(df_grouped.index[i],
+                                     df_grouped.index[i] + pd.Timedelta(df_grouped.loc[df_grouped.index[i], "sampling_period"]-1, unit="s")))
+
+        # Check baseline is correctly set
+        if 0. in ds_slice.baseline.values:
+            assert df_grouped.loc[df_grouped.index[i], "baseline"] == 0
+        else:
+            assert df_grouped.loc[df_grouped.index[i], "baseline"] == 1
+        
+        # Check that mean is correct
+        assert np.isclose(ds_slice.mf.mean().values, df_grouped.loc[df_grouped.index[i], "mf"])
+
+        # Check that variability is correct
+        assert np.isclose(ds_slice.mf.std(ddof=1).values, df_grouped.loc[df_grouped.index[i], "mf_variability"])
+
+        # Check that inlet_height is correctly set
+        assert np.isclose(ds_slice.inlet_height.median().values, df_grouped.loc[df_grouped.index[i], "inlet_height"])
+
+
 def test_resample():
     """Test resample function"""
+
+    # First test straight resampling
+    ##################################################
 
     # Create test dataset
     time = pd.date_range(start="2021-01-01", end="2021-01-02", freq="1min")
     data = np.random.rand(len(time))
+
+    inlet_height = np.ones(len(time)) * 10
+
     ds = xr.Dataset({"time": time, 
                     "mf": ("time", data),
                     "mf_repeatability": ("time", data * 0.1),
                     "sampling_period": ("time", np.ones(len(time)) * 60),
+                    "inlet_height": ("time", inlet_height),
                     "baseline": ("time", np.ones(len(time)))})
 
     ds["mf"].attrs["units"] = "1e-9"
@@ -60,6 +181,10 @@ def test_resample():
     ds["mf_repeatability"].attrs["units"] = "1e-9"
     ds["mf_repeatability"].attrs["calibration_scale"] = "TU-87"
     ds["mf_repeatability"].attrs["long_name"] = "Repeatability"
+
+    ds.attrs["version"] = "test"
+    ds.attrs["species"] = "ch4"
+    ds.attrs["comment"] = "This is a test dataset"
 
     # Set the baseline variable to 0 once every two hours
     ds.baseline.values[::120] = 0
@@ -81,12 +206,62 @@ def test_resample():
     assert np.isclose(ds_resample.mf.values[0], data[:60].mean())
 
     # Check variability has been calculated correctly
-    assert np.isclose(ds_resample.mf_variability.values[0], np.std(data[:60], ddof=0))
+    assert np.isclose(ds_resample.mf_variability.values[0], np.std(data[:60], ddof=1))
 
     # Check that units are consistent
     assert ds_resample.mf_variability.attrs["units"] == ds_resample.mf.attrs["units"]
     assert ds_resample.mf_variability.attrs["calibration_scale"] == ds_resample.mf.attrs["calibration_scale"]
     assert ds_resample.mf_repeatability.attrs["units"] == ds_resample.mf.attrs["units"]
+
+    # Test that all the output attributes are the same as the input attributes
+    for attr in ds.attrs.keys():
+        if attr.lower() == "comment":
+            assert "resampled" in ds_resample.attrs[attr].lower()
+        else:
+            assert ds_resample.attrs[attr] == ds.attrs[attr]
+
+
+    # Second test resampling and grouping by inlet height
+    ##################################################
+
+    # Create test dataset
+    time = pd.date_range(start="2021-01-01", end="2021-01-03", freq="1min")
+
+    # Inlet height changes every 20 minutes, starting from some random time point after 2 hours
+    inlet_height = np.ones(len(time))*10.
+    inlet_height_steps = np.tile(np.concatenate([np.ones(20)*10, np.ones(20)*20]), len(time) // 40 + 1)
+    inlet_height[2*60+3:] = inlet_height_steps[:len(inlet_height)-(2*60+3)]
+
+    data = np.random.rand(len(time))
+
+    ds = xr.Dataset({"time": time,
+                    "mf": ("time", data),
+                    "mf_repeatability": ("time", data * 0.1),
+                    "sampling_period": ("time", np.ones(len(time)) * 60),
+                    "baseline": ("time", np.ones(len(time))),
+                    "inlet_height": ("time", inlet_height)})
+    
+    ds["mf"].attrs["units"] = "1e-9"
+    ds["mf"].attrs["calibration_scale"] = "TU-87"
+
+    ds["mf_repeatability"].attrs["units"] = "1e-9"
+    ds["mf_repeatability"].attrs["calibration_scale"] = "TU-87"
+    ds["mf_repeatability"].attrs["long_name"] = "Repeatability"
+
+    # Set the baseline variable to 0 once every two hours
+    ds.baseline.values[::120] = 0
+
+    ds.attrs["version"] = "test"
+    ds.attrs["species"] = "ch4"
+    ds.attrs["comment"] = "This is a test dataset"
+
+    # Test resample function
+    ds_resample = resample(ds, resample_period="3600s", resample_threshold="600s")
+
+    # Test that inlets are either 10 or 20, but not fractional values
+    assert np.all(ds_resample.inlet_height.values % 10 == 0)
+
+    #TODO: Add more tests for resampling by inlet height
 
 
 def test_monthly_baseline():
@@ -120,7 +295,7 @@ def test_monthly_baseline():
     assert np.allclose(ds_monthly.mf.values, ds_baseline_points.mf.resample(time="1MS").mean().values)
 
     # Check if the monthly standard deviation is calculated correctly
-    expected_std = ds_baseline_points.mf.resample(time="1MS").std()
+    expected_std = ds_baseline_points.mf.resample(time="1MS").std(ddof=1)
     assert np.allclose(ds_monthly.mf_variability.values, expected_std.values)
     assert ds_monthly.mf_variability.attrs["long_name"] == "Monthly standard deviation of baseline mole fractions"
     assert ds_monthly.mf_variability.attrs["units"] == ds.mf.attrs["units"]
