@@ -12,6 +12,8 @@ instrument_number, instrument_number_string = instrument_type_definition()
 def plot_add_trace(fig, ds,
                 name="", mode="lines"):
 
+    global colour_counter
+
     # If data density is more than one point every hour, thin the dataset
     time_diff = ds.time.diff(dim="time")
 
@@ -23,17 +25,26 @@ def plot_add_trace(fig, ds,
     else:
         ds_plot = ds.copy()
 
-    # Add trace
-    fig.add_trace(
-        go.Scatter(
-            visible=True,
-            mode=mode,
-            marker=dict(color=colours[colour_counter % colour_max], size=5, symbol='cross'),
-            line=dict(color=colours[colour_counter % colour_max], width=2),
-            name=name,
-            x=ds_plot.time,
-            y=ds_plot.mf)
-        )
+    inlets = set(ds.inlet_height.values)
+
+    for inlet in inlets:
+
+        # Get the indices of the inlet
+        ind = ds_plot.inlet_height == inlet
+
+        # Add trace
+        fig.add_trace(
+            go.Scatter(
+                visible=True,
+                mode=mode,
+                marker=dict(color=colours[colour_counter % colour_max], size=5, symbol='cross'),
+                line=dict(color=colours[colour_counter % colour_max], width=2),
+                name=name + f", {inlet} m",
+                x=ds_plot.time[ind].values,
+                y=ds_plot.mf[ind].values,)
+            )
+
+        colour_counter += 1
 
     return fig
 
