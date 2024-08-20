@@ -36,7 +36,11 @@ def apply_resample_method(df, index, columns, variable_defaults, resample_period
         elif variable_defaults[var]["resample_method"] == "standard_error":
             df_out[var] = df[var].mean() / np.sqrt(df[var].count())
         elif variable_defaults[var]["resample_method"] == "mode":
-            df_out[var] = df[var].apply(lambda x: x.mode()[0] if not x.mode().empty else -1)
+            if isinstance(df[var], pd.core.groupby.SeriesGroupBy):
+                mode_value = df[var].apply(lambda x: x.mode().iloc[0] if not x.mode().empty else np.nan)
+            else:
+                mode_value = df[var].mode()
+            df_out[var] = mode_value[0] if not mode_value.empty else np.nan
         else:
             if var == "baseline":
                 # If any value in a resampled period is not 1, set baseline to 0
@@ -99,15 +103,18 @@ def grouper(df, variable_defaults, resample_period="3600s"):
     """
 
     # First, find the indices where the inlet height changes
-    inlet_height_change_indices = np.where(np.diff(df.inlet_height) != 0)[0]+1
-
-    # Prepend the first index and append the last index
-    inlet_height_change_indices = np.insert(inlet_height_change_indices, 0, 0)
-    inlet_height_change_indices = np.append(inlet_height_change_indices, len(df.inlet_height) - 1)
+    inlet_height_change_indices = np.where(np.concatenate([np.array([True]),
+                                                           np.diff(df.inlet_height) != 0]))[0]
+    inlet_height_change_indices = np.append(inlet_height_change_indices, len(df))
 
     dfs = []
     for i in range(len(inlet_height_change_indices)-1):
+
         df_slice = df.iloc[inlet_height_change_indices[i]:inlet_height_change_indices[i+1]]
+
+        if np.unique(df_slice.inlet_height).size > 1:
+            raise ValueError("Inlet height changes more than once in a single resample period. This must be a bug!")
+
         if (df_slice.index[-1] - df_slice.index[0]) > pd.Timedelta(resample_period):
             # Resample this slice
             df_avg = resampler(df_slice, variable_defaults, resample_period=resample_period)
@@ -124,8 +131,13 @@ def grouper(df, variable_defaults, resample_period="3600s"):
                                            df_slice.columns,
                                            variable_defaults,
                                            resample_period=resample_period)
-            df_avg["sampling_period"] = (df.index[inlet_height_change_indices[i+1]] - \
-                                                  df_slice.index[0]).seconds
+            if i == len(inlet_height_change_indices)-2:
+                # If this is the last slice, set the sampling period to the number of seconds between the last time point
+                # and the end of the dataset
+                next_timestamp = df.index[-1] + pd.Timedelta(df["sampling_period"].iloc[-1], unit="s")
+            else:
+                next_timestamp = df.index[inlet_height_change_indices[i+1]]
+            df_avg["sampling_period"] = (next_timestamp - df_slice.index[0]).seconds
 
         dfs.append(df_avg)
 
@@ -168,21 +180,33 @@ def resample(ds,
     if pd.to_timedelta(ds.time.diff("time").median().values) < \
             pd.to_timedelta(resample_threshold):
         
+        # Remove duplicate time points, which seem to be there when inlets switch sometimes
+        ds = ds.drop_duplicates("time", keep = "first")
+
         # Create new dataset to store resampled data
         ds_out = ds.isel(time=0)
 
-        inlet_height_change_median = pd.to_timedelta(ds.inlet_height.diff("time").median().values)
+        inlet_height_change_times = [ds.time.values[0]]
+        inlet_height_change_times_delta = []
 
-        if inlet_height_change_median == pd.to_timedelta(0):
+        for i in range(1, len(ds.time)):
+            if ds.inlet_height.values[i] != ds.inlet_height.values[i-1]:
+                inlet_height_change_times_delta.append(ds.time.values[i] - \
+                                    inlet_height_change_times[-1])
+                inlet_height_change_times.append(ds.time.values[i])
+
+        inlet_height_change_times = pd.to_datetime(inlet_height_change_times)
+        inlet_height_change_times_delta = pd.to_timedelta(inlet_height_change_times_delta)
+
+        if inlet_height_change_times_delta.median() == pd.to_timedelta(0):
 
             df = resampler(ds.to_dataframe(), variable_defaults, resample_period=resample_period)
             comment_str = f"Resampled to {resample_period}."
 
         else:
             # Is inlet height changing more quickly than the resample period?
-            inlet_height_change_times = ds.inlet_height.where(ds.inlet_height.diff("time") != 0, drop=True).time
-            if pd.to_timedelta(inlet_height_change_times.diff("time").median().values) < \
-                    pd.to_timedelta(resample_threshold) and not ignore_inlet:
+            if inlet_height_change_times_delta.median() < pd.to_timedelta(resample_period) and \
+                    not ignore_inlet:
 
                 df = grouper(ds.to_dataframe(), variable_defaults, resample_period=resample_period)
                 comment_str = f"Grouped by inlet height and/or resampled to {resample_period}."

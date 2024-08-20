@@ -219,6 +219,52 @@ def test_picarro():
     assert ds.mf.notnull().all()
 
 
+def test_picarro_inlet_grouping():
+    """This is mostly a test of the inlet grouping in the Picarro data"""
+
+    filename, sub_path = read_nc_path("agage_test", "ch4", "TAC", "Picarro")
+    
+    # Original data
+    with open_data_file(filename, network="agage_test", sub_path=sub_path) as f:
+        ds_original = xr.open_dataset(f).load()
+    
+    # Output of read_nc
+    ds = read_nc("agage_test", "ch4", "TAC", "Picarro", dropna=False)
+
+    # Apply any scale conversion
+    ds_original = scale_convert(ds_original, ds.attrs["calibration_scale"])
+
+    # Unique input and output inlet values should be the same
+    assert np.all(np.unique(ds_original.inlet_height.values) == np.unique(ds.inlet_height.values))
+
+    # In this dataset, the first and last outputs should be at inlet_heights of 185 and 54 respectively
+    assert ds.inlet_height[0].values == 185
+    assert ds.inlet_height[-1].values == 54
+
+    # Check that the sum of the original and new datasets are the same for each inlet
+    # Ideally, we'd do this with the means, but it's an average of an average
+    for inlet in np.unique(ds_original.inlet_height.values):
+        sum_original = ds_original.groupby("inlet_height").sum().mf_mean_N.sel(inlet_height=inlet).values
+        sum_new = ds.mf_count.where(ds.inlet_height == inlet).sum().values
+
+        # Check that the sum of the original and new datasets are the same
+        assert np.isclose(sum_original, sum_new, rtol=0.0001)
+
+    # Check that at least the first mean is OK
+    first_inlet_change_index = 0
+    while ds_original.inlet_height[first_inlet_change_index] == ds_original.inlet_height[0]:
+        first_inlet_change_index += 1
+    
+    assert np.isclose(ds_original.mf.sel(time=slice(ds_original.time[0], ds_original.time[first_inlet_change_index])).mean().values,
+                      ds.mf.isel(time=0).values, rtol=0.00001)
+
+    # Check that the first time difference is correct
+    timediff_original = (ds_original.time.isel({"time": first_inlet_change_index+1}).values - \
+                          ds_original.time.isel({"time": 0}).values).astype("timedelta64[s]").astype(int)
+
+    assert ds.sampling_period.isel({"time": 0}).values == timediff_original
+
+
 def test_read_gcwerks_flask():
 
     ds = read_gcwerks_flask("agage_test", "cf4", "CBW", "GCMS-Medusa-flask")
