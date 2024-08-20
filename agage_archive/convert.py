@@ -40,7 +40,7 @@ def apply_resample_method(df, index, columns, variable_defaults, resample_period
                 mode_value = df[var].apply(lambda x: x.mode().iloc[0] if not x.mode().empty else np.nan)
             else:
                 mode_value = df[var].mode()
-            df_out[var] = mode_value[0] if not mode_value.empty else np.nan
+            df_out[var] = mode_value.iloc[0] if not mode_value.empty else np.nan
         else:
             if var == "baseline":
                 # If any value in a resampled period is not 1, set baseline to 0
@@ -139,7 +139,12 @@ def grouper(df, variable_defaults, resample_period="3600s"):
                 next_timestamp = df.index[inlet_height_change_indices[i+1]]
             df_avg["sampling_period"] = (next_timestamp - df_slice.index[0]).seconds
 
-        dfs.append(df_avg)
+        if not df.empty:
+            dfs.append(df_avg)
+
+    # Ensure all dtypes are the same
+    for i in range(len(dfs)):
+        dfs[i] = dfs[i].astype(dfs[0].dtypes)
 
     df_avg = pd.concat(dfs, axis=0).sort_index()
 
