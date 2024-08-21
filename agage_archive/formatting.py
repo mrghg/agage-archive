@@ -531,3 +531,23 @@ def lookup_locals_and_attrs(v, local, attrs):
     else:
         # If set, format it
         return eval(f"format_{v}('{local[v]}')")
+
+
+def comment_append(existing_comment, comment):
+    '''Append comment to existing comment
+
+    Args:
+        existing_comment (str): Existing comment
+        comment (str): Comment to append
+
+    Returns:
+        str: Comment
+    '''
+
+    if existing_comment == "":
+        return comment
+    else:
+        if existing_comment[-1] == ".":
+            return existing_comment + " " + comment
+        else:
+            return existing_comment + ". " + comment
