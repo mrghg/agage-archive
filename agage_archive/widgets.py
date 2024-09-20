@@ -303,8 +303,8 @@ def dashboard(network,
     output = widgets.Output()
     output_netcdf = widgets.Output()
 
-    # Text widget to explain what the asterisk means
-    asterisk_text = widgets.HTML(value="<p>* Asterisk indicates individual, rather than combined file</p>")
+    # Widget to store output dataset
+    output_dataset = widgets.Output()
 
     # Update network and site dropdown when species is changed
     species_dropdown.observe(lambda change:
@@ -347,7 +347,7 @@ def dashboard(network,
     display(species_dropdown)
     display(file_type_dropdown)
     display(instrument_site)
-    display(asterisk_text)
     display(plot_button)
     display(output)
     display(output_netcdf)
+
