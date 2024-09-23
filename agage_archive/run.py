@@ -1,7 +1,6 @@
 import pandas as pd
 from shutil import rmtree
 from zipfile import ZipFile
-from multiprocessing import Pool
 import time
 import traceback
 import os
@@ -16,10 +15,6 @@ from agage_archive.io import combine_datasets, combine_baseline, \
 from agage_archive.formatting import format_species
 from agage_archive.convert import monthly_baseline
 from agage_archive.definitions import instrument_number
-
-
-# Set number of threads for multiprocessing
-nthreads = 1
 
 
 def get_error(e):
@@ -325,14 +320,11 @@ def run_individual_instrument(network, instrument,
 
     # Process for all species and sites
     for sp in species_to_process:
-
-        with Pool(processes=nthreads) as p:
-            result = p.starmap_async(run_individual_site, [(site, sp, network, instrument,
-                                                            rs, read_function, read_baseline_function, instrument_out,
-                                                            baseline, monthly, verbose, public, resample, top_level_only) for site in rs.columns])
-
-            for r in result.get():
-                error_log.append(r)
+        for site in rs.columns:
+            result = run_individual_site(site, sp, network, instrument,
+                                        rs, read_function, read_baseline_function, instrument_out,
+                                        baseline, monthly, verbose, public, resample, top_level_only)
+            error_log.append(result)
 
     has_errors = any([error[2] for error in error_log])
 
@@ -480,14 +472,11 @@ def run_combined_instruments(network,
     with open_data_file("data_combination.xlsx", network=network) as data_selection_path:
         sites = pd.ExcelFile(data_selection_path).sheet_names
 
-    with Pool(processes=nthreads) as p:
-        args = [(site, species, network, baseline, monthly, verbose, public, resample) for site in sites]
-        result = p.starmap_async(run_combined_site, [(site, species, network, baseline, monthly, verbose, public, resample) for site in sites])
-    
-        error_log = []
+    error_log = []
 
-        for r in result.get():
-            error_log.extend(r)
+    for site in sites:
+        result = run_combined_site(site, species, network, baseline, monthly, verbose, public, resample)
+        error_log.extend(result)
 
     has_errors = any([error[2] for error in error_log])
 
@@ -704,14 +693,14 @@ def preprocess():
 
 if __name__ == "__main__":
 
-    preprocess()
+    #preprocess()
 
     start_time = time.time()
 
     print("####################################")
     print("#####Processing public archive######")
     print("####################################")
-    run_all("agage", public=True)
+    run_all("agage", species = ["ch4"], public=True)
 
     # print("####################################")
     # print("#####Processing private archive#####")

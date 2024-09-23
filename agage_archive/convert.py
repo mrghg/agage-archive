@@ -1,8 +1,8 @@
 import pandas as pd
 import numpy as np
-import networkx as nx
 import xarray as xr
 import json
+from multiprocessing import Pool
 from openghg_calscales import convert as convert_scale
 
 from agage_archive.config import open_data_file
@@ -88,7 +88,54 @@ def resampler(df, variable_defaults, resample_period="3600s"):
     return df_out
 
 
-def grouper(df, variable_defaults, resample_period="3600s"):
+def grouper_worker(df, inlet_height_change_indices, i, variable_defaults, resample_period):
+    """Worker function for the grouper function
+
+    Args:
+        df (pd.DataFrame): DataFrame created from xarray dataset
+        inlet_height_change_indices (list): Indices where the inlet height changes
+        i (int): Index of the current slice
+        variable_defaults (dict): Variable defaults
+        resample_period (str): Period to resample to
+
+    Returns:
+        pd.DataFrame: Resampled/grouped DataFrame
+    """
+
+    df_slice = df.iloc[inlet_height_change_indices[i]:inlet_height_change_indices[i+1]]
+
+    if np.unique(df_slice.inlet_height).size > 1:
+        raise ValueError("Inlet height changes more than once in a single resample period. This must be a bug!")
+
+    if (df_slice.index[-1] - df_slice.index[0]) > pd.Timedelta(resample_period):
+        # Resample this slice
+        df_avg = resampler(df_slice, variable_defaults, resample_period=resample_period)
+        # If last resample period passes the end of the slice,
+        # change the sampling period to the number of seconds between the last time point and the end of the slice
+        if df_avg.index[-1] + pd.Timedelta(df_avg["sampling_period"].iloc[-1], unit="s") > \
+                df.index[inlet_height_change_indices[i+1]]:
+            df_avg.loc[df_avg.index[-1], "sampling_period"] = (df.index[inlet_height_change_indices[i+1]] - \
+                                            df_avg.index[-1]).seconds
+    else:
+        # Apply the resample method to the slice and store the result in a new dataframe
+        df_avg = apply_resample_method(df_slice,
+                                        pd.DatetimeIndex([df_slice.index[0]]),
+                                        df_slice.columns,
+                                        variable_defaults,
+                                        resample_period=resample_period)
+        if i == len(inlet_height_change_indices)-2:
+            # If this is the last slice, set the sampling period to the number of seconds between the last time point
+            # and the end of the dataset
+            next_timestamp = df.index[-1] + pd.Timedelta(df["sampling_period"].iloc[-1], unit="s")
+        else:
+            next_timestamp = df.index[inlet_height_change_indices[i+1]]
+        df_avg["sampling_period"] = (next_timestamp - df_slice.index[0]).seconds
+    
+    return df_avg
+
+
+def grouper(df, variable_defaults, resample_period="3600s",
+            nprocesses=8):
     """Group the dataset by inlet height or resample to a regular time interval, 
     if the inlet height changes more quickly than the resample period
 
@@ -108,39 +155,14 @@ def grouper(df, variable_defaults, resample_period="3600s"):
     inlet_height_change_indices = np.append(inlet_height_change_indices, len(df))
 
     dfs = []
-    for i in range(len(inlet_height_change_indices)-1):
 
-        df_slice = df.iloc[inlet_height_change_indices[i]:inlet_height_change_indices[i+1]]
+    with Pool(processes=nprocesses) as p:
+        results = p.starmap_async(grouper_worker,
+                                  [(df, inlet_height_change_indices, i, variable_defaults, resample_period) for i in range(len(inlet_height_change_indices)-1)])
 
-        if np.unique(df_slice.inlet_height).size > 1:
-            raise ValueError("Inlet height changes more than once in a single resample period. This must be a bug!")
-
-        if (df_slice.index[-1] - df_slice.index[0]) > pd.Timedelta(resample_period):
-            # Resample this slice
-            df_avg = resampler(df_slice, variable_defaults, resample_period=resample_period)
-            # If last resample period passes the end of the slice,
-            # change the sampling period to the number of seconds between the last time point and the end of the slice
-            if df_avg.index[-1] + pd.Timedelta(df_avg["sampling_period"].iloc[-1], unit="s") > \
-                    df.index[inlet_height_change_indices[i+1]]:
-                df_avg.loc[df_avg.index[-1], "sampling_period"] = (df.index[inlet_height_change_indices[i+1]] - \
-                                                df_avg.index[-1]).seconds
-        else:
-            # Apply the resample method to the slice and store the result in a new dataframe
-            df_avg = apply_resample_method(df_slice,
-                                           pd.DatetimeIndex([df_slice.index[0]]),
-                                           df_slice.columns,
-                                           variable_defaults,
-                                           resample_period=resample_period)
-            if i == len(inlet_height_change_indices)-2:
-                # If this is the last slice, set the sampling period to the number of seconds between the last time point
-                # and the end of the dataset
-                next_timestamp = df.index[-1] + pd.Timedelta(df["sampling_period"].iloc[-1], unit="s")
-            else:
-                next_timestamp = df.index[inlet_height_change_indices[i+1]]
-            df_avg["sampling_period"] = (next_timestamp - df_slice.index[0]).seconds
-
-        if not df.empty:
-            dfs.append(df_avg)
+        for res in results.get():
+            if not res.empty:
+                dfs.append(res)
 
     # Ensure all dtypes are the same
     for i in range(len(dfs)):
