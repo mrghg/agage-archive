@@ -704,14 +704,14 @@ def preprocess():
 
 if __name__ == "__main__":
 
-    preprocess()
+#    preprocess()
 
     start_time = time.time()
 
     print("####################################")
     print("#####Processing public archive######")
     print("####################################")
-    run_all("agage", public=True)
+    run_all("agage", species = ["ch4"], public=True)
 
     # print("####################################")
     # print("#####Processing private archive#####")

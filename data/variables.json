@@ -74,8 +74,8 @@
             "units": ""
         },
         "encoding": {
-            "dtype": "i2",
-            "_FillValue": -99
+            "dtype": "i4",
+            "_FillValue": -999
         },
         "optional": "True",
         "resample_method": "sum",
