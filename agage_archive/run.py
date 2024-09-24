@@ -207,7 +207,6 @@ def run_individual_site(site, species, network, instrument,
                 if top_level_only:
                     raise ValueError(f"Looks like combined instruments has been run for {species} at {site}, but top_level_only is set to True")
             
-
             for output_subpath in folders:
 
                 if "individual" in output_subpath:

@@ -2,7 +2,7 @@ import pandas as pd
 import numpy as np
 import xarray as xr
 import json
-from multiprocessing import Pool
+from concurrent.futures import ProcessPoolExecutor as Pool
 from openghg_calscales import convert as convert_scale
 
 from agage_archive.config import open_data_file
@@ -88,50 +88,50 @@ def resampler(df, variable_defaults, resample_period="3600s"):
     return df_out
 
 
-def grouper_worker(df, inlet_height_change_indices, i, variable_defaults, resample_period):
-    """Worker function for the grouper function
+# def grouper_worker(df, inlet_height_change_indices, i, variable_defaults, resample_period):
+#     """Worker function for the grouper function
 
-    Args:
-        df (pd.DataFrame): DataFrame created from xarray dataset
-        inlet_height_change_indices (list): Indices where the inlet height changes
-        i (int): Index of the current slice
-        variable_defaults (dict): Variable defaults
-        resample_period (str): Period to resample to
+#     Args:
+#         df (pd.DataFrame): DataFrame created from xarray dataset
+#         inlet_height_change_indices (list): Indices where the inlet height changes
+#         i (int): Index of the current slice
+#         variable_defaults (dict): Variable defaults
+#         resample_period (str): Period to resample to
 
-    Returns:
-        pd.DataFrame: Resampled/grouped DataFrame
-    """
+#     Returns:
+#         pd.DataFrame: Resampled/grouped DataFrame
+#     """
 
-    df_slice = df.iloc[inlet_height_change_indices[i]:inlet_height_change_indices[i+1]]
+#     df_slice = df.iloc[inlet_height_change_indices[i]:inlet_height_change_indices[i+1]]
 
-    if np.unique(df_slice.inlet_height).size > 1:
-        raise ValueError("Inlet height changes more than once in a single resample period. This must be a bug!")
+#     if np.unique(df_slice.inlet_height).size > 1:
+#         raise ValueError("Inlet height changes more than once in a single resample period. This must be a bug!")
 
-    if (df_slice.index[-1] - df_slice.index[0]) > pd.Timedelta(resample_period):
-        # Resample this slice
-        df_avg = resampler(df_slice, variable_defaults, resample_period=resample_period)
-        # If last resample period passes the end of the slice,
-        # change the sampling period to the number of seconds between the last time point and the end of the slice
-        if df_avg.index[-1] + pd.Timedelta(df_avg["sampling_period"].iloc[-1], unit="s") > \
-                df.index[inlet_height_change_indices[i+1]]:
-            df_avg.loc[df_avg.index[-1], "sampling_period"] = (df.index[inlet_height_change_indices[i+1]] - \
-                                            df_avg.index[-1]).seconds
-    else:
-        # Apply the resample method to the slice and store the result in a new dataframe
-        df_avg = apply_resample_method(df_slice,
-                                        pd.DatetimeIndex([df_slice.index[0]]),
-                                        df_slice.columns,
-                                        variable_defaults,
-                                        resample_period=resample_period)
-        if i == len(inlet_height_change_indices)-2:
-            # If this is the last slice, set the sampling period to the number of seconds between the last time point
-            # and the end of the dataset
-            next_timestamp = df.index[-1] + pd.Timedelta(df["sampling_period"].iloc[-1], unit="s")
-        else:
-            next_timestamp = df.index[inlet_height_change_indices[i+1]]
-        df_avg["sampling_period"] = (next_timestamp - df_slice.index[0]).seconds
+#     if (df_slice.index[-1] - df_slice.index[0]) > pd.Timedelta(resample_period):
+#         # Resample this slice
+#         df_avg = resampler(df_slice, variable_defaults, resample_period=resample_period)
+#         # If last resample period passes the end of the slice,
+#         # change the sampling period to the number of seconds between the last time point and the end of the slice
+#         if df_avg.index[-1] + pd.Timedelta(df_avg["sampling_period"].iloc[-1], unit="s") > \
+#                 df.index[inlet_height_change_indices[i+1]]:
+#             df_avg.loc[df_avg.index[-1], "sampling_period"] = (df.index[inlet_height_change_indices[i+1]] - \
+#                                             df_avg.index[-1]).seconds
+#     else:
+#         # Apply the resample method to the slice and store the result in a new dataframe
+#         df_avg = apply_resample_method(df_slice,
+#                                         pd.DatetimeIndex([df_slice.index[0]]),
+#                                         df_slice.columns,
+#                                         variable_defaults,
+#                                         resample_period=resample_period)
+#         if i == len(inlet_height_change_indices)-2:
+#             # If this is the last slice, set the sampling period to the number of seconds between the last time point
+#             # and the end of the dataset
+#             next_timestamp = df.index[-1] + pd.Timedelta(df["sampling_period"].iloc[-1], unit="s")
+#         else:
+#             next_timestamp = df.index[inlet_height_change_indices[i+1]]
+#         df_avg["sampling_period"] = (next_timestamp - df_slice.index[0]).seconds
     
-    return df_avg
+#     return df_avg
 
 
 def grouper(df, variable_defaults, resample_period="3600s",
@@ -156,13 +156,57 @@ def grouper(df, variable_defaults, resample_period="3600s",
 
     dfs = []
 
-    with Pool(processes=nprocesses) as p:
-        results = p.starmap_async(grouper_worker,
-                                  [(df, inlet_height_change_indices, i, variable_defaults, resample_period) for i in range(len(inlet_height_change_indices)-1)])
+    group_chunks = []
+    group_sampling_periods = []
+    group_next_timestamps = []
 
-        for res in results.get():
-            if not res.empty:
-                dfs.append(res)
+    resample_chunks = []
+    resample_sampling_periods = []
+    resample_next_timestamps = []
+
+    # Work out which chunks to group and which to resample
+    for i in range(len(inlet_height_change_indices)-1):
+
+        df_slice = df.iloc[inlet_height_change_indices[i]:inlet_height_change_indices[i+1]]
+
+        if i == len(inlet_height_change_indices)-2:
+            # If this is the last slice, set the sampling period to the number of seconds between the last time point
+            # and the end of the dataset
+            next_timestamp = df.index[-1] + pd.Timedelta(df["sampling_period"].iloc[-1], unit="s")
+        else:
+            next_timestamp = df.index[inlet_height_change_indices[i+1]]
+        
+        if (df_slice.index[-1] - df_slice.index[0]) < pd.Timedelta(resample_period):
+            # These chunks will be grouped
+            group_chunks.append(df_slice)
+            group_sampling_periods.append((next_timestamp - df_slice.index[0]).seconds)
+            group_next_timestamps.append(next_timestamp)
+        else:
+            # These chunks will be resampled
+            resample_chunks.append(df_slice)
+            resample_sampling_periods.append(0)  # sampling period will be worked out by the resampler
+            resample_next_timestamps.append(next_timestamp)
+
+    # First, run the resampler on the chunks that need resampling
+    for i in range(len(resample_chunks)):
+        df_avg = resampler(resample_chunks[i], variable_defaults, resample_period=resample_period)
+        if df_avg.index[-1] + pd.Timedelta(df_avg["sampling_period"].iloc[-1], unit="s") > resample_next_timestamps[i]:
+            df_avg.loc[df_avg.index[-1], "sampling_period"] = (resample_next_timestamps[i] - df_avg.index[-1]).seconds
+        dfs.append(df_avg)
+
+    # Now, run the grouper on the chunks that need grouping
+    with Pool(max_workers=nprocesses) as executor:
+
+        results = list(executor.map(apply_resample_method, group_chunks,
+                                    [pd.DatetimeIndex([group_chunks[i].index[0]]) for i in range(len(group_chunks))],
+                                    [group_chunks[i].columns for i in range(len(group_chunks))],
+                                    [variable_defaults]*len(group_chunks),
+                                    [str(sp) + "s" for sp in group_sampling_periods]))
+
+    # Collect non-empty results
+    for res in results:
+        if not res.empty:
+            dfs.append(res)
 
     # Ensure all dtypes are the same
     for i in range(len(dfs)):
