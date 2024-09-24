@@ -75,7 +75,7 @@
         },
         "encoding": {
             "dtype": "i4",
-            "_FillValue": -999
+            "_FillValue": -99
         },
         "optional": "True",
         "resample_method": "sum",

@@ -826,14 +826,14 @@ def combine_datasets(network, species, site,
 
         # Store instrument info and make sure the instrument_date is the same as in the filtered file
         instrument_rec.append({key:value for key, value in ds.attrs.items() if "instrument" in key})
-        instrument_rec[-1]["instrument_date"] = dates_rec[-1]
+        instrument_rec[-1]["instrument_date"] = str(dates_rec[-1])
 
         # If variable mf_count is not present, add it (1 measurement per time point)
         if "mf_count" not in ds:
-            ds["mf_count"] = xr.DataArray(np.ones(len(ds.time)).astype(np.int16),
+            ds["mf_count"] = xr.DataArray(np.ones(len(ds.time)).astype(int),
                                         dims="time", coords={"time": ds.time})
             # Set to zero if mf is NaN
-            ds["mf_count"].values[np.isnan(ds.mf.values)] = 0
+            #ds["mf_count"].values[np.isnan(ds.mf.values)] = 0
             ds["mf_count"].attrs = {"long_name": "Number of data points in mean",
                                     "units": ""}
 
