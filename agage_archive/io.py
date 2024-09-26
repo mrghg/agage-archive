@@ -810,9 +810,6 @@ def combine_datasets(network, species, site,
         # Store attributes
         attrs.append(ds.attrs)
 
-        # Store instrument info
-        instrument_rec.append({key:value for key, value in ds.attrs.items() if "instrument" in key})
-
         # Store comments
         comments.append(ds.attrs["comment"])
 
@@ -826,6 +823,19 @@ def combine_datasets(network, species, site,
             raise ValueError(f"No data retained for {species} {site} {instrument}. " + \
                              "Check dates in data_combination or omit this instrument.")
         dates_rec.append(ds.time[0].dt.strftime("%Y-%m-%d").values)
+
+        # Store instrument info and make sure the instrument_date is the same as in the filtered file
+        instrument_rec.append({key:value for key, value in ds.attrs.items() if "instrument" in key})
+        instrument_rec[-1]["instrument_date"] = str(dates_rec[-1])
+
+        # If variable mf_count is not present, add it (1 measurement per time point)
+        if "mf_count" not in ds:
+            ds["mf_count"] = xr.DataArray(np.ones(len(ds.time)).astype(int),
+                                        dims="time", coords={"time": ds.time})
+            # Set to zero if mf is NaN
+            #ds["mf_count"].values[np.isnan(ds.mf.values)] = 0
+            ds["mf_count"].attrs = {"long_name": "Number of data points in mean",
+                                    "units": ""}
 
         # Record scale
         scales.append(ds.attrs["calibration_scale"])

@@ -74,7 +74,7 @@
             "units": ""
         },
         "encoding": {
-            "dtype": "i2",
+            "dtype": "i4",
             "_FillValue": -99
         },
         "optional": "True",
