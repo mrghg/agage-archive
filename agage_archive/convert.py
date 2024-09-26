@@ -2,7 +2,7 @@ import pandas as pd
 import numpy as np
 import xarray as xr
 import json
-from concurrent.futures import ProcessPoolExecutor as Pool
+from concurrent.futures import ProcessPoolExecutor
 from openghg_calscales import convert as convert_scale
 
 from agage_archive.config import open_data_file
@@ -195,13 +195,15 @@ def grouper(df, variable_defaults, resample_period="3600s",
         dfs.append(df_avg)
 
     # Now, run the grouper on the chunks that need grouping
-    with Pool(max_workers=nprocesses) as executor:
+    with ProcessPoolExecutor(max_workers=nprocesses) as executor:
+        futures = [executor.submit(apply_resample_method, group_chunks[i],
+                                   pd.DatetimeIndex([group_chunks[i].index[0]]),
+                                   group_chunks[i].columns,
+                                   variable_defaults,
+                                   str(group_sampling_periods[i]) + "s")
+                   for i in range(len(group_chunks))]
 
-        results = list(executor.map(apply_resample_method, group_chunks,
-                                    [pd.DatetimeIndex([group_chunks[i].index[0]]) for i in range(len(group_chunks))],
-                                    [group_chunks[i].columns for i in range(len(group_chunks))],
-                                    [variable_defaults]*len(group_chunks),
-                                    [str(sp) + "s" for sp in group_sampling_periods]))
+        results = [future.result() for future in futures]
 
     # Collect non-empty results
     for res in results:
