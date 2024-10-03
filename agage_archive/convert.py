@@ -2,69 +2,63 @@ import pandas as pd
 import numpy as np
 import xarray as xr
 import json
-from concurrent.futures import ProcessPoolExecutor
 from openghg_calscales import convert as convert_scale
+import timeit
 
 from agage_archive.config import open_data_file
 from agage_archive.data_selection import calibration_scale_default
 from agage_archive.formatting import format_species, format_variables, comment_append
 
 
-def apply_resample_method(df, index, columns, variable_defaults, resample_period="3600s"):
-    """Apply the resample method to the dataset
+def define_agg_dict(variable_defaults, resample_period, columns,
+                    no_time = False):
+    """Define the aggregation dictionary for the resample method
 
     Args:
-        df (pd.DataFrame): DataFrame created from xarray dataset
-        index (pd.DatetimeIndex): Index of the resampled DataFrame
-        columns (list): List of columns in the DataFrame
         variable_defaults (dict): Variable defaults
-        resample_period (str, optional): Period to resample to. Defaults to "3600s".
+        resample_period (str): Period to resample to
+        columns (list): List of columns in the DataFrame
+        no_time (bool, optional): If True, don't include time in the aggregation dictionary. Defaults to False.
 
     Returns:
-        pd.DataFrame: Resampled DataFrame
+        dict: Aggregation dictionary
     """
 
-    df_out = pd.DataFrame(index=index)
+    agg_dict = {}
 
     for var in columns:
+        if var =="time":
+            continue
         if variable_defaults[var]["resample_method"] == "mean":
-            df_out[var] = df[var].mean()
+            agg_dict[var] = "mean"
         elif variable_defaults[var]["resample_method"] == "median":
-            df_out[var] = df[var].median()
+            agg_dict[var] = "median"
         elif variable_defaults[var]["resample_method"] == "sum":
-            df_out[var] = df[var].sum()
+            agg_dict[var] = "sum"
         elif variable_defaults[var]["resample_method"] == "standard_error":
-            df_out[var] = df[var].mean() / np.sqrt(df[var].count())
+            agg_dict[var] = lambda x: np.mean(x) / np.sqrt(x.count())
         elif variable_defaults[var]["resample_method"] == "mode":
-            if isinstance(df[var], pd.core.groupby.SeriesGroupBy):
-                mode_value = df[var].apply(lambda x: x.mode().iloc[0] if not x.mode().empty else np.nan)
-            else:
-                mode_value = df[var].mode()
-            df_out[var] = mode_value.iloc[0] if not mode_value.empty else np.nan
+            agg_dict[var] = lambda x: x.mode().iloc[0] if not x.mode().empty else np.nan
+        elif variable_defaults[var]["resample_method"] == "first":
+            agg_dict[var] = "first"
         else:
             if var == "baseline":
-                # If any value in a resampled period is not 1, set baseline to 0
-                df_out[var] = np.where(df[var].prod() != 1, 0, 1)
+                agg_dict[var] = "prod"
             elif var == "sampling_period":
-                # Set sampling period to resample_period
-                df_out[var] = pd.Timedelta(resample_period).total_seconds()
+                agg_dict[var] = lambda x: pd.Timedelta(resample_period).total_seconds()
             elif var == "mf_variability":
-                # Overwritten below
-                pass
+                # Careful! This requires that mf_variability is overwritten by mf before resampling
+                agg_dict[var] = "std"
             else:
                 raise ValueError(f"Resample method not defined for {var}")
 
-    # Add in mole fraction standard deviation variable
-    df_out["mf_variability"] = df["mf"].std().copy()
+    if not no_time:
+        agg_dict["time"] = "first"
 
-    if not "mf_count" in columns:
-        df_out["mf_count"] = df["mf"].count().copy()
-    # Else: Should have already been summed, as set in variables.json
-
-    return df_out
+    return agg_dict
 
 
-def resampler(df, variable_defaults, resample_period="3600s"):
+def resampler(df, variable_defaults, last_timestamp, resample_period="3600s"):
     """Resample the dataset to a regular time interval
 
     Args:
@@ -77,65 +71,28 @@ def resampler(df, variable_defaults, resample_period="3600s"):
         pd.DataFrame: Resampled DataFrame
     """
 
-    df_resample = df.resample(resample_period, closed="left", label="left")
-
-    df_out = apply_resample_method(df_resample,
-                                   df_resample[df.columns[0]].mean().index,
-                                   list(df.columns),
-                                   variable_defaults,
-                                   resample_period=resample_period)
+    variables = variable_defaults.copy()
+    variables["inlet_height_change"] = {"resample_method": "first"}
+    variables["time_difference"] = {"resample_method": "first"}
     
-    return df_out
+    agg_dict = define_agg_dict(variables, resample_period, df.columns,
+                            no_time = True)
+
+    df_resample = df.resample(resample_period,
+                            closed="left", label="left").agg(agg_dict)
+
+    # If last resample period passes the end of the slice,
+    # change the sampling period to the number of seconds between the last time point and the end of the slice
+    if df_resample.index[-1] + pd.Timedelta(df_resample["sampling_period"].iloc[-1], unit="s") > last_timestamp:
+        df_resample.loc[df_resample.index[-1], "sampling_period"] = (last_timestamp - df_resample.index[-1]).seconds
+
+    return df_resample
 
 
-# def grouper_worker(df, inlet_height_change_indices, i, variable_defaults, resample_period):
-#     """Worker function for the grouper function
-
-#     Args:
-#         df (pd.DataFrame): DataFrame created from xarray dataset
-#         inlet_height_change_indices (list): Indices where the inlet height changes
-#         i (int): Index of the current slice
-#         variable_defaults (dict): Variable defaults
-#         resample_period (str): Period to resample to
-
-#     Returns:
-#         pd.DataFrame: Resampled/grouped DataFrame
-#     """
-
-#     df_slice = df.iloc[inlet_height_change_indices[i]:inlet_height_change_indices[i+1]]
-
-#     if np.unique(df_slice.inlet_height).size > 1:
-#         raise ValueError("Inlet height changes more than once in a single resample period. This must be a bug!")
-
-#     if (df_slice.index[-1] - df_slice.index[0]) > pd.Timedelta(resample_period):
-#         # Resample this slice
-#         df_avg = resampler(df_slice, variable_defaults, resample_period=resample_period)
-#         # If last resample period passes the end of the slice,
-#         # change the sampling period to the number of seconds between the last time point and the end of the slice
-#         if df_avg.index[-1] + pd.Timedelta(df_avg["sampling_period"].iloc[-1], unit="s") > \
-#                 df.index[inlet_height_change_indices[i+1]]:
-#             df_avg.loc[df_avg.index[-1], "sampling_period"] = (df.index[inlet_height_change_indices[i+1]] - \
-#                                             df_avg.index[-1]).seconds
-#     else:
-#         # Apply the resample method to the slice and store the result in a new dataframe
-#         df_avg = apply_resample_method(df_slice,
-#                                         pd.DatetimeIndex([df_slice.index[0]]),
-#                                         df_slice.columns,
-#                                         variable_defaults,
-#                                         resample_period=resample_period)
-#         if i == len(inlet_height_change_indices)-2:
-#             # If this is the last slice, set the sampling period to the number of seconds between the last time point
-#             # and the end of the dataset
-#             next_timestamp = df.index[-1] + pd.Timedelta(df["sampling_period"].iloc[-1], unit="s")
-#         else:
-#             next_timestamp = df.index[inlet_height_change_indices[i+1]]
-#         df_avg["sampling_period"] = (next_timestamp - df_slice.index[0]).seconds
-    
-#     return df_avg
-
-
-def grouper(df, variable_defaults, resample_period="3600s",
-            nprocesses=8):
+def grouper(df, inlet_height_change_indices,
+            inlet_height_change_times,
+            inlet_height_change_times_delta,
+            variable_defaults, resample_period="3600s"):
     """Group the dataset by inlet height or resample to a regular time interval, 
     if the inlet height changes more quickly than the resample period
 
@@ -149,67 +106,72 @@ def grouper(df, variable_defaults, resample_period="3600s",
         pd.DataFrame: Grouped/resampled DataFrame
     """
 
-    # First, find the indices where the inlet height changes
-    inlet_height_change_indices = np.where(np.concatenate([np.array([True]),
-                                                           np.diff(df.inlet_height) != 0]))[0]
-    inlet_height_change_indices = np.append(inlet_height_change_indices, len(df))
+    variables = variable_defaults.copy()
+    variables["inlet_height_change"] = {"resample_method": "first"}
+    variables["time_difference"] = {"resample_method": "first"}
+    # variables["next_timestamp"] = {"resample_method": "first"}
+
+    # Create a unique label for each of these time periods
+    # This will be used to group the data
+    inlet_height_change = np.repeat(np.arange(len(inlet_height_change_indices)-1), 
+                                np.diff(inlet_height_change_indices))
+    df["inlet_height_change"] = inlet_height_change
+
+    # Create a column to store the time difference between each time period
+    time_difference_values = np.repeat(inlet_height_change_times_delta, np.diff(inlet_height_change_indices))
+    df["time_difference"] = time_difference_values
+
+    # Create the dataframes to either resample or group
+    df_to_resample = df[df["time_difference"] > pd.Timedelta(resample_period)]
+    df_to_group = df[df["time_difference"] <= pd.Timedelta(resample_period)]
 
     dfs = []
 
-    group_chunks = []
-    group_sampling_periods = []
-    group_next_timestamps = []
+    # Grouping
+    # =========
 
-    resample_chunks = []
-    resample_sampling_periods = []
-    resample_next_timestamps = []
+    if not df_to_group.empty:
 
-    # Work out which chunks to group and which to resample
-    for i in range(len(inlet_height_change_indices)-1):
+        # Move time index to column
+        df_to_group.reset_index(inplace=True)
 
-        df_slice = df.iloc[inlet_height_change_indices[i]:inlet_height_change_indices[i+1]]
+        # Overwrite the mf_variability column with the mf column, so that the std can be taken
+        df_to_group = df_to_group.copy()
+        df_to_group["mf_variability"] = df_to_group["mf"]
 
-        if i == len(inlet_height_change_indices)-2:
-            # If this is the last slice, set the sampling period to the number of seconds between the last time point
-            # and the end of the dataset
-            next_timestamp = df.index[-1] + pd.Timedelta(df["sampling_period"].iloc[-1], unit="s")
-        else:
-            next_timestamp = df.index[inlet_height_change_indices[i+1]]
-        
-        if (df_slice.index[-1] - df_slice.index[0]) < pd.Timedelta(resample_period):
-            # These chunks will be grouped
-            group_chunks.append(df_slice)
-            group_sampling_periods.append((next_timestamp - df_slice.index[0]).seconds)
-            group_next_timestamps.append(next_timestamp)
-        else:
-            # These chunks will be resampled
-            resample_chunks.append(df_slice)
-            resample_sampling_periods.append(0)  # sampling period will be worked out by the resampler
-            resample_next_timestamps.append(next_timestamp)
+        # Group the data
+        agg_dict = define_agg_dict(variables, resample_period, df_to_group.columns)
+        df_grouped = df_to_group.groupby("inlet_height_change").agg(agg_dict, axis=0)
 
-    # First, run the resampler on the chunks that need resampling
-    for i in range(len(resample_chunks)):
-        df_avg = resampler(resample_chunks[i], variable_defaults, resample_period=resample_period)
-        if df_avg.index[-1] + pd.Timedelta(df_avg["sampling_period"].iloc[-1], unit="s") > resample_next_timestamps[i]:
-            df_avg.loc[df_avg.index[-1], "sampling_period"] = (resample_next_timestamps[i] - df_avg.index[-1]).seconds
-        dfs.append(df_avg)
+        # Remove inlet_height_change and time_difference columns
+        df_grouped.set_index("time", inplace=True)
+        # Replace sampling period with time difference in seconds
+        df_grouped["sampling_period"] = df_grouped["time_difference"].dt.total_seconds()
 
-    # Now, run the grouper on the chunks that need grouping
-    with ProcessPoolExecutor(max_workers=nprocesses) as executor:
-        futures = [executor.submit(apply_resample_method, group_chunks[i],
-                                   pd.DatetimeIndex([group_chunks[i].index[0]]),
-                                   group_chunks[i].columns,
-                                   variable_defaults,
-                                   str(group_sampling_periods[i]) + "s")
-                   for i in range(len(group_chunks))]
+        # Remove unneeded columns
+        df_grouped = df_grouped.drop(columns=["inlet_height_change", "time_difference"])
 
-        results = [future.result() for future in futures]
+        dfs.append(df_grouped)
 
-    # Collect non-empty results
-    for res in results:
-        if not res.empty:
-            dfs.append(res)
+    # Resampling
+    # ==========
 
+    if not df_to_resample.empty:
+
+        # Resample the data that needs resampling
+        # But first, we need to group by inlet height change
+        df_to_resample_grouped = df_to_resample.groupby("inlet_height_change")
+
+        # Loop through the groups and resample
+        for name, group in df_to_resample_grouped:
+            group_to_resample = group.copy()
+            group_to_resample["mf_variability"] = group_to_resample["mf"].copy()
+            df_avg = resampler(group_to_resample, variable_defaults,
+                               group_to_resample.index[0] + pd.Timedelta(group_to_resample["time_difference"].iloc[0], unit="s"),
+                               resample_period=resample_period)
+            if not df_avg.empty:
+                dfs.append(df_avg.drop(columns=["inlet_height_change", "time_difference"]))
+    
     # Ensure all dtypes are the same
     for i in range(len(dfs)):
         dfs[i] = dfs[i].astype(dfs[0].dtypes)
@@ -217,6 +179,46 @@ def grouper(df, variable_defaults, resample_period="3600s",
     df_avg = pd.concat(dfs, axis=0).sort_index()
 
     return df_avg
+
+
+def find_inlet_height_changes(ds):
+    """Find changes in inlet height
+
+    Args:
+        ds (xarray.Dataset): Dataset
+
+    Returns:
+        np.ndarray, pd.DatetimeIndex, pd.TimedeltaIndex: Indices of changes in inlet height,
+            times of changes in inlet height, time deltas between changes in inlet height
+    """
+
+    inlet_height_change_times = [ds.time.values[0]]
+    inlet_height_change_times_delta = []
+
+    # Identify changes in inlet_height
+    inlet_height_changes = np.where(np.diff(ds.inlet_height.values) != 0)[0] + 1
+
+    # Extract change times
+    inlet_height_change_times = ds.time.values[inlet_height_changes]
+
+    # Include the first time value
+    inlet_height_change_times = np.insert(inlet_height_change_times, 0, ds.time.values[0])
+    inlet_height_changes = np.insert(inlet_height_changes, 0, 0)
+
+    # Include the last time value
+    last_time_value = ds.time.values[-1] + np.timedelta64(int(ds.sampling_period.values[-1]), 's')
+    inlet_height_change_times = np.append(inlet_height_change_times,
+                                        last_time_value)
+    inlet_height_changes = np.append(inlet_height_changes, len(ds.time))
+
+    # Calculate time deltas
+    inlet_height_change_times_delta = np.diff(inlet_height_change_times)
+
+    # Convert to pandas datetime and timedelta
+    inlet_height_change_times = pd.to_datetime(inlet_height_change_times)
+    inlet_height_change_times_delta = pd.to_timedelta(inlet_height_change_times_delta)
+
+    return inlet_height_changes, inlet_height_change_times, inlet_height_change_times_delta
 
 
 def resample(ds,
@@ -235,6 +237,7 @@ def resample(ds,
             So, if the threshold is 600s and the resample_period is 3600s and 1-minute data is provided, 
             the dataset is resampled to houry. If 20-minute data is provided, the dataset is not resampled.
             Pandas alias for time period, e.g. "600s" for 10 minutes.
+        ignore_inlet (bool, optional): If True, ignore changes in inlet height. Defaults to False.
 
     Returns:
         xarray.Dataset: Resampled dataset
@@ -259,35 +262,42 @@ def resample(ds,
         # Create new dataset to store resampled data
         ds_out = ds.isel(time=0)
 
-        inlet_height_change_times = [ds.time.values[0]]
-        inlet_height_change_times_delta = []
-
-        for i in range(1, len(ds.time)):
-            if ds.inlet_height.values[i] != ds.inlet_height.values[i-1]:
-                inlet_height_change_times_delta.append(ds.time.values[i] - \
-                                    inlet_height_change_times[-1])
-                inlet_height_change_times.append(ds.time.values[i])
-
-        inlet_height_change_times = pd.to_datetime(inlet_height_change_times)
-        inlet_height_change_times_delta = pd.to_timedelta(inlet_height_change_times_delta)
-
-        if inlet_height_change_times_delta.median() == pd.to_timedelta(0):
-
-            df = resampler(ds.to_dataframe(), variable_defaults, resample_period=resample_period)
-            comment_str = f"Resampled to {resample_period}."
-
-        else:
-            # Is inlet height changing more quickly than the resample period?
-            if inlet_height_change_times_delta.median() < pd.to_timedelta(resample_period) and \
-                    not ignore_inlet:
-
-                df = grouper(ds.to_dataframe(), variable_defaults, resample_period=resample_period)
-                comment_str = f"Grouped by inlet height and/or resampled to {resample_period}."
-
-            else:
-
+        # If not considering inlet changes, resample
+        if ignore_inlet:
+                print("... resampling")
                 df = resampler(ds.to_dataframe(), variable_defaults, resample_period=resample_period)
                 comment_str = f"Resampled to {resample_period}."
+
+        else:
+
+            # Find changes in inlet height
+            inlet_height_changes, inlet_height_change_times, inlet_height_change_times_delta = find_inlet_height_changes(ds)
+
+            resample_or_group = ""
+            
+            # There are no changes in inlet height
+            if inlet_height_change_times_delta.median() == pd.to_timedelta(0):
+                resample_or_group = "resample"
+            else:
+                # If the median time difference is less than the resample period, group
+                if inlet_height_change_times_delta.median() < pd.to_timedelta(resample_period):
+                    resample_or_group = "group"
+                else:
+                    resample_or_group = "resample"
+
+            if resample_or_group == "resample":
+                print("... resampling")
+                df = resampler(ds.to_dataframe(), variable_defaults, inlet_height_change_times[-1], resample_period=resample_period)
+                comment_str = f"Resampled to {resample_period}."
+
+            else:
+                print("... grouping inlets and averaging/resampling")
+                df = grouper(ds.to_dataframe(),
+                            inlet_height_changes,
+                            inlet_height_change_times,
+                            inlet_height_change_times_delta,
+                            variable_defaults, resample_period=resample_period)
+                comment_str = f"Grouped by inlet height and/or resampled to {resample_period}."
 
         # Expand dimensions to include time
         # This step removes time attributes, so need to store and replace

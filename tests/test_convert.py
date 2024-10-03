@@ -3,7 +3,7 @@ import pandas as pd
 import numpy as np
 import warnings
 
-from agage_archive.convert import resample, grouper, resampler
+from agage_archive.convert import resample, grouper, resampler, find_inlet_height_changes
 from agage_archive.convert import monthly_baseline, scale_convert
 
 
@@ -121,10 +121,15 @@ def test_grouper():
     # Set the baseline variable to 0 once every two hours
     ds.baseline.values[::120] = 0
 
+    inlet_height_changes, inlet_height_change_times, inlet_height_change_times_delta = \
+        find_inlet_height_changes(ds)
+
     # Test resample function
     df_grouped = grouper(ds.to_dataframe(),
+                    inlet_height_changes, inlet_height_change_times, inlet_height_change_times_delta,
                     variable_defaults={"mf": {"resample_method": "mean"},
                                     "mf_repeatability": {"resample_method": "standard_error"},
+                                    "mf_variability": {"resample_method": "std"},
                                     "sampling_period": {"resample_method": ""},
                                     "baseline": {"resample_method": ""},
                                     "inlet_height": {"resample_method": "median"}},
@@ -134,8 +139,7 @@ def test_grouper():
     for i in range(1, len(df_grouped.index)):
         assert (df_grouped.index[i] - df_grouped.index[i-1]).seconds == \
             df_grouped.loc[df_grouped.index[i-1], "sampling_period"]
-    
-    # Check that the baseline variable has been resampled correctly
+
     for i in range(0, len(df_grouped)):
         ds_slice = ds.sel(time=slice(df_grouped.index[i],
                                      df_grouped.index[i] + pd.Timedelta(df_grouped.loc[df_grouped.index[i], "sampling_period"]-1, unit="s")))
