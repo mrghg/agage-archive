@@ -678,28 +678,30 @@ def preprocess():
 
     paths = Paths("agage")
 
-    # SOME MD DATA IS MISSING AND IN THE WRONG FORMAT
-    sites = {"TAC": ["n2o", "co"],
-            "TOB": ["sf6"]}
-    og_paths = {"TAC": "/agage/summary/netcdf-decc/md/AGAGE-GCMD_TAC_species.nc",
-                "TOB": "/agage/summary/netcdf-other/md/AGAGE-GCECD_TOB_species.nc"}
+    # # SOME MD DATA IS MISSING AND IN THE WRONG FORMAT
+    # sites = {"TAC": ["n2o", "co"],
+    #         "TOB": ["sf6"]}
+    # og_paths = {"TAC": "/agage/summary/netcdf-decc/md/AGAGE-GCMD_TAC_species.nc",
+    #             "TOB": "/agage/summary/netcdf-other/md/AGAGE-GCECD_TOB_species.nc"}
 
-    for site in sites:
+    # for site in sites:
 
-        for sp in sites[site]:
+    #     for sp in sites[site]:
 
-            # Copy MD files from md to md-modified directory, and replace repeatability
-            md_folder = data_file_path("", "agage", sub_path=paths.md_path)
-            og_path = og_paths[site].replace('species', sp.lower())
-            og_file = og_path.split('/')[-1]
-            std_path = og_path.replace(og_file, "") + f"stds/{site.upper()}_GCMD_stds.dat"
+    #         # Copy MD files from md to md-modified directory, and replace repeatability
+    #         md_folder = data_file_path("", "agage", sub_path=paths.md_path)
+    #         og_path = og_paths[site].replace('species', sp.lower())
+    #         og_file = og_path.split('/')[-1]
+    #         std_path = og_path.replace(og_file, "") + f"stds/{site.upper()}_GCMD_stds.dat"
 
-            # Copy from to md path
-            os.system(f"cp {og_path} {md_folder}")
+    #         # Copy from to md path
+    #         os.system(f"cp {og_path} {md_folder}")
 
-            # Replace repeatability
-            replace_repeatability_and_height(md_folder / og_file, std_path, sp, site)
+    #         # Replace repeatability
+    #         replace_repeatability_and_height(md_folder / og_file, std_path, sp, site)
 
+
+    md_folder = data_file_path("", "agage", sub_path=paths.md_path)
     # For CGO H2 data, the PDD is mis-labelled (Issue #47)
     if (md_folder / "AGAGE-GCMD_CGO_h2_pdd.nc").exists():
         os.system(f"cp {md_folder / 'AGAGE-GCMD_CGO_h2_pdd.nc'} {md_folder / 'AGAGE-GCPDD_CGO_h2.nc'}")
@@ -707,14 +709,14 @@ def preprocess():
 
 if __name__ == "__main__":
 
-#    preprocess()
+    preprocess()
 
     start_time = time.time()
 
     print("####################################")
     print("#####Processing public archive######")
     print("####################################")
-    run_all("agage", species = ["ch4"], sites = ["TAC"], public=True)
+    run_all("agage", public=True)
 
     # print("####################################")
     # print("#####Processing private archive#####")

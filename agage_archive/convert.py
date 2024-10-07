@@ -3,7 +3,6 @@ import numpy as np
 import xarray as xr
 import json
 from openghg_calscales import convert as convert_scale
-import timeit
 
 from agage_archive.config import open_data_file
 from agage_archive.data_selection import calibration_scale_default
@@ -64,6 +63,7 @@ def resampler(df, variable_defaults, last_timestamp, resample_period="3600s"):
     Args:
         df (pd.DataFrame): DataFrame created from xarray dataset
         variable_defaults (dict): Variable defaults
+        last_timestamp (pd.Timestamp): Last timestamp in the slice. Used to calculate the final sampling period.
         resample_period (str, optional): Period to resample to. Defaults to "3600s". 
             Pandas alias for time period, e.g. "1H" for hourly, "1D" for daily.
 
@@ -74,7 +74,16 @@ def resampler(df, variable_defaults, last_timestamp, resample_period="3600s"):
     variables = variable_defaults.copy()
     variables["inlet_height_change"] = {"resample_method": "first"}
     variables["time_difference"] = {"resample_method": "first"}
-    
+
+    # The resample method for mf_variability is "std", 
+    # but we need to overwrite the mf_variability column with the mf column to make this work
+    df = df.copy()
+    df["mf_variability"] = df["mf"].copy()
+
+    # If mf_count isn't there, add it with ones
+    if "mf_count" not in df.columns:
+        df["mf_count"] = 1
+
     agg_dict = define_agg_dict(variables, resample_period, df.columns,
                             no_time = True)
 
@@ -106,10 +115,20 @@ def grouper(df, inlet_height_change_indices,
         pd.DataFrame: Grouped/resampled DataFrame
     """
 
+    # Store dtypes for later
+    dtypes = df.dtypes
+    if not "mf_variability" in dtypes:
+        dtypes["mf_variability"] = "float32"
+    if not "mf_count" in dtypes:
+        dtypes["mf_count"] = "int32"
+    if "inlet_height_change" in dtypes:
+        dtypes = dtypes.drop(["inlet_height_change"])
+    if "time_difference" in dtypes:
+        dtypes = dtypes.drop(["time_difference"])
+
     variables = variable_defaults.copy()
     variables["inlet_height_change"] = {"resample_method": "first"}
     variables["time_difference"] = {"resample_method": "first"}
-    # variables["next_timestamp"] = {"resample_method": "first"}
 
     # Create a unique label for each of these time periods
     # This will be used to group the data
@@ -139,6 +158,10 @@ def grouper(df, inlet_height_change_indices,
         df_to_group = df_to_group.copy()
         df_to_group["mf_variability"] = df_to_group["mf"]
 
+        # If mf_count isn't there, add it with ones
+        if "mf_count" not in df_to_group.columns:
+            df_to_group["mf_count"] = 1
+
         # Group the data
         agg_dict = define_agg_dict(variables, resample_period, df_to_group.columns)
         df_grouped = df_to_group.groupby("inlet_height_change").agg(agg_dict, axis=0)
@@ -164,18 +187,29 @@ def grouper(df, inlet_height_change_indices,
 
         # Loop through the groups and resample
         for name, group in df_to_resample_grouped:
-            group_to_resample = group.copy()
-            group_to_resample["mf_variability"] = group_to_resample["mf"].copy()
-            df_avg = resampler(group_to_resample, variable_defaults,
-                               group_to_resample.index[0] + pd.Timedelta(group_to_resample["time_difference"].iloc[0], unit="s"),
+            df_avg = resampler(group, variable_defaults,
+                               group.index[0] + pd.Timedelta(group["time_difference"].iloc[0], unit="s"),
                                resample_period=resample_period)
             if not df_avg.empty:
                 dfs.append(df_avg.drop(columns=["inlet_height_change", "time_difference"]))
     
-    # Ensure all dtypes are the same
+    # Ensure all dtypes are the same and that there are no NaNs in columns that are going to be converted to int
     for i in range(len(dfs)):
-        dfs[i] = dfs[i].astype(dfs[0].dtypes)
+        # If there are any nans in int columns, replace with -999
+        for col in dfs[i].select_dtypes(include=["int8", "int16", "int32", "int64"]).columns:
+            if dfs[i][col].isnull().any():
+                dfs[i][col].fillna(-999, inplace=True)
 
+        # If there are any nans in columns that are going to be converted to int, replace with -999
+        for col in dtypes.index:
+            if "int" in str(dtypes[col]):
+                if dfs[i][col].isnull().any():
+                    dfs[i][col].fillna(-999, inplace=True)
+
+        # Convert dtypes
+        dfs[i] = dfs[i].astype(dtypes)
+
+    # Concatenate and sort
     df_avg = pd.concat(dfs, axis=0).sort_index()
 
     return df_avg
@@ -265,7 +299,10 @@ def resample(ds,
         # If not considering inlet changes, resample
         if ignore_inlet:
                 print("... resampling")
-                df = resampler(ds.to_dataframe(), variable_defaults, resample_period=resample_period)
+                df = resampler(ds.to_dataframe(),
+                               variable_defaults,
+                               ds.time.values[-1] + pd.Timedelta(ds.sampling_period.values[-1], unit="s"),
+                               resample_period=resample_period)
                 comment_str = f"Resampled to {resample_period}."
 
         else:
