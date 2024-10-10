@@ -1,7 +1,6 @@
 import pandas as pd
 from shutil import rmtree
 from zipfile import ZipFile
-from multiprocessing import Pool
 import time
 import traceback
 import os
@@ -16,10 +15,6 @@ from agage_archive.io import combine_datasets, combine_baseline, \
 from agage_archive.formatting import format_species
 from agage_archive.convert import monthly_baseline
 from agage_archive.definitions import instrument_number
-
-
-# Set number of threads for multiprocessing
-nthreads = 1
 
 
 def get_error(e):
@@ -212,7 +207,6 @@ def run_individual_site(site, species, network, instrument,
                 if top_level_only:
                     raise ValueError(f"Looks like combined instruments has been run for {species} at {site}, but top_level_only is set to True")
             
-
             for output_subpath in folders:
 
                 if "individual" in output_subpath:
@@ -277,6 +271,7 @@ def run_individual_instrument(network, instrument,
                               baseline = "",
                               monthly = False,
                               species = [],
+                              sites = [],
                               public=True,
                               resample=True,
                               top_level_only=False):
@@ -325,14 +320,14 @@ def run_individual_instrument(network, instrument,
 
     # Process for all species and sites
     for sp in species_to_process:
-
-        with Pool(processes=nthreads) as p:
-            result = p.starmap_async(run_individual_site, [(site, sp, network, instrument,
-                                                            rs, read_function, read_baseline_function, instrument_out,
-                                                            baseline, monthly, verbose, public, resample, top_level_only) for site in rs.columns])
-
-            for r in result.get():
-                error_log.append(r)
+        for site in rs.columns:
+            if site in sites or not sites:
+                if verbose:
+                    print(f"Processing {sp} at {site} for {instrument}")
+                result = run_individual_site(site, sp, network, instrument,
+                                            rs, read_function, read_baseline_function, instrument_out,
+                                            baseline, monthly, verbose, public, resample, top_level_only)
+                error_log.append(result)
 
     has_errors = any([error[2] for error in error_log])
 
@@ -459,6 +454,7 @@ def run_combined_instruments(network,
                              monthly = False,
                              verbose = False,
                              species = [],
+                             sites = [],
                              public = True,
                              resample=True):
     """Process combined data files for a given network.
@@ -478,16 +474,19 @@ def run_combined_instruments(network,
         raise TypeError("Species must be a list")
 
     with open_data_file("data_combination.xlsx", network=network) as data_selection_path:
-        sites = pd.ExcelFile(data_selection_path).sheet_names
+        sites_dc = pd.ExcelFile(data_selection_path).sheet_names
 
-    with Pool(processes=nthreads) as p:
-        args = [(site, species, network, baseline, monthly, verbose, public, resample) for site in sites]
-        result = p.starmap_async(run_combined_site, [(site, species, network, baseline, monthly, verbose, public, resample) for site in sites])
-    
-        error_log = []
+    if not sites:
+        sites = sites_dc.copy()
+    else:
+        # Check if sites are in data_combination.xlsx, if not, remove from sites
+        sites = [site for site in sites if site in sites_dc]
 
-        for r in result.get():
-            error_log.extend(r)
+    error_log = []
+
+    for site in sites:
+        result = run_combined_site(site, species, network, baseline, monthly, verbose, public, resample)
+        error_log.extend(result)
 
     has_errors = any([error[2] for error in error_log])
 
@@ -509,6 +508,7 @@ def run_all(network,
             instrument_include = [],
             instrument_exclude = ["GCPDD"],
             species = [],
+            sites = [],
             public = True,
             resample=True,
             top_level_only=False,):
@@ -557,6 +557,9 @@ def run_all(network,
     if not isinstance(species, list):
         raise TypeError("species must be a list")
 
+    if not isinstance(sites, list):
+        raise TypeError("sites must be a list")
+
     path = Paths(network, public = public, errors="ignore")
 
     # Delete log files, if they exist
@@ -580,7 +583,7 @@ def run_all(network,
     if combined:
         run_combined_instruments(network,
                                 baseline=baseline, verbose=True,
-                                monthly=monthly, species=species,
+                                monthly=monthly, species=species, sites=sites,
                                 public=public, resample=resample)
 
     # If include is empty, process all instruments in release schedule
@@ -596,7 +599,7 @@ def run_all(network,
             baseline_flag = {True: "git_pollution_flag", False: ""}[baseline]
             run_individual_instrument(network, instrument, 
                                     baseline=baseline_flag, verbose=True,
-                                    monthly=monthly, species=species,
+                                    monthly=monthly, species=species, sites=sites,
                                     public=public, resample=resample, top_level_only=top_level_only)
 
     # Incorporate README file into output directory or zip file
@@ -675,28 +678,30 @@ def preprocess():
 
     paths = Paths("agage")
 
-    # SOME MD DATA IS MISSING AND IN THE WRONG FORMAT
-    sites = {"TAC": ["n2o", "co"],
-            "TOB": ["sf6"]}
-    og_paths = {"TAC": "/agage/summary/netcdf-decc/md/AGAGE-GCMD_TAC_species.nc",
-                "TOB": "/agage/summary/netcdf-other/md/AGAGE-GCECD_TOB_species.nc"}
+    # # SOME MD DATA IS MISSING AND IN THE WRONG FORMAT
+    # sites = {"TAC": ["n2o", "co"],
+    #         "TOB": ["sf6"]}
+    # og_paths = {"TAC": "/agage/summary/netcdf-decc/md/AGAGE-GCMD_TAC_species.nc",
+    #             "TOB": "/agage/summary/netcdf-other/md/AGAGE-GCECD_TOB_species.nc"}
 
-    for site in sites:
+    # for site in sites:
 
-        for sp in sites[site]:
+    #     for sp in sites[site]:
 
-            # Copy MD files from md to md-modified directory, and replace repeatability
-            md_folder = data_file_path("", "agage", sub_path=paths.md_path)
-            og_path = og_paths[site].replace('species', sp.lower())
-            og_file = og_path.split('/')[-1]
-            std_path = og_path.replace(og_file, "") + f"stds/{site.upper()}_GCMD_stds.dat"
+    #         # Copy MD files from md to md-modified directory, and replace repeatability
+    #         md_folder = data_file_path("", "agage", sub_path=paths.md_path)
+    #         og_path = og_paths[site].replace('species', sp.lower())
+    #         og_file = og_path.split('/')[-1]
+    #         std_path = og_path.replace(og_file, "") + f"stds/{site.upper()}_GCMD_stds.dat"
 
-            # Copy from to md path
-            os.system(f"cp {og_path} {md_folder}")
+    #         # Copy from to md path
+    #         os.system(f"cp {og_path} {md_folder}")
 
-            # Replace repeatability
-            replace_repeatability_and_height(md_folder / og_file, std_path, sp, site)
+    #         # Replace repeatability
+    #         replace_repeatability_and_height(md_folder / og_file, std_path, sp, site)
 
+
+    md_folder = data_file_path("", "agage", sub_path=paths.md_path)
     # For CGO H2 data, the PDD is mis-labelled (Issue #47)
     if (md_folder / "AGAGE-GCMD_CGO_h2_pdd.nc").exists():
         os.system(f"cp {md_folder / 'AGAGE-GCMD_CGO_h2_pdd.nc'} {md_folder / 'AGAGE-GCPDD_CGO_h2.nc'}")
@@ -711,7 +716,7 @@ if __name__ == "__main__":
     print("####################################")
     print("#####Processing public archive######")
     print("####################################")
-    run_all("agage", public=True)
+    run_all("agage", species = ["cfc-11"], public=True)
 
     # print("####################################")
     # print("#####Processing private archive#####")
