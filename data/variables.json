@@ -119,7 +119,7 @@
             "_FillValue": -99
         },
         "optional": "True",
-        "resample_method": "mode",
+        "resample_method": "first",
         "remove_flagged": "False"
     }
 }

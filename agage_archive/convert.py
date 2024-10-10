@@ -90,6 +90,11 @@ def resampler(df, variable_defaults, last_timestamp, resample_period="3600s"):
     df_resample = df.resample(resample_period,
                             closed="left", label="left").agg(agg_dict)
 
+    # If there are any Nans in the instrument_type column, replace with -1 (UNDEFINED)
+    if "instrument_type" in df.columns:
+        if df_resample["instrument_type"].isnull().any():
+            df_resample["instrument_type"].fillna(-1, inplace=True)
+
     # If last resample period passes the end of the slice,
     # change the sampling period to the number of seconds between the last time point and the end of the slice
     if df_resample.index[-1] + pd.Timedelta(df_resample["sampling_period"].iloc[-1], unit="s") > last_timestamp:
@@ -192,7 +197,7 @@ def grouper(df, inlet_height_change_indices,
                                resample_period=resample_period)
             if not df_avg.empty:
                 dfs.append(df_avg.drop(columns=["inlet_height_change", "time_difference"]))
-    
+
     # Ensure all dtypes are the same and that there are no NaNs in columns that are going to be converted to int
     for i in range(len(dfs)):
         # If there are any nans in int columns, replace with -999
@@ -211,6 +216,11 @@ def grouper(df, inlet_height_change_indices,
 
     # Concatenate and sort
     df_avg = pd.concat(dfs, axis=0).sort_index()
+
+    # If there are any Nans in the instrument_type column, replace with -1 (UNDEFINED)
+    if "instrument_type" in df.columns:
+        if df_avg["instrument_type"].isnull().any():
+            df_avg["instrument_type"].fillna(-1, inplace=True)
 
     return df_avg
 

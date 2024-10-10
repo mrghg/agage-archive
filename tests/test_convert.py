@@ -287,7 +287,8 @@ def test_monthly_baseline():
     data = {"mf": (["time"], np.random.rand(len(time))),
             "mf_repeatability": (["time"], np.random.rand(len(time))),
             "sampling_period": (["time"], np.ones(len(time)) * 60),
-            "inlet_height": (["time"], np.ones(len(time)))}
+            "inlet_height": (["time"], np.ones(len(time))),
+            "instrument_type": (["time"], np.ones(len(time))),}
     ds = xr.Dataset(coords={"time": time}, data_vars=data)
     ds.mf.attrs["units"] = "1e-12"
     ds.mf.attrs["calibration_scale"] = "TU-87"
