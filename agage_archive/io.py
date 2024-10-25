@@ -242,12 +242,6 @@ def read_nc(network, species, site, instrument,
         # Add baseline flag back in to main dataset so that it gets resampled, etc. consistently
         ds["baseline"] = xr.DataArray(ds_baseline.baseline.values, dims="time")
 
-    # Everything should have been flagged in the AGAGE files already, but just in case...
-    # JP 2024-10-23 - remove these lines because there are some flags that don't mean bad data
-    # flagged = ds.data_flag != 0
-    # ds.mf[flagged] = np.nan
-    # ds.mf_repeatability[flagged] = np.nan
-
     # Add global attributes and format attributes
     ds.attrs["site_code"] = site.upper()
 
