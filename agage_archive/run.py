@@ -635,9 +635,12 @@ def preprocess():
     # Copy TAC GCMD data into the AGAGE MD folder (not synced with the main archive at the mo)
     decc_path = Path("/agage/summary/netcdf-decc/md")
     decc_md_co = decc_path / "AGAGE-GCMD_TAC_co.nc"
+    decc_md_n2o = decc_path / "AGAGE-GCMD_TAC_n2o.nc"
     decc_md_sf6 = decc_path / "AGAGE-GCMD_TAC_sf6.nc"
     if (decc_md_co).exists():
         os.system(f"cp {decc_md_co} {md_folder / 'AGAGE-GCMD_TAC_co.nc'}")
+    if (decc_md_n2o).exists():
+        os.system(f"cp {decc_md_n2o} {md_folder / 'AGAGE-GCMD_TAC_n2o.nc'}")
     if (decc_md_sf6).exists():
         os.system(f"cp {decc_md_sf6} {md_folder / 'AGAGE-GCMD_TAC_sf6.nc'}")
 
@@ -657,7 +660,7 @@ if __name__ == "__main__":
     print("####################################")
     print("#####Processing public archive######")
     print("####################################")
-    run_all("agage", species = ["sf6"], public=True)
+    run_all("agage", public=True)
 
     # print("####################################")
     # print("#####Processing private archive#####")
