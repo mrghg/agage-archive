@@ -263,7 +263,6 @@ def format_variables(ds,
                 raise ValueError(f"Variable {var_ds} not found in dataset. " + \
                                 "Use variable_translate to map to a different variable name.")
     
-
     # Create new dataset
     ds = xr.Dataset(vars_out,
                     coords = {"time": ds.time.copy()}, 
