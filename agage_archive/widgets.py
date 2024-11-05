@@ -33,8 +33,10 @@ def file_search_species(network, file_type, species, public = True):
         pattern = f"{species}/monthly-baseline/*.nc"
     elif file_type == "individual-instruments":
         pattern = f"{species}/individual-instruments/*.nc"
+    elif file_type == "archive":
+        pattern = f"{species}/archive/*nc"
     else:
-        raise ValueError("File type must be 'high-frequency', 'monthly-baseline' or 'individual-instruments'")
+        raise ValueError("File type must be 'high-frequency', 'monthly-baseline', 'individual-instruments' or 'archive'")
 
     files = data_file_list(network,
                            sub_path=f"{paths.output_path}",
