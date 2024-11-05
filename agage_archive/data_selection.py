@@ -2,7 +2,7 @@ import pandas as pd
 import numpy as np
 import json
 
-from agage_archive.config import open_data_file
+from agage_archive.config import open_data_file, data_file_list
 from agage_archive.formatting import format_species
 
 
@@ -135,7 +135,33 @@ def read_release_schedule(network, instrument,
         return df
 
 
-def calibration_scale_default(network, species):
+def choose_scale_defaults_file(network, instrument):
+    """ Choose the scale_defaults file. If a file exists with an appropriate name, use that. 
+    Otherwise, use the defaults file.
+
+    Args:
+        network (str): Network
+        instrument (str): Instrument
+
+    Returns:
+        str: Name of the scale_defaults file
+    """
+
+    scale_defaults = "defaults"
+    _, _, scale_defaults_files = data_file_list(network=network,
+                                        pattern = f"scale_defaults-*.csv",
+                                        errors="ignore")
+    for file in scale_defaults_files:
+        scale_instrument = file.split("-")[-1].split(".")[0]
+        if scale_instrument in instrument:
+            scale_defaults = "defaults-" + scale_instrument
+            break
+    
+    return scale_defaults
+
+
+def calibration_scale_default(network, species,
+                              scale_defaults_file="defaults"):
     '''Get default calibration scale
 
     Args:
@@ -145,8 +171,13 @@ def calibration_scale_default(network, species):
         str: Calibration scale
     '''
 
+    # Check if scale_defaults_file exists
+    with open_data_file(f"scale_{scale_defaults_file}.csv", network=network) as f:
+        if f is None:
+            raise ValueError(f"No scale_{scale_defaults_file}.csv file found. Check the path.")
+
     # Read scale_defaults csv file
-    with open_data_file("scale_defaults.csv", network=network) as f:
+    with open_data_file(f"scale_{scale_defaults_file}.csv", network=network) as f:
         scale_defaults = pd.read_csv(f, index_col="Species")
     
     scale_defaults = scale_defaults.map(lambda x: x.strip() if isinstance(x, str) else x)

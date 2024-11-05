@@ -2,7 +2,15 @@ import numpy as np
 import pandas as pd
 import xarray as xr
 
-from agage_archive.data_selection import read_data_exclude
+from agage_archive.data_selection import read_data_exclude, calibration_scale_default
+
+
+def test_calibration_scale_defaults():
+    '''Test calibration_scale_default function'''
+
+    assert calibration_scale_default("agage_test", "CO2") == "WMO-X2019"
+    assert calibration_scale_default("agage_test", "CH4") == "TU-87"
+    assert calibration_scale_default("agage_test", "CO2", scale_defaults_file="defaults-test") == "TESTING"
 
 
 def test_read_data_exclude():

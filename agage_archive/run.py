@@ -8,7 +8,7 @@ import xarray as xr
 
 from agage_archive.config import Paths, open_data_file, data_file_list, data_file_path, \
     copy_to_archive, output_path
-from agage_archive.data_selection import read_release_schedule, read_data_combination
+from agage_archive.data_selection import read_release_schedule, read_data_combination, choose_scale_defaults_file
 from agage_archive.io import combine_datasets, combine_baseline, \
     read_nc, read_baseline, read_ale_gage, read_gcwerks_flask, \
     output_dataset
@@ -179,7 +179,8 @@ def run_individual_site(site, species, network, instrument,
         if rs.loc[species, site].lower() != "x":
 
             ds = read_function(network, species, site, instrument,
-                            public = public, verbose=verbose, resample=resample)
+                            public = public, verbose=verbose,
+                            resample=resample, scale=choose_scale_defaults_file(network, instrument))
 
             if baseline:
                 ds_baseline = read_baseline_function(network, species, site, instrument,

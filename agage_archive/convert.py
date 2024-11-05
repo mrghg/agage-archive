@@ -444,29 +444,35 @@ def monthly_baseline(ds, ds_baseline):
     return ds_monthly
 
 
-def scale_convert(ds, scale_new):
+def scale_convert(ds, scale_new_in):
     """Convert mole fraction from one scale to another
 
     Args:
         ds (xarray.Dataset): Dataset containing mole fractions
-        scale_new (str): New scale to convert to. If None, no conversion is applied.
-            If "default", the default scale for the species is used.
+        scale_new_in (str): New scale to convert to. If None, no conversion is applied.
+            If "defaults", the default scale for the species is used from the scale_defaults.csv file
+            If "defaults-individual", the default scale for the species is used from the scale_defaults-individual.csv file. 
+            You can set any other default file by setting to the path to something like "defaults-<suffix>", 
+            which will look for a file called scale_defaults-<suffix>.csv
         
     Returns:
         ndarray,float: Mole fraction in new scale
     """
 
     # If no conversion required, return original dataset
-    if scale_new == None:
+    if scale_new_in == None:
         return ds
 
     # Find species
     species = ds.attrs["species"]
 
     # Get default scale, if needed
-    if scale_new == "default":
+    if "default" in scale_new_in:
         scale_new = calibration_scale_default(ds.attrs["network"],
-                                              format_species(species))
+                                              format_species(species),
+                                              scale_defaults_file=scale_new_in)
+    else:
+        scale_new = scale_new_in
 
     # If scales are the same, return original dataset
     if ds.attrs["calibration_scale"] == scale_new:
