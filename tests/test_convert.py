@@ -163,7 +163,7 @@ def test_grouper():
         assert np.isclose(ds_slice.mf.mean().values, df_grouped.loc[df_grouped.index[i], "mf"])
 
         # Check that variability is correct
-        assert np.isclose(ds_slice.mf.std(ddof=1).values, df_grouped.loc[df_grouped.index[i], "mf_variability"])
+        assert np.isclose(ds_slice.mf.std(ddof=0).values, df_grouped.loc[df_grouped.index[i], "mf_variability"])
 
         # Check that inlet_height is correctly set
         assert np.isclose(ds_slice.inlet_height.median().values, df_grouped.loc[df_grouped.index[i], "inlet_height"])
