@@ -9,6 +9,99 @@ from agage_archive.data_selection import calibration_scale_default
 from agage_archive.formatting import format_species, format_variables, comment_append
 
 
+def std_ddof0(x):
+    """Standard deviation with ddof=0
+
+    Args:
+        x (ndarray): Array
+
+    Returns:
+        float: Standard deviation
+    """
+
+    return np.std(x, ddof=0)
+
+
+def resample_variability(df_in, grouping_args,
+                         grouping_method="resample",
+                         grouping_kwargs={"closed": "left", "label": "left"}):
+    """Resample the variability of the dataset
+    If no variability is present, the standard deviation is calculated.
+    If variability is present, a weighted standard deviation is calculated,
+    based on VarT = (1/N) sum[nj(Varj + SqrMeanj)]  - SqrMeanT
+    
+    Args:
+        df_in (pd.DataFrame): DataFrame
+        grouping_method (str, optional): Grouping method to use: either groupby or resample. Defaults to "resample".
+        grouping_args (str, optional): Arguments for the grouping method. Defaults to "resample_period".
+        grouping_kwargs (dict, optional): Keyword arguments for the grouping method. Defaults to {"closed": "left", "label": "left"}.
+
+    Returns:
+        pd.Series: Resampled variability
+    """
+
+    if not isinstance(df_in, pd.DataFrame):
+        raise ValueError("Input must be a pandas DataFrame")
+
+    if grouping_method not in ["resample", "groupby"]:
+        raise ValueError("Grouping method must be either 'resample' or 'groupby'")
+
+    if "mf_variability" not in df_in.columns:
+        # If the variability isn't in the dataset, we can just resample the data and calculate the std
+
+        if grouping_method == "resample":
+            df = df_in[["mf"]].copy()
+            df_grouped = df.resample(*grouping_args,
+                                    **grouping_kwargs).agg(std_ddof0)
+        elif grouping_method == "groupby":
+            df = df_in[["mf", *grouping_args]].copy()
+            df = df.reset_index()
+            df_grouped = df.groupby(*grouping_args, 
+                                    **grouping_kwargs).agg({"mf": std_ddof0, "time": "first"})
+            df_grouped.set_index("time", inplace=True)
+        
+        return df_grouped["mf"]
+
+    else:
+
+        # If the variability is already in the dataset, we need to do a weighted resample        
+        if "mf_count" not in df_in.columns:
+            raise ValueError("mf_count must be in the DataFrame")
+
+        vars_list = ["mf", "mf_count", "mf_variability"]
+        if grouping_method == "groupby":
+            vars_list.append(*grouping_args)
+        df = df_in[vars_list].copy()
+
+        # Some variables to resample for the calculation
+        df["mfN"] = df["mf"] * df["mf_count"]
+        df["sumOfSquares"] = df["mf_count"] * (df["mf_variability"]**2 + df["mf"]**2)
+        df.drop(columns=["mf", "mf_variability"], inplace=True)
+
+        # Resample or group
+        agg_dict = {"mfN": "sum",
+                    "mf_count": "sum",
+                    "sumOfSquares": "sum"}
+        
+        if grouping_method == "resample":
+            df_grouped = df.resample(*grouping_args,
+                                    **grouping_kwargs).agg(agg_dict)
+        elif grouping_method == "groupby":
+            df = df.reset_index()
+            if "time" not in agg_dict.keys():
+                agg_dict["time"] = "first"
+            df_grouped = df.groupby(*grouping_args, 
+                                    **grouping_kwargs).agg(agg_dict)
+            df_grouped.set_index("time", inplace=True)
+
+        weighted_resample_mf = df_grouped["mfN"] / (df_grouped["mf_count"])
+        variance = df_grouped["sumOfSquares"] / df_grouped["mf_count"] - weighted_resample_mf**2
+        variance[variance < 0] = 0
+        df_grouped["mf_variability"] = np.sqrt(variance)
+
+        return df_grouped["mf_variability"]
+
+
 def define_agg_dict(variable_defaults, resample_period, columns,
                     no_time = False):
     """Define the aggregation dictionary for the resample method
@@ -47,7 +140,7 @@ def define_agg_dict(variable_defaults, resample_period, columns,
                 agg_dict[var] = lambda x: pd.Timedelta(resample_period).total_seconds()
             elif var == "mf_variability":
                 # Careful! This requires that mf_variability is overwritten by mf before resampling
-                agg_dict[var] = "std"
+                agg_dict[var] = std_ddof0
             else:
                 raise ValueError(f"Resample method not defined for {var}")
 
@@ -75,20 +168,23 @@ def resampler(df, variable_defaults, last_timestamp, resample_period="3600s"):
     variables["inlet_height_change"] = {"resample_method": "first"}
     variables["time_difference"] = {"resample_method": "first"}
 
-    # The resample method for mf_variability is "std", 
-    # but we need to overwrite the mf_variability column with the mf column to make this work
     df = df.copy()
-    df["mf_variability"] = df["mf"].copy()
 
     # If mf_count isn't there, add it with ones
     if "mf_count" not in df.columns:
         df["mf_count"] = 1
 
+    # First resample the variability. We'll add it back in later
+    df_variability = resample_variability(df, [resample_period])
+
+    # Resample the data
     agg_dict = define_agg_dict(variables, resample_period, df.columns,
                             no_time = True)
-
     df_resample = df.resample(resample_period,
                             closed="left", label="left").agg(agg_dict)
+
+    # Add the variability back in
+    df_resample["mf_variability"] = df_variability
 
     # If there are any Nans in the instrument_type column, replace with -1 (UNDEFINED)
     if "instrument_type" in df.columns:
@@ -146,8 +242,8 @@ def grouper(df, inlet_height_change_indices,
     df["time_difference"] = time_difference_values
 
     # Create the dataframes to either resample or group
-    df_to_resample = df[df["time_difference"] > pd.Timedelta(resample_period)]
-    df_to_group = df[df["time_difference"] <= pd.Timedelta(resample_period)]
+    df_to_resample = df[df["time_difference"] > pd.Timedelta(resample_period)].copy()
+    df_to_group = df[df["time_difference"] <= pd.Timedelta(resample_period)].copy()
 
     dfs = []
 
@@ -156,16 +252,17 @@ def grouper(df, inlet_height_change_indices,
 
     if not df_to_group.empty:
 
-        # Move time index to column
-        df_to_group.reset_index(inplace=True)
-
-        # Overwrite the mf_variability column with the mf column, so that the std can be taken
-        df_to_group = df_to_group.copy()
-        df_to_group["mf_variability"] = df_to_group["mf"]
-
         # If mf_count isn't there, add it with ones
         if "mf_count" not in df_to_group.columns:
             df_to_group["mf_count"] = 1
+
+        # First resample the variability. We'll add it back in later
+        df_variability = resample_variability(df_to_group, ["inlet_height_change"],
+                                              grouping_method="groupby",
+                                              grouping_kwargs={})
+
+        # Move time index to column
+        df_to_group.reset_index(inplace=True)
 
         # Group the data
         agg_dict = define_agg_dict(variables, resample_period, df_to_group.columns)
@@ -175,6 +272,9 @@ def grouper(df, inlet_height_change_indices,
         df_grouped.set_index("time", inplace=True)
         # Replace sampling period with time difference in seconds
         df_grouped["sampling_period"] = df_grouped["time_difference"].dt.total_seconds()
+
+        # Add the variability back in
+        df_grouped["mf_variability"] = df_variability
 
         # Remove unneeded columns
         df_grouped = df_grouped.drop(columns=["inlet_height_change", "time_difference"])

@@ -3,8 +3,8 @@ import pandas as pd
 import numpy as np
 import warnings
 
-from agage_archive.convert import resample, grouper, resampler, find_inlet_height_changes
-from agage_archive.convert import monthly_baseline, scale_convert
+from agage_archive.convert import resample, grouper, resampler, resample_variability,\
+                     find_inlet_height_changes, monthly_baseline, scale_convert
 
 
 def test_scale_convert():
@@ -97,7 +97,7 @@ def test_resampler():
     assert np.isclose(df_resample.mf.values[0], data[:60].mean())
 
     # Check variability has been calculated correctly
-    assert np.isclose(df_resample["mf_variability"].values[0], np.std(data[:60], ddof=1))
+    assert np.isclose(df_resample["mf_variability"].values[0], np.std(data[:60], ddof=0))
 
 
 def test_grouper():
@@ -163,10 +163,48 @@ def test_grouper():
         assert np.isclose(ds_slice.mf.mean().values, df_grouped.loc[df_grouped.index[i], "mf"])
 
         # Check that variability is correct
-        assert np.isclose(ds_slice.mf.std(ddof=1).values, df_grouped.loc[df_grouped.index[i], "mf_variability"])
+        assert np.isclose(ds_slice.mf.std(ddof=0).values, df_grouped.loc[df_grouped.index[i], "mf_variability"])
 
         # Check that inlet_height is correctly set
         assert np.isclose(ds_slice.inlet_height.median().values, df_grouped.loc[df_grouped.index[i], "inlet_height"])
+
+
+def test_resample_variability():
+
+   # Test weighted resampling for variability
+    ##################################################
+
+    # Create test dataset
+    time = pd.date_range(start="2021-01-01", end="2021-01-02", freq="1min")
+    data = np.random.rand(len(time))
+
+    inlet_height = np.ones(len(time)) * 10
+
+    df = pd.DataFrame({"time": time,
+                        "mf": data,
+                        "mf_repeatability": data * 0.1,
+                        "mf_count": np.ones(len(time)),
+                        "sampling_period": np.ones(len(time)) * 60,
+                        "inlet_height": inlet_height,
+                        "baseline": np.ones(len(time))})
+    df.set_index("time", inplace=True)
+
+    df_10min = df.resample("600S", closed="left", label="left").agg({"mf": "mean",
+                                                                    "mf_repeatability": "mean",
+                                                                    "mf_count": "sum",
+                                                                    "sampling_period": "first",
+                                                                    "inlet_height": "first",
+                                                                    "baseline": "prod"})
+
+    # Create a 10-minute average of the data, which we'll use as an intermediate step
+    var_10min = resample_variability(df, ["600S"])
+    assert np.isclose(var_10min.values[0], np.std(data[:10], ddof=0))
+
+    df_10min["mf_variability"] = var_10min
+
+    # Now resample a second time, this time to hourly
+    var_60min = resample_variability(df_10min, ["3600S"])
+    assert np.isclose(var_60min.values[0], np.std(data[:60], ddof=0))
 
 
 def test_resample():
@@ -222,7 +260,7 @@ def test_resample():
     assert np.isclose(ds_resample.mf.values[0], data[:60].mean())
 
     # Check variability has been calculated correctly
-    assert np.isclose(ds_resample.mf_variability.values[0], np.std(data[:60], ddof=1))
+    assert np.isclose(ds_resample.mf_variability.values[0], np.std(data[:60], ddof=0))
 
     # Check that units are consistent
     assert ds_resample.mf_variability.attrs["units"] == ds_resample.mf.attrs["units"]
@@ -280,6 +318,44 @@ def test_resample():
     #TODO: Add more tests for resampling by inlet height
 
 
+    # Test weighted resampling for variability
+    ##################################################
+
+    # Create test dataset
+    time = pd.date_range(start="2021-01-01", end="2021-01-02", freq="1min")
+    data = np.random.rand(len(time))
+
+    inlet_height = np.ones(len(time)) * 10
+
+    ds = xr.Dataset({"time": time, 
+                    "mf": ("time", data),
+                    "mf_repeatability": ("time", data * 0.1),
+                    "sampling_period": ("time", np.ones(len(time)) * 60),
+                    "inlet_height": ("time", inlet_height),
+                    "baseline": ("time", np.ones(len(time)))})
+
+    ds["mf"].attrs["units"] = "1e-9"
+    ds["mf"].attrs["calibration_scale"] = "TU-87"
+
+    ds["mf_repeatability"].attrs["units"] = "1e-9"
+    ds["mf_repeatability"].attrs["calibration_scale"] = "TU-87"
+    ds["mf_repeatability"].attrs["long_name"] = "Repeatability"
+
+    ds.attrs["version"] = "test"
+    ds.attrs["species"] = "ch4"
+    ds.attrs["comment"] = "This is a test dataset"
+
+    # Create a 10-minute average of the data, which we'll use as an intermediate step
+    ds_10min = resample(ds, resample_period="600S")
+    assert ds_10min.time.diff("time").median() == np.timedelta64(600, "s")
+    assert np.isclose(ds_10min.mf_variability[0].values, np.std(data[:10], ddof=0))
+
+    # Now resample a second time, this time to hourly
+    ds_60min = resample(ds_10min, resample_period="3600S", resample_threshold="6000S")
+    assert ds_60min.time.diff("time").median() == np.timedelta64(3600, "s")
+    assert np.isclose(ds_60min.mf_variability[0].values, np.std(data[:60], ddof=0))
+
+
 def test_monthly_baseline():
     
     # Create a sample dataset
@@ -313,7 +389,7 @@ def test_monthly_baseline():
     assert np.allclose(ds_monthly.mf.values, ds_baseline_points.mf.resample(time="1MS").mean().values)
 
     # Check if the monthly standard deviation is calculated correctly
-    expected_std = ds_baseline_points.mf.resample(time="1MS").std(ddof=1)
+    expected_std = ds_baseline_points.mf.resample(time="1MS").std(ddof=0)
     assert np.allclose(ds_monthly.mf_variability.values, expected_std.values)
     assert ds_monthly.mf_variability.attrs["long_name"] == "Monthly standard deviation of baseline mole fractions"
     assert ds_monthly.mf_variability.attrs["units"] == ds.mf.attrs["units"]
