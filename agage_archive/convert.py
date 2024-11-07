@@ -95,8 +95,9 @@ def resample_variability(df_in, grouping_args,
             df_grouped.set_index("time", inplace=True)
 
         weighted_resample_mf = df_grouped["mfN"] / (df_grouped["mf_count"])
-        df_grouped["mf_variability"] = np.sqrt(df_grouped["sumOfSquares"] / (df_grouped["mf_count"])
-                                        - weighted_resample_mf**2)
+        variance = df_grouped["sumOfSquares"] / df_grouped["mf_count"] - weighted_resample_mf**2
+        variance[variance < 0] = 0
+        df_grouped["mf_variability"] = np.sqrt(variance)
 
         return df_grouped["mf_variability"]
 
@@ -241,8 +242,8 @@ def grouper(df, inlet_height_change_indices,
     df["time_difference"] = time_difference_values
 
     # Create the dataframes to either resample or group
-    df_to_resample = df[df["time_difference"] > pd.Timedelta(resample_period)]
-    df_to_group = df[df["time_difference"] <= pd.Timedelta(resample_period)]
+    df_to_resample = df[df["time_difference"] > pd.Timedelta(resample_period)].copy()
+    df_to_group = df[df["time_difference"] <= pd.Timedelta(resample_period)].copy()
 
     dfs = []
 
