@@ -3,8 +3,8 @@ import pandas as pd
 import numpy as np
 import warnings
 
-from agage_archive.convert import resample, grouper, resampler, find_inlet_height_changes
-from agage_archive.convert import monthly_baseline, scale_convert
+from agage_archive.convert import resample, grouper, resampler, resample_variability,\
+                     find_inlet_height_changes, monthly_baseline, scale_convert
 
 
 def test_scale_convert():
@@ -168,7 +168,44 @@ def test_grouper():
         # Check that inlet_height is correctly set
         assert np.isclose(ds_slice.inlet_height.median().values, df_grouped.loc[df_grouped.index[i], "inlet_height"])
 
-test_grouper()
+
+def test_resample_variability():
+
+   # Test weighted resampling for variability
+    ##################################################
+
+    # Create test dataset
+    time = pd.date_range(start="2021-01-01", end="2021-01-02", freq="1min")
+    data = np.random.rand(len(time))
+
+    inlet_height = np.ones(len(time)) * 10
+
+    df = pd.DataFrame({"time": time,
+                        "mf": data,
+                        "mf_repeatability": data * 0.1,
+                        "mf_count": np.ones(len(time)),
+                        "sampling_period": np.ones(len(time)) * 60,
+                        "inlet_height": inlet_height,
+                        "baseline": np.ones(len(time))})
+    df.set_index("time", inplace=True)
+
+    df_10min = df.resample("600S", closed="left", label="left").agg({"mf": "mean",
+                                                                    "mf_repeatability": "mean",
+                                                                    "mf_count": "sum",
+                                                                    "sampling_period": "first",
+                                                                    "inlet_height": "first",
+                                                                    "baseline": "prod"})
+
+    # Create a 10-minute average of the data, which we'll use as an intermediate step
+    var_10min = resample_variability(df, ["600S"])
+    assert np.isclose(var_10min.values[0], np.std(data[:10], ddof=0))
+
+    df_10min["mf_variability"] = var_10min
+
+    # Now resample a second time, this time to hourly
+    var_60min = resample_variability(df_10min, ["3600S"])
+    assert np.isclose(var_60min.values[0], np.std(data[:60], ddof=0))
+
 
 def test_resample():
     """Test resample function"""
