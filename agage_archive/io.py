@@ -173,7 +173,7 @@ def read_nc(network, species, site, instrument,
             data_exclude = True,
             baseline = None,
             resample = True,
-            scale = "default",
+            scale = "defaults",
             public = True,
             dropna = True):
     """Read GCWerks netCDF files
@@ -185,7 +185,9 @@ def read_nc(network, species, site, instrument,
         instrument (str): Instrument
         verbose (bool, optional): Print verbose output. Defaults to False.
         data_exclude (bool, optional): Exclude data based on data_exclude.xlsx. Defaults to True.
-        scale (str, optional): Scale to convert to. Defaults to "default". If None, will keep original scale.
+        scale (str, optional): Scale to convert to. Defaults to "defaults", which will read scale_defaults file. 
+            If None, will keep original scale. If you want to use a different default scale, create a new scale defaults file, 
+            with the name scale_defaults-<suffix>.csv and set to "defaults-<suffix>".
         public (bool, optional): Whether the dataset is for public release. Default to True.
         resample (bool, optional): Whether to resample the data, if needed. Default to True.
         dropna (bool, optional): Drop NaN values. Default to True.
@@ -303,7 +305,7 @@ def read_nc(network, species, site, instrument,
     ds = format_variables(ds)
 
     # Convert scale, if needed
-    ds = scale_convert(ds, scale)    
+    ds = scale_convert(ds, scale)
 
     return ds
 
@@ -409,7 +411,7 @@ def read_ale_gage(network, species, site, instrument,
                   verbose = True,
                   utc = True,
                   data_exclude = True,
-                  scale = "default",
+                  scale = "defaults",
                   baseline = False,
                   public=True,
                   resample = False,
@@ -747,7 +749,7 @@ def read_gcwerks_flask(network, species, site, instrument,
 
 
 def combine_datasets(network, species, site, 
-                    scale = "default",
+                    scale = "defaults",
                     verbose = True,
                     public = True,
                     resample = True,
