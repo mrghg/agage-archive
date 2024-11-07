@@ -14,7 +14,8 @@ from agage_archive.formatting import format_species, \
     format_variables, format_attributes, format_species_flask
 from agage_archive.data_selection import read_release_schedule, read_data_exclude, \
     read_data_combination, calibration_scale_default
-from agage_archive.definitions import instrument_type_definition, get_instrument_type, get_instrument_number
+from agage_archive.definitions import instrument_type_definition, get_instrument_type, \
+    get_instrument_number, instrument_selection_text
 from agage_archive.util import tz_local_to_utc
 
 
@@ -257,7 +258,11 @@ def read_nc(network, species, site, instrument,
                         instruments=instruments,
                         network=network,
                         species=species,
-                        public=public)
+                        public=public,
+                        extra_attributes={
+                            "product_type": "mole fraction",
+                            "instrument_selection": "Individual instruments",
+                            "frequency": "high-frequency"})
 
     # Set the instrument_type attribute
     # slightly convoluted method, but ensures consistency with combined files
@@ -374,6 +379,9 @@ def read_baseline(network, species, site, instrument,
     ds_out.attrs["species"] = format_species(species)
     ds_out.attrs["instrument"] = instrument
     ds_out.attrs["network"] = network
+    ds_out.attrs["product_type"] = "baseline flag"
+    ds_out.attrs["instrument_selection"] = "Individual instruments"
+    ds_out.attrs["frequency"] = "high-frequency"
     if public:
         ds_out.attrs["version"] = attributes_default["version"]
     else:
@@ -579,7 +587,10 @@ def read_ale_gage(network, species, site, instrument,
                 "inlet_latitude": site_info[site]["latitude"],
                 "inlet_longitude": site_info[site]["longitude"],
                 "inlet_comment": "",
-                "site_code": site}
+                "site_code": site,
+                "product_type": "mole fraction",
+                "instrument_selection": "Individual instruments",
+                "frequency": "high-frequency",}
 
     ds = format_attributes(ds,
                         instruments=[{"instrument": f"{instrument.upper()}_GCMD"}],
@@ -861,7 +872,8 @@ def combine_datasets(network, species, site,
     ds_combined = ds_combined.sortby("time")
 
     # Add details on instruments to global attributes
-    ds_combined = format_attributes(ds_combined, instrument_rec, public=public)
+    ds_combined = format_attributes(ds_combined, instrument_rec, public=public,
+                                    extra_attributes={"instrument_selection": instrument_selection_text})
 
     # Extend comment attribute describing all datasets
     if len(comments) > 1:
@@ -950,6 +962,9 @@ def combine_baseline(network, species, site,
     # but we don't have access to the instrument type. Impact should be minimal
     if len(ds_combined.time) != len(ds_combined.time.drop_duplicates(dim="time")):
         ds_combined = ds_combined.drop_duplicates(dim="time")
+
+    # Global attributes
+    ds_combined.attrs["instrument_selection"] = instrument_selection_text
 
     return ds_combined
 

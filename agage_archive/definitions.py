@@ -80,6 +80,8 @@ instrument_number = {"UNDEFINED": -1,
 
 minimum_averaging_period = {"Picarro": "1H"}
 
+instrument_selection_text = "Recommended instrument(s) selected and combined by AGAGE PIs"
+
 
 def instrument_type_definition():
     '''Define instrument numbers for each instrument type

@@ -7,6 +7,7 @@ import json
 
 from agage_archive.config import open_data_file, data_file_path
 from agage_archive.run import run_individual_instrument
+from agage_archive.formatting import format_attributes
 
 
 def check_cf_compliance(dataset):
@@ -88,3 +89,40 @@ def test_cf_compliance():
         ds = xr.load_dataset(f)
 
     assert check_cf_compliance(dataset=ds) == True
+
+
+def test_format_attributes():
+    # Test that the attributes are formatted correctly
+
+    # Test dataset
+    data = {
+        "time": pd.date_range(start="2021-01-01 00:00", periods=10, freq="D"),
+        "data": np.random.random(10),
+    }
+
+    ds = xr.Dataset(data_vars={"mf": (["time"], data["data"])}, coords={"time": data["time"]})
+
+    ds.attrs["site_code"] = "CBW"
+    ds.attrs["calibration_scale"] = "SIO-05"
+
+    # Test attributes
+    ds = format_attributes(ds,
+                           network="agage_test",
+                           site="CBW",
+                           species="nf3",
+                           extra_attributes={"product_type": "mole_fraction",
+                                             "frequency": "high-frequency",
+                                             "instrument_selection": "test"},
+                           )
+    
+    assert ds.attrs["site_code"] == "CBW"
+    assert ds.attrs["species"] == "nf3"
+    assert ds.attrs["network"] == "agage_test"
+    assert ds.attrs["start_date"] == "2021-01-01 00:00:00"
+    assert ds.attrs["end_date"] == "2021-01-10 00:00:00"
+    assert ds.attrs["product_type"] == "mole_fraction"
+    assert ds.attrs["frequency"] == "high-frequency"
+    assert ds.attrs["instrument_selection"] == "test"
+    assert ds.attrs["version"] == "testv1"
+
+test_format_attributes()
