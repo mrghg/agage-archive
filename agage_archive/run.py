@@ -14,7 +14,7 @@ from agage_archive.io import combine_datasets, combine_baseline, \
     output_dataset
 from agage_archive.formatting import format_species
 from agage_archive.convert import monthly_baseline
-from agage_archive.definitions import instrument_number
+from agage_archive.definitions import instrument_number, instrument_selection_text
 
 
 def get_error(e):
@@ -214,6 +214,11 @@ def run_individual_site(site, species, network, instrument,
                     instrument_str = instrument_out
                 else:
                     instrument_str = ""
+                    # In this case, change the instrument selection text to show that it's the recommended file
+                    if baseline:
+                        ds_baseline.attrs["instrument_selection"] = instrument_selection_text
+                    else:
+                        ds.attrs["instrument_selection"] = instrument_selection_text
 
                 # Check if file already exists in the top-level directory. 
                 # This can happen if only one instrument is specified in data_combination.xlsx

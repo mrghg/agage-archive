@@ -315,7 +315,8 @@ def format_attributes(ds, instruments = [],
                     species = None,
                     calibration_scale = None,
                     public = True,
-                    site = False):
+                    site = False,
+                    extra_attributes = {}):
     '''Format attributes
 
     Note that many of the above arguments don't appear to be used,
@@ -330,6 +331,7 @@ def format_attributes(ds, instruments = [],
         calibration_scale (str, optional): Calibration scale. Defaults to None, in which case it is looked up in the dataset attributes.
         public (bool, optional): Whether the dataset is for public release. Defaults to True.
         site (bool, optional): Look for site-specific attributes.
+        extra_attributes (dict, optional): Extra attributes to add to the dataset. Defaults to {}. Keys must be present in one of the attributes.json files.
 
     Returns:
         xr.Dataset: Dataset with formatted attributes
@@ -375,7 +377,7 @@ def format_attributes(ds, instruments = [],
 
     for attr in attributes_default:
 
-        if "instrument" in attr and attr != "instrument_type":
+        if "instrument" in attr and attr != "instrument_type" and attr != "instrument_selection":
             # Update instrument attributes
             attrs.update(format_attributes_global_instruments(ds,
                                                         instruments,
@@ -388,6 +390,14 @@ def format_attributes(ds, instruments = [],
         elif attr == "file_created":
             # Get current time
             attrs[attr] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+        elif attr == "start_date":
+            # Get start date
+            attrs[attr] = f"{ds.time[0].dt.strftime('%Y-%m-%d %H:%M:%S').values}"
+        
+        elif attr == "end_date":
+            # Get end date
+            attrs[attr] = f"{ds.time[-1].dt.strftime('%Y-%m-%d %H:%M:%S').values}"
         
         elif attr == "processing_code_version":
             # Get code version
@@ -411,6 +421,10 @@ def format_attributes(ds, instruments = [],
                         attrs[attr] = att.encode("utf-8", "surrogateescape").decode("UTF-8")
                     else:
                         attrs[attr] = att
+            
+            # If attribute is in extra_attributes, overwrite
+            if attr in extra_attributes:
+                attrs[attr] = extra_attributes[attr]
 
     # Format certain key attributes, and determine if they have been set as keywords
     for v in ["species", "calibration_scale", "network"]:
