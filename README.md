@@ -23,8 +23,12 @@ Input a descriptive user name when prompted. This function will create a file ``
 
 ## Usage
 
-We use git and [dvc](https://dvc.org) to track code and data files for this project. Read the [workflow](workflow.md) document for usage details.
+We use git and [dvc](https://dvc.org) to track code and data files for this project. Read the [workflow](docs/workflow.md) document for usage details.
 
 ## Methodology and references
 
-See the [notes](notes.md) document for methodological details and citations.
+See the [ALE and GAGE notes](docs/ale_gage_notes.md) document for details on how we've processed data from ALE and GAGE, the previous incarnations of AGAGE.
+
+## Reusing this code for processing other datasets
+
+The core functionality behind this code has been designed to be used in other projects. Take a look at the [template-archive](https://github.com/mrghg/template-archive) repository. Note also that processing of flask data requires some specific steps as outlined in the [flasks](docs/flasks.md) document.
