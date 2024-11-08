@@ -382,6 +382,8 @@ def read_baseline(network, species, site, instrument,
     ds_out.attrs["product_type"] = "baseline flag"
     ds_out.attrs["instrument_selection"] = "Individual instruments"
     ds_out.attrs["frequency"] = "high-frequency"
+    ds_out.attrs["start_date"] = str(ds_out.time[0].dt.strftime("%Y-%m-%d %H:%M:%S").values)
+    ds_out.attrs["end_date"] = str(ds_out.time[-1].dt.strftime("%Y-%m-%d %H:%M:%S").values)
     if public:
         ds_out.attrs["version"] = attributes_default["version"]
     else:
@@ -965,6 +967,8 @@ def combine_baseline(network, species, site,
 
     # Global attributes
     ds_combined.attrs["instrument_selection"] = instrument_selection_text
+    ds_combined.attrs["start_date"] = str(ds_combined.time[0].dt.strftime("%Y-%m-%d %H:%M:%S").values)
+    ds_combined.attrs["end_date"] = str(ds_combined.time[-1].dt.strftime("%Y-%m-%d %H:%M:%S").values)
 
     return ds_combined
 
