@@ -370,14 +370,23 @@ def read_baseline(network, species, site, instrument,
     if "sampling_time_seconds" in ds_out.time.attrs:
         del ds_out.time.attrs["sampling_time_seconds"]
 
+    attrs = ds_out.attrs.copy()
+
     # Add global attributes
     ds_out.attrs = baseline_attrs[flag_name]
+
+    # Copy across a few attributes
+    for att in ["inlet_latitude", "inlet_longitude", "inlet_base_elevation_masl",
+                "doi", "file_created_by", "station_long_name",
+                "processing_code_url", "processing_code_version"]:
+        ds_out.attrs[att] = attrs[att]
 
     # Add some global attributes
     ds_out.attrs["baseline_flag"] = flag_name
     ds_out.attrs["site_code"] = site.upper()
     ds_out.attrs["species"] = format_species(species)
     ds_out.attrs["instrument"] = instrument
+    ds_out.attrs["instrument_type"] = get_instrument_type(get_instrument_number(instrument))
     ds_out.attrs["network"] = network
     ds_out.attrs["product_type"] = "baseline flag"
     ds_out.attrs["instrument_selection"] = "Individual instruments"
@@ -630,6 +639,7 @@ def read_ale_gage(network, species, site, instrument,
     
     # Remove pollution flag
     ds_baseline = ds.baseline.copy(deep=True).to_dataset(name="baseline")
+    ds_baseline.attrs = ds.attrs.copy()
     ds = ds.drop_vars("baseline")
 
     # Raise error if baseline dataset is different length to main dataset
