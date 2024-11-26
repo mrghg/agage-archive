@@ -212,13 +212,11 @@ def run_individual_site(site, species, network, instrument,
 
                 if "individual" in output_subpath:
                     instrument_str = instrument_out
+                    instrument_selection_text_str = ds.attrs["instrument_selection"] #Should default to "Individual instruments"
                 else:
                     instrument_str = ""
                     # In this case, change the instrument selection text to show that it's the recommended file
-                    if baseline:
-                        ds_baseline.attrs["instrument_selection"] = instrument_selection_text
-                    else:
-                        ds.attrs["instrument_selection"] = instrument_selection_text
+                    instrument_selection_text_str = instrument_selection_text
 
                 # Check if file already exists in the top-level directory. 
                 # This can happen if only one instrument is specified in data_combination.xlsx
@@ -230,6 +228,7 @@ def run_individual_site(site, species, network, instrument,
                         raise FileExistsError(f"Top-level file already exists for {species} at {site} (now trying to add instrument {instrument_out}). "\
                                             "Add to data_combination.xlsx to tell me how to combine the data.")
 
+                ds.attrs["instrument_selection"] = instrument_selection_text_str
                 output_dataset(ds, network, instrument=instrument_str,
                             output_subpath=output_subpath,
                             end_date=rs.loc[species, site],
@@ -239,6 +238,7 @@ def run_individual_site(site, species, network, instrument,
                 if baseline:
                     if (ds_baseline.time != ds.time).any():
                         raise ValueError(f"Baseline and data files for {species} at {site} have different timestamps")
+                    ds_baseline.attrs["instrument_selection"] = instrument_selection_text_str
                     output_dataset(ds_baseline, network, instrument=instrument_str,
                             output_subpath=output_subpath + "/baseline-flags",
                             end_date=rs.loc[species, site],
@@ -248,6 +248,7 @@ def run_individual_site(site, species, network, instrument,
                     
                     if monthly:
                         ds_baseline_monthly = monthly_baseline(ds, ds_baseline)
+                        ds_baseline_monthly.attrs["instrument_selection"] = instrument_selection_text_str
                         output_dataset(ds_baseline_monthly, network, instrument=instrument_str,
                             output_subpath=output_subpath + "/monthly-baseline",
                             end_date=rs.loc[species, site],
@@ -659,14 +660,14 @@ def preprocess():
 
 if __name__ == "__main__":
 
-    preprocess()
+    #preprocess()
 
     start_time = time.time()
 
     print("####################################")
     print("#####Processing public archive######")
     print("####################################")
-    run_all("agage", public=True)
+    run_all("agage", species = ["cfc-11"], sites = ["ADR"], public=True)
 
     # print("####################################")
     # print("#####Processing private archive#####")
