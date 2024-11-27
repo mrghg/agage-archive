@@ -204,17 +204,22 @@ def read_data_exclude(ds, species, site, instrument,
         xr.Dataset: Dataset with NaNs between start and end dates
     '''
 
-    # Determine if data_exclude.xlsx contains sheet name called site.upper()
-    with open_data_file("data_exclude.xlsx", network = ds.attrs["network"]) as f:
-        if site.upper() not in pd.ExcelFile(f).sheet_names:
-            return ds
+    # Determine if data_exclude folder contains file for site.upper()
+    _, _, files = data_file_list(network = ds.attrs["network"],
+                                 sub_path="data_exclude",
+                                 pattern = f"*{site.upper()}.csv")
+
+    if len(files) == 0:
+        return ds
+
+    if len(files) > 1:
+        raise ValueError(f"Multiple data_exclude files found for {site.upper()}. Check the path.")
 
     # Read data_exclude
-    with open_data_file("data_exclude.xlsx", network = ds.attrs["network"]) as f:
-        data_exclude = pd.read_excel(f,
-                                    comment="#",
-                                    sheet_name=site.upper())
-    
+    with open_data_file(files[0], network = ds.attrs["network"],
+                        sub_path="data_exclude") as f:
+        data_exclude = pd.read_csv(f, comment="#")
+
     # Read variable defaults to find what to do with missing data
     with open_data_file("variables.json", this_repo=True) as f:
         variable_defaults = json.load(f)

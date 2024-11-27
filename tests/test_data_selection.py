@@ -73,3 +73,4 @@ def test_read_data_exclude():
         assert not np.isnan(ds["mf"][2].values)
         assert ds["mf"][2].values == 3
 
+test_read_data_exclude()
