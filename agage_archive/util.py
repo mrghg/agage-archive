@@ -2,8 +2,10 @@ import os
 import json
 import pytz
 import yaml
+import pandas as pd
 
-from agage_archive.config import Paths, open_data_file
+from agage_archive.config import Paths, open_data_file, data_file_path
+
 
 def is_number(s):
     """ Check if a string is a number. 
@@ -73,3 +75,50 @@ def tz_local_to_utc(index, network, site):
     return ind.tz_convert(None)
 
 
+def excel_to_csv(file, network):
+    """ Convert Excel data specification file to CSVs.
+
+    Args:
+        file (str): File name. Must be either:
+            "data_release_schedule", "data_combination" or "data_exclude"
+        network (str): Network name
+    """
+
+    filename = data_file_path(file + ".xlsx", network)
+
+    if not filename.exists():
+        raise ValueError(f"Check filename: {filename}")
+
+    csv_folder_name = filename.parent / filename.name.split(".")[0]
+
+    if not csv_folder_name.exists():
+        raise ValueError(f"Create folder {csv_folder_name}")
+
+    # Read Excel file and output worksheets to CSVs
+    sheet_names = pd.ExcelFile(filename).sheet_names
+
+    for sheet in sheet_names:
+        # Read header
+        header_sheet = pd.read_excel(filename,
+                                    sheet_name=sheet)
+
+        header = [header_sheet.columns[0]]
+        i=0
+        while header_sheet.iloc[i, 0][0] == "#":
+            header.append(header_sheet.iloc[i, 0])
+            i+=1
+
+        # Special case of general release date
+        if header_sheet.iloc[i, 0][:7].upper() == "GENERAL":
+            header.append("# " + header_sheet.iloc[i, 0] + ": " + header_sheet.iloc[i, 1])
+            i+=1
+
+        xlsx_data = pd.read_excel(filename, sheet_name=sheet,
+                                skiprows=i+1, dtype=str)
+        
+        csv_filename = csv_folder_name / f"{file}_{sheet}.csv"
+
+        with open(csv_filename, "w") as f:
+            for h in header:
+                f.writelines(h + "\n")
+            xlsx_data.to_csv(f, index = None)
