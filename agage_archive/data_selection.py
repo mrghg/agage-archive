@@ -23,21 +23,25 @@ def read_data_combination(network, species, site,
 
     default_output = {"GCMS-Medusa": [None, None]}
 
-    # Determine if data_exclude.xlsx contains sheet name called site.upper()
-    with open_data_file("data_combination.xlsx", network=network) as f:
-        if site.upper() not in pd.ExcelFile(f).sheet_names:
-            if verbose:
-                print(warning_message)
-            return default_output
+    # Check if relevant file exists
+    _, _, files = data_file_list(network = network,
+                                sub_path = "data_combination",
+                                pattern = f"*{site.upper()}.csv"
+                                )
 
-    # Read data_selection
-    with open_data_file("data_combination.xlsx", network=network) as f:
-        df = pd.read_excel(f,
-                        comment="#",
-                        sheet_name=site.upper(),
-                        index_col="Species")
+    if len(files) == 0:
+        if verbose:
+            print(warning_message)
+        return default_output
+
+    if len(files) > 1:
+        raise ValueError(f"Found too many data_combination files for {site}")
+
+    # Read the data_combination file
+    with open_data_file(files[0], network = "agage_test", sub_path = "data_combination") as f:
+        df = pd.read_csv(f, comment = "#", index_col = "Species")
     
-    # Look for species name in table, return Medusa if not there
+    # Look for species name in table
     df = df[df.index == format_species(species)]
 
     if len(df) == 0:
@@ -89,23 +93,23 @@ def read_release_schedule(network, instrument,
         pd.DataFrame: Release schedule
     '''
 
-    with open_data_file("data_release_schedule.xlsx", network=network, errors = "ignore") as f:
-        df_all = pd.read_excel(f, sheet_name=instrument)
+    # Read csv file
+    with open_data_file(f"data_release_schedule_{instrument}.csv",
+                        network = "agage_test", sub_path = "data_release_schedule") as f:
+        # Read header lines
+        header = [f.readline().decode("utf-8")]
+        while header[-1][0] == "#":
+            pos = f.tell()
+            header.append(f.readline().decode("utf-8"))
 
-        # Remove whitespace and convert to string
-        df_all = df_all.map(str)
-        df_all = df_all.map(lambda x: x.strip() if isinstance(x, str) else x)
+        f.seek(pos)
 
-        # Get index of row that contains "General release date"
-        idx = df_all[df_all.iloc[:, 0] == "General release date"].index[0]
-        general_end_date = df_all.iloc[idx, 1]
+        df = pd.read_csv(f)
 
-        # Determine if general_end_date is a string
-        if not isinstance(general_end_date, str):
-            print(f"WARNING: No general end date found for {instrument}. Assuming no limit.")
-            general_end_date = "2100-01-01 00:00"
+    # Find general release line
+    general_end_line = [h for h in header if "# GENERAL" in h.upper()][0].upper()
 
-        df = pd.read_excel(f, sheet_name=instrument, skiprows=idx+2)
+    general_end_date = general_end_line.split("# GENERAL RELEASE DATE:")[1].strip()
 
     # Remove whitespace
     df = df.map(lambda x: x.strip() if isinstance(x, str) else x)
