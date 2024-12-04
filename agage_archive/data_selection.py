@@ -38,7 +38,7 @@ def read_data_combination(network, species, site,
         raise ValueError(f"Found too many data_combination files for {site}")
 
     # Read the data_combination file
-    with open_data_file(files[0], network = "agage_test", sub_path = "data_combination") as f:
+    with open_data_file(files[0], network = network, sub_path = "data_combination") as f:
         df = pd.read_csv(f, comment = "#", index_col = "Species")
     
     # Look for species name in table
@@ -80,7 +80,7 @@ def read_release_schedule(network, instrument,
                           species = None,
                           site = None,
                           public=True):
-    '''Read release schedule from Excel file
+    '''Read release schedule from csv files
 
     Args:
         network (str): Network
@@ -95,7 +95,7 @@ def read_release_schedule(network, instrument,
 
     # Read csv file
     with open_data_file(f"data_release_schedule_{instrument}.csv",
-                        network = "agage_test", sub_path = "data_release_schedule") as f:
+                        network = network, sub_path = "data_release_schedule") as f:
         # Read header lines
         header = [f.readline().decode("utf-8")]
         while header[-1][0] == "#":
