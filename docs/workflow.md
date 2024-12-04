@@ -92,40 +92,40 @@ You will need to copy over the GCWerks output folders ```data-nc/md```, ```data-
 
 ## Data Specification Files
 
-There are four main Excel and csv files that tell the code which data to include in the archive and how to combine or process each set of files. These files must be in the ```data/<network>``` folder (```data/agage``` for this repository, but if you are using this code to process data from a different network, rename accordingly).
+There are four main sets of csv files that tell the code which data to include in the archive and how to combine or process each set of files. These files must be in the ```data/<network>``` folder (e.g., ```data/agage``` for this repository, but if you are using this code to process data from a different network, rename accordingly).
 
-**Important note to git users**: Git cannot track changes in Excel files. Therefore, please **do not** commit changes to these files simultaneously with code changes. It makes it very difficult to resolve any conflicts. It is recommended that you make changes to the Excel files in isolation, commit changes and create a PR explaining exactly which parts of these files have been changed. In the future, we'll move this all to csv.
+**Important note on date formats**: If you edit the csv files in Excel will try to convert date strings into its own date format. Please don't let it do so. Keep all date cells as strings. 
 
-**Important note on date formats**: Excel will try to convert date strings into its own date format. Please don't let it do so. Keep all date cells as strings.
+Data specification files are in the following sub-folders:
 
-### ```data_release_schedule.xlsx```
+### ```data_release_schedule```
 
-This file tells us which species to include in the archive and until which date(s). Individual instrument files will be released until the specified end date. Combined files will contain data for a particular instrument until the date in the release schedule, or until the date specified in ```data_combination.xlsx```, whichever comes first.
+These files tells us which species to include in the archive and until which date(s). Individual instrument files will be released until the specified end date. Combined files will contain data for a particular instrument until the date in the release schedule, or until the date specified in the relevant ```data_combination``` file, whichever comes first.
 
 **Each species that should be released from a site needs to be listed in this file. If it's not in here, it won't be included in the archive.**
 
-Each tab of the spreadsheet is for an instrument. A separate tab will be needed for each instrument name that appears in the GCWerks output filenames (e.g., GCMD, Picarro-1, Picarro-2, etc.).
+Each csv file is for a different instrument. A separate file will be needed for each instrument name that appears in the GCWerks output filenames (e.g., GCMD, Picarro-1, Picarro-2, etc.).
 
-Within each tab, there is a cell for a "General release date". This date applies to every compound at every cite, unless a date is specified in the table.
+Within each file, there is a cell for a "General release date". This date applies to every compound at every site, unless a date is specified in the table.
 
-The table specifies the species and site-specific release date. An "x" in this table means that a particular species will not be released at a site. A date in this column overrides the general release date, and this species/site will only be released until the specified date.
+The table specifies the species- and site-specific release date. An "x" in this table means that a particular species will not be released at a site. A date in this column overrides the general release date, and this species/site will only be released until the specified date.
 
-### ```data_combination.xlsx```
+### ```data_combination```
 
-This spreadsheet specifies when to switch from one instrument to another at each site and for each species. If a species does not appear in this table, no combined file is produced. 
+These csv files specify when to switch from one instrument to another at each site and for each species. If a species does not appear in this table, no combined file is produced. 
 
-There is one worksheet per site (denoted by the three-letter site code). Rows are the standardised species names (see the ```scale_defaults.csv``` file for the definitive list). The column headers have the format ```<instrument> start``` and ```<instrument> end``` (e.g., ```GCMD start```, ```GCMD end```). Use these columns to specify when a particular instrument starts and ends:
+There is one file per site (denoted by the three-letter site code). Rows are the standardised species names (see the ```scale_defaults.csv``` file for the definitive list). The column headers have the format ```<instrument> start``` and ```<instrument> end``` (e.g., ```GCMD start```, ```GCMD end```). Use these columns to specify when a particular instrument starts and ends:
 - An "x" means that no data from this instrument should be used
 - An empty cell means that all data should be used (subject to the end date in the release schedule)
 - A date in the start column specifies the starting date for a particular instrument. Similarly, end date.
 
-**Interleaving data**: Sometimes, we may want to interleave one instrument and another. E.g., there is a period where instrument 1's precision is poor, so we should use instrument 2, but then bring instrument 1 back again later. The code isn't directly set up to do this. However, this behaviour can be achieved by setting overlapping start and end dates for two instruments, and then using the ```data_exclude.xlsx``` file to remove certain periods from one or more instrument.
+**Interleaving data**: Sometimes, we may want to interleave one instrument and another. E.g., there is a period where instrument 1's precision is poor, so we should use instrument 2, but then bring instrument 1 back again later. The code isn't directly set up to do this. However, this behaviour can be achieved by setting overlapping start and end dates for two instruments, and then using a ```data_exclude``` file to remove certain periods from one or more instrument (see below).
 
-### ```data_exclude.xlsx```
+### ```data_exclude```
 
-This file specifies periods to remove data from the archive. This can occur when data has been left in the input files, but should have been flagged, or when we want to interleave two instruments.
+These files specify periods to remove data from the archive. This can occur when data has been left in the input files, but should have been flagged, or when we want to interleave two instruments.
 
-There is one worksheet per site in this file. If a site is not present, no data is excluded. One row is required per period to exclude for each species and instrument. Any data between the start and end dates is excluded (UTC, inclusive). Note that this is the time as it appears in the archive files, which may have been adjusted from the GCWerks time, for any lag due to the sampling period.
+There is one csv file per site. If a site is not present, no data is excluded. One row is required per period to exclude for each species and instrument. Any data between the start and end dates is excluded (UTC, inclusive). Note that this is the time as it appears in the archive files, which may have been adjusted from the GCWerks time, for any lag due to the sampling period.
 
 Use the "Notes" column to explain why this particular block of data is being omitted from the archive.
 

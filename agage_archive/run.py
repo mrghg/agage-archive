@@ -219,14 +219,14 @@ def run_individual_site(site, species, network, instrument,
                     instrument_selection_text_str = instrument_selection_text
 
                 # Check if file already exists in the top-level directory. 
-                # This can happen if only one instrument is specified in data_combination.xlsx
+                # This can happen if only one instrument is specified in data_combination
                 if output_subpath == f"{species}":
                     if data_file_list(network=network,
                                     sub_path=paths.output_path,
                                     pattern = f"{format_species(species)}/{network.lower()}_{site.lower()}_{format_species(species)}*.nc",
                                     errors="ignore")[2]:
                         raise FileExistsError(f"Top-level file already exists for {species} at {site} (now trying to add instrument {instrument_out}). "\
-                                            "Add to data_combination.xlsx to tell me how to combine the data.")
+                                            "Add to data_combination csv to tell me how to combine the data.")
 
                 ds.attrs["instrument_selection"] = instrument_selection_text_str
                 output_dataset(ds, network, instrument=instrument_str,
@@ -370,12 +370,14 @@ def run_combined_site(site, species, network,
 
     print(f"Processing files for {site}")
 
-    # Read data selection file
-    with open_data_file("data_combination.xlsx", network=network) as f:
-        df = pd.read_excel(f,
-                        comment="#",
-                        sheet_name=site,
-                        index_col="Species")
+    instrument_dates = {}
+    for sp in species:
+        instrument_dates[sp] = read_data_combination(network, sp, site, verbose=verbose)
+
+    # Read the data_combination file to get list of species
+    with open_data_file(f"data_combination_{site.upper()}.csv",
+                        sub_path="data_combination", network=network, errors="ignore") as f:
+        df = pd.read_csv(f, comment="#", index_col="Species")
 
     # Determine species to process
     if species:
@@ -480,13 +482,17 @@ def run_combined_instruments(network,
     if not isinstance(species, list):
         raise TypeError("Species must be a list")
 
-    with open_data_file("data_combination.xlsx", network=network) as data_selection_path:
-        sites_dc = pd.ExcelFile(data_selection_path).sheet_names
+    # Check data combination files for list of sites
+    _, _, files = data_file_list(network = network,
+                                sub_path = "data_combination",
+                                pattern = f"*.csv")
+    
+    sites_dc = [f.split(".")[0].split("_")[-1] for f in files]
 
     if not sites:
         sites = sites_dc.copy()
     else:
-        # Check if sites are in data_combination.xlsx, if not, remove from sites
+        # Check if sites are in data_combination files if not, remove from sites
         sites = [site for site in sites if site in sites_dc]
 
     error_log = []
@@ -595,8 +601,10 @@ def run_all(network,
 
     # If include is empty, process all instruments in release schedule
     if len(instrument_include) == 0:
-        with open_data_file("data_release_schedule.xlsx", network=network, errors = "ignore") as frs:
-            instruments = pd.ExcelFile(frs).sheet_names
+        _, _, files = data_file_list(network = network,
+                                    sub_path = "data_release_schedule",
+                                    pattern = f"*.csv")
+        instruments = [f.split(".")[0].split("_")[-1] for f in files]
     else:
         instruments = instrument_include
 
