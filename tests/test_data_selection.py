@@ -2,7 +2,8 @@ import numpy as np
 import pandas as pd
 import xarray as xr
 
-from agage_archive.data_selection import read_data_exclude, calibration_scale_default
+from agage_archive.data_selection import read_data_exclude, calibration_scale_default, \
+                                        read_data_combination, read_release_schedule
 
 
 def test_calibration_scale_defaults():
@@ -73,3 +74,38 @@ def test_read_data_exclude():
         assert not np.isnan(ds["mf"][2].values)
         assert ds["mf"][2].values == 3
 
+
+def test_read_release_schedule():
+    '''Test read_release_schedule function'''
+
+    df = read_release_schedule("agage_test", "GCMD",
+                          species = None,
+                          site = None,
+                          public = True)
+
+    # Check that full dataframe has been returned
+    assert df.shape == (10, 5)
+
+    # Check that the default release date has been input in the relevant cells
+    assert df.loc["cfc-11", "MHD"] == "2023-01-01 00:00"
+
+    # Check some species-specific dates
+    assert df.loc["ccl4", "SMO"] == "2019-11-21 00:00"
+    assert df.loc["ch4", "RPB"] == "2017-02-15 00:00"
+
+    # Return for one species and site
+    assert read_release_schedule("agage_test", "GCMD", species = "cfc-113", site = "RPB") \
+        == "2005-07-31 00:00"
+
+
+def test_read_data_combination():
+
+    instrument_dates = read_data_combination("agage_test", "ch3ccl3", "CGO")
+
+    assert isinstance(instrument_dates, dict)
+
+    assert instrument_dates["ALE"][0] == None
+    assert instrument_dates["ALE"][1] == "1984-01-01 00:00"
+
+    assert instrument_dates["GCMD"][0] == "1994-03-15 00:00"
+    assert instrument_dates["GCMD"][1] == "2010-06-01 00:00"

@@ -1,0 +1,11 @@
+# File specifying when to use the various ALE/GAGE/AGAGE instruments
+# A blank entry in either the start or end date means that the time is unbounded at that side
+# If there is no entry for a species it is assumed that it is only measured on the GCMS-Medusa
+# Time periods can overlap if you want to keep both instruments
+# An "x" indicates that this instrument should not be included in timeseries for this species
+# Date format should be YYYY-MM-DD HH:MM
+# NOTE: ENSURE CELLS ARE FORMATTED AS TEXT, NOT DATES. IF PASTING VALUES ENSURE YOU "MATCH DESTINATION FORMATTING" TO PREVENT EXCEL FROM CONVERTING TO DATE AND TIME
+Species,GCMD start,GCMD end,GCMS-Medusa start,GCMS-Medusa end,Picarro start,Picarro end,LGR start,LGR end
+n2o,,2016-09-02 21:00,x,x,x,x,2016-09-02 21:00,
+sf6,,2018-03-14 00:00,2018-03-14 00:00,,x,x,x,x
+co,,2016-09-02 21:00,x,x,x,x,2016-09-02 21:00,
