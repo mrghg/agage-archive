@@ -603,6 +603,10 @@ def read_ale_gage(network, species, site, instrument,
                 "instrument_selection": "Individual instruments",
                 "frequency": "high-frequency",}
 
+    if instrument == "ALE":
+        ds.attrs["instrument_comment"] = "NOTE: Some data points may have been removed from the original dataset " + \
+            "because they were not felt to be representative of the baseline air masses (Paul Fraser, pers. comm.). "
+
     ds = format_attributes(ds,
                         instruments=[{"instrument": f"{instrument.upper()}_GCMD"}],
                         network=network,
