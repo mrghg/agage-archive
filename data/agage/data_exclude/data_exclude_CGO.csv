@@ -2,9 +2,9 @@
 # Date format must by YYYY-MM-DD HH:MM
 # Make sure that the cell format is text rather than Excel's date format
 Species,Instrument,Start,End,Notes
-ch4,GAGE,1990-01-08 12:09,1990-01-17 06:04,"Ray Wang (pers comm., 31/7/23): 1), CH4 data from 1990/01/08, 23:09 to 1990/01/17, 17:04 (YYYY/mm/dd, hh:mm).  2), CH4 data from 1990/02/03, 08:57 to 1990/02/05, 17:53. TIMES CONVERTED TO UTC FROM LOCAL TIME"
-ch4,GAGE,1990-02-02 21:57,1990-02-05 06:53,"Ray Wang (pers comm., 31/7/23): 1), CH4 data from 1990/01/08, 23:09 to 1990/01/17, 17:04 (YYYY/mm/dd, hh:mm).  2), CH4 data from 1990/02/03, 08:57 to 1990/02/05, 17:53. TIMES CONVERTED TO UTC FROM LOCAL TIME"
-cfc-113,GAGE,1982-09-05 23:10,1982-09-05 23:20,"Paul Krummel (pers comm., 31/7/23): point to flag please: CGO GAGE CFC-113 1982 09 06 0916 (local time) or 1982 09 05 2316 (UTC time)"
+ch4,GAGE,1990-01-08 12:09,1990-01-17 06:04,"Ray Wang (pers comm. 31/7/23): 1) CH4 data from 1990/01/08 23:09 to 1990/01/17 17:04 (YYYY/mm/dd hh:mm). 2) CH4 data from 1990/02/03 08:57 to 1990/02/05 17:53. TIMES CONVERTED TO UTC FROM LOCAL TIME"
+ch4,GAGE,1990-02-02 21:57,1990-02-05 06:53,"Ray Wang (pers comm. 31/7/23): 1) CH4 data from 1990/01/08 23:09 to 1990/01/17 17:04 (YYYY/mm/dd hh:mm). 2) CH4 data from 1990/02/03 08:57 to 1990/02/05 17:53. TIMES CONVERTED TO UTC FROM LOCAL TIME"
+cfc-113,GAGE,1982-09-05 23:10,1982-09-05 23:20,"Paul Krummel (pers comm. 31/7/23): point to flag please: CGO GAGE CFC-113 1982 09 06 0916 (local time) or 1982 09 05 2316 (UTC time)"
 cfc-113,GAGE,1982-10-16 14:40,1982-10-16 14:50,MR flagged
 cfc-113,GAGE,1982-10-25 14:25,1982-10-25 14:35,MR flagged
 cfc-113,GAGE,1982-12-28 17:45,1982-12-28 18:55,MR flagged
