@@ -53,7 +53,8 @@ def format_attributes_global_instruments(ds,
     # If no instruments specified, check if they are in the dataset attributes
     if len(instruments) == 0:
         if "instrument" in ds.attrs:
-            instruments = [{key: ds.attrs[key] for key in ds.attrs if ("instrument" in key) and (key != "instrument_type")}]
+            instruments = [{key: ds.attrs[key] for key in ds.attrs if ("instrument" in key) and \
+                            (key != "instrument_type") and (key != "instrument_selection")}]
         else:
             raise ValueError("No instrument* attributes specified and none found in dataset attributes. " + \
                              "As a minimum, set keyword instrument = [{'instrument': 'INSTRUMENT_NAME'}]")
@@ -69,7 +70,7 @@ def format_attributes_global_instruments(ds,
     for attr in ds.attrs:
         if "instrument" not in attr:
             attrs[attr] = ds.attrs[attr]
-        elif attr == "instrument_type":
+        elif attr == "instrument_type" or attr == "instrument_selection":
             attrs[attr] = ds.attrs[attr]
 
     dates = []
