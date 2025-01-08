@@ -850,7 +850,7 @@ def combine_datasets(network, species, site,
 
         # Store instrument info and make sure the instrument_date is the same as in the filtered file
         instrument_rec.append({key:value for key, value in ds.attrs.items() if "instrument" in key})
-        instrument_rec[-1]["instrument_date"] = str(dates_rec[-1])
+        #instrument_rec[-1]["instrument_date"] = str(dates_rec[-1])
 
         # If variable mf_count is not present, add it (1 measurement per time point)
         if "mf_count" not in ds:

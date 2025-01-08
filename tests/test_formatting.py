@@ -125,4 +125,4 @@ def test_format_attributes():
     assert ds.attrs["instrument_selection"] == "test"
     assert ds.attrs["version"] == "testv1"
 
-test_format_attributes()
+test_cf_compliance()
