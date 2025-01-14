@@ -426,6 +426,75 @@ def ale_gage_timestamp_issues(datetime, timestamp_issues,
     return datetime
 
 
+def read_ale_gage_file(f, network, site,
+                    timestamp_issues = {},
+                    utc = True,
+                    verbose = True):
+    """Read individual ALE/GAGE file
+
+    Args:
+        f (file): File object
+        network (str): Network
+        site (str): Site
+        timestamp_issues (dict): Dictionary of timestamp issues
+        utc (bool): Convert to UTC
+        verbose (bool): Print verbose output
+
+    Returns:
+        pd.DataFrame: Dataframe containing file contents
+    """
+
+    meta = f.readline().decode("ascii").strip()
+    header = f.readline().decode("ascii").split()
+
+    site_in_file = meta[:2]
+    year = meta[2:4]
+    month = meta[4:7]
+
+    nspecies = len(header) - 3
+    columns = header[:3]
+
+    # Define column widths
+    colspec = [3, 5, 7]
+    coldtypes = [int, int, int]
+    for sp in header[3:]:
+        colspec += [7, 1]
+        coldtypes += [np.float32, str]
+        columns += [str(sp).replace("'", ""),
+                    f"{sp}_pollution"]
+
+    # Read data
+    df = pd.read_fwf(f, skiprows=0,
+                    widths=colspec,
+                    names=columns,
+                    na_values = -99.9)
+
+    # Create datetime string. This format is a little weird, but it's an easy way to construct it
+    datetime = df["DA"].astype(str).str.zfill(2) + \
+        f"-{month}-{year} " + \
+        df["TIME"].astype(str).str.zfill(4)
+    
+    # Check for datetime issues
+    datetime = ale_gage_timestamp_issues(datetime, timestamp_issues,
+                                            verbose=verbose)
+
+    # Convert datetime string
+    df.index = pd.to_datetime(datetime, format="%d-%b-%y %H%M")
+
+    # Drop duplicates
+    if "duplicates" in timestamp_issues:
+        keep = timestamp_issues["duplicates"]
+    else:
+        keep = "first"
+    df = df[~df.index.duplicated(keep=keep)]
+
+    # Timestamps are local time (no daylight savings)
+    if utc:
+        df.index = tz_local_to_utc(df.index, network, site)
+
+    return df
+
+
 def read_ale_gage(network, species, site, instrument,
                   verbose = True,
                   utc = True,
@@ -495,53 +564,10 @@ def read_ale_gage(network, species, site, instrument,
             # Extract tar file
             f = tar.extractfile(member)
             
-            meta = f.readline().decode("ascii").strip()
-            header = f.readline().decode("ascii").split()
-
-            site_in_file = meta[:2]
-            year = meta[2:4]
-            month = meta[4:7]
-
-            nspecies = len(header) - 3
-            columns = header[:3]
-
-            # Define column widths
-            colspec = [3, 5, 7]
-            coldtypes = [int, int, int]
-            for sp in header[3:]:
-                colspec += [7, 1]
-                coldtypes += [np.float32, str]
-                columns += [str(sp).replace("'", ""),
-                            f"{sp}_pollution"]
-
-            # Read data
-            df = pd.read_fwf(f, skiprows=0,
-                            widths=colspec,
-                            names=columns,
-                            na_values = -99.9)
-
-            # Create datetime string. This format is a little weird, but it's an easy way to construct it
-            datetime = df["DA"].astype(str).str.zfill(2) + \
-                f"-{month}-{year} " + \
-                df["TIME"].astype(str).str.zfill(4)
-            
-            # Check for datetime issues
-            datetime = ale_gage_timestamp_issues(datetime, timestamp_issues,
-                                                 verbose=verbose)
-
-            # Convert datetime string
-            df.index = pd.to_datetime(datetime, format="%d-%b-%y %H%M")
-
-            # Drop duplicates
-            if "duplicates" in timestamp_issues:
-                keep = timestamp_issues["duplicates"]
-            else:
-                keep = "first"
-            df = df[~df.index.duplicated(keep=keep)]
-
-            # Timestamps are local time (no daylight savings)
-            if utc:
-                df.index = tz_local_to_utc(df.index, network, site)
+            df = read_ale_gage_file(f, network, site,
+                                timestamp_issues=timestamp_issues,
+                                utc=utc,
+                                verbose=verbose)
 
             # append data frame if it's not all NaN
             if not df.empty:
