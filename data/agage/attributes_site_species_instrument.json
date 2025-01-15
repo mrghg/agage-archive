@@ -1,0 +1,9 @@
+{
+    "JFJ": {
+        "cfc-11": {
+            "GCMS-Medusa": {
+                "instrument_comment": "Warning: There are known biases of AGAGE Medusa measurements for this species relative to AGAGE MD measurements. Generally MD data is preferred. Please discuss with data owner before use."
+            }
+        }
+    }
+}
