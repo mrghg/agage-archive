@@ -4,7 +4,7 @@
 # Date format YYYY-MM-DD HH:MM
 # All data will be processed until the "general release date" unless specified in the table
 # "x" indicates that no part of the record will be processed
-# General release date: 2023-06-01 00:00
+# General release date: 2024-01-01 00:00
 Species,CMN
 hfc-23,x
 hfc-32,
@@ -27,7 +27,7 @@ cfc-11,
 cfc-12,
 cfc-13,x
 cfc-113,x
-cfc-114,2017-12-31 00:00
+cfc-114,2018-01-01 00:00
 cfc-115,
 h-1211,
 h-1301,
