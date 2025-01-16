@@ -4,7 +4,7 @@
 # Date format YYYY-MM-DD HH:MM
 # All data will be processed until the "general release date" unless specified in the table
 # "x" indicates that no part of the record will be processed
-# General release date: 2024-04-01 00:00
+# General release date: 2024-01-01 00:00
 Species,MHD,CGO,JFJ,ZEP
 hfc-125,2004-12-31 00:00,2004-12-31 00:00,2008-04-30 00:00,2010-10-31 00:00
 hfc-134a,2004-12-31 00:00,2004-12-31 00:00,2008-05-09 17:30,2010-10-31 00:00
