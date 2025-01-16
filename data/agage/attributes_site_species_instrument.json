@@ -1,8 +1,100 @@
 {
+    "CMN": {
+        "cfc-11": {
+            "GCMS-Medusa": {
+                "instrument_comment": "WARNING: For this species, AGAGE MD measurements are of higher frequency and also appear internally more consistent than AGAGE Medusa measurements. Please discuss with data owner before use."
+            }
+        },
+        "cfc-12": {
+            "GCMS-Medusa": {
+                "instrument_comment": "WARNING: For this species, AGAGE MD measurements are of higher frequency and also appear internally more consistent than AGAGE Medusa measurements. Please discuss with data owner before use."
+            }
+        }
+    },
+    "GSN": {
+        "cfc-11": {
+            "GCMS-Medusa": {
+                "instrument_comment": "WARNING: For this species, AGAGE MD measurements are of higher frequency and also appear internally more consistent than AGAGE Medusa measurements. Please discuss with data owner before use."
+            }
+        },
+        "cfc-12": {
+            "GCMS-Medusa": {
+                "instrument_comment": "WARNING: For this species, AGAGE MD measurements are of higher frequency and also appear internally more consistent than AGAGE Medusa measurements. Please discuss with data owner before use."
+            }
+        },
+        "ccl4": {
+            "GCMS-Medusa": {
+                "instrument_comment": "WARNING: For this species, AGAGE MD measurements are of higher frequency with significantly better precisions and also appear internally more consistent than AGAGE Medusa measurements. Please discuss with data owner before use."
+            }
+        }
+    },
     "JFJ": {
         "cfc-11": {
             "GCMS-Medusa": {
-                "instrument_comment": "Warning: There are known biases of AGAGE Medusa measurements for this species relative to AGAGE MD measurements. Generally MD data is preferred. Please discuss with data owner before use."
+                "instrument_comment": "WARNING: For this species, AGAGE MD measurements are of higher frequency and also appear internally more consistent than AGAGE Medusa measurements. Please discuss with data owner before use."
+            }
+        },
+        "cfc-12": {
+            "GCMS-Medusa": {
+                "instrument_comment": "WARNING: For this species, AGAGE MD measurements are of higher frequency and also appear internally more consistent than AGAGE Medusa measurements. Please discuss with data owner before use."
+            }
+        },
+        "ccl4": {
+            "GCMS-Medusa": {
+                "instrument_comment": "WARNING: For this species, AGAGE MD measurements are of higher frequency with significantly better precisions and also appear internally more consistent than AGAGE Medusa measurements. Please discuss with data owner before use."
+            }
+        }
+    },
+    "MHD": {
+        "cfc-11": {
+            "GCMS-Medusa": {
+                "instrument_comment": "WARNING: For this species, AGAGE MD measurements are of higher frequency and also appear internally more consistent than AGAGE Medusa measurements. Please discuss with data owner before use."
+            }
+        }
+    },
+    "TAC": {
+        "cfc-11": {
+            "GCMS-Medusa": {
+                "instrument_comment": "WARNING: For this species, AGAGE MD measurements are of higher frequency and also appear internally more consistent than AGAGE Medusa measurements. Please discuss with data owner before use."
+            }
+        },
+        "cfc-12": {
+            "GCMS-Medusa": {
+                "instrument_comment": "WARNING: For this species, AGAGE MD measurements are of higher frequency and also appear internally more consistent than AGAGE Medusa measurements. Please discuss with data owner before use."
+            }
+        },
+        "ccl4": {
+            "GCMS-Medusa": {
+                "instrument_comment": "WARNING: For this species, AGAGE MD measurements are of higher frequency with significantly better precisions and also appear internally more consistent than AGAGE Medusa measurements. Please discuss with data owner before use."
+            }
+        }
+    },
+    "TOB": {
+        "cfc-11": {
+            "GCMS-Medusa": {
+                "instrument_comment": "WARNING: For this species, AGAGE MD measurements are of higher frequency and also appear internally more consistent than AGAGE Medusa measurements. Please discuss with data owner before use."
+            }
+        },
+        "cfc-12": {
+            "GCMS-Medusa": {
+                "instrument_comment": "WARNING: For this species, AGAGE MD measurements are of higher frequency and also appear internally more consistent than AGAGE Medusa measurements. Please discuss with data owner before use."
+            }
+        },
+        "ccl4": {
+            "GCMS-Medusa": {
+                "instrument_comment": "WARNING: For this species, AGAGE MD measurements are of higher frequency with significantly better precisions and also appear internally more consistent than AGAGE Medusa measurements. Please discuss with data owner before use."
+            }
+        }
+    },
+    "ZEP": {
+        "cfc-11": {
+            "GCMS-Medusa": {
+                "instrument_comment": "WARNING: For this species, AGAGE MD measurements are of higher frequency and also appear internally more consistent than AGAGE Medusa measurements. Please discuss with data owner before use."
+            }
+        },
+        "cfc-12": {
+            "GCMS-Medusa": {
+                "instrument_comment": "WARNING: For this species, AGAGE MD measurements are of higher frequency and also appear internally more consistent than AGAGE Medusa measurements. Please discuss with data owner before use."
             }
         }
     }
