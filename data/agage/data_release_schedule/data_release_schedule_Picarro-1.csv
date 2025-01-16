@@ -5,7 +5,7 @@
 # All data will be processed until the "general release date" unless specified in the table
 # "x" indicates that no part of the record will be processed
 # General release date: 2024-01-01 00:00
-Species,CGO,ZEP
-co2,x,x
-ch4,,
-co,x,
+Species,CGO
+co2,x
+ch4,
+co,x
