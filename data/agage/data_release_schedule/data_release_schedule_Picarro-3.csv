@@ -6,5 +6,5 @@
 # "x" indicates that no part of the record will be processed
 # General release date: 2025-01-01 00:00
 Species,CGO
-n2o,
+n2o,x
 co,x
