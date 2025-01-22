@@ -365,7 +365,7 @@ def read_baseline(network, species, site, instrument,
         if flag_name != "git_pollution_flag":
             raise ValueError("Only git_pollution_flag is available for ALE/GAGE data")
 
-        ds_out = read_gcms_magnum(network, species,
+        ds_out = read_gcms_magnum(network, species, site, instrument,
                                 verbose=verbose,
                                 scale = "defaults",
                                 baseline = True,
@@ -828,6 +828,8 @@ def read_gcms_magnum_file(file, species,
 
 
 def read_gcms_magnum(network, species,
+                  site = "MHD",
+                  instrument = "GCMS-Magnum",
                   verbose = True,
                   scale = "defaults",
                   baseline = False,
@@ -839,6 +841,8 @@ def read_gcms_magnum(network, species,
     Args:
         network (str): Network
         species (str): Species
+        site (str, optional): Site. Defaults to "MHD".
+        instrument (str, optional): Instrument. Defaults to "GCMS-Magnum".
         verbose (bool, optional): Print verbose output. Defaults to False.
         scale (str, optional): Calibration scale. Defaults to "defaults".
         baseline (bool, optional): Return baseline dataset. Defaults to False.
@@ -859,9 +863,6 @@ def read_gcms_magnum(network, species,
         species_info = json.load(f)[format_species(species)]
 
     paths = Paths(network)
-
-    site = "MHD"
-    instrument = "GCMS-Magnum"
 
     with open_data_file(paths.magnum_path,
                         network = network,
@@ -1132,6 +1133,13 @@ def combine_datasets(network, species, site,
                                verbose=verbose,
                                scale=scale,
                                public=public)
+        elif instrument == "GCMS-Magnum":
+            ds = read_gcms_magnum(network, species, site, instrument,
+                                verbose=verbose,
+                                scale = scale,
+                                public=public,
+                                resample = False,
+                                dropna = dropna)
         else:
             ds = read_nc(network, species, site, instrument,
                         verbose=verbose,
