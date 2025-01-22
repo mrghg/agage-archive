@@ -617,13 +617,20 @@ def run_all(network,
                                     monthly=monthly, species=species, sites=sites,
                                     public=public, resample=resample, top_level_only=top_level_only)
 
-    # Incorporate README file into output directory or zip file
+    # Incorporate README and CHANGELOG into output directory or zip file
     try:
         readme_file = data_file_path(filename='README.md',
                                     network=network, errors = "ignore_inputs")
         copy_to_archive(readme_file, network, public=public)
     except FileNotFoundError:
         print("No README file found")
+
+    try:
+        changelog_file = data_file_path(filename='CHANGELOG.md',
+                                    network=network, errors = "ignore_inputs")
+        copy_to_archive(changelog_file, network, public=public)
+    except FileNotFoundError:
+        print("No CHANGELOG file found")
 
     # If error log files have been created, warn the user
     if data_file_path("error_log_combined.txt", network=network, errors="ignore").exists():
