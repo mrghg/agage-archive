@@ -316,7 +316,7 @@ def format_attributes(ds, instruments = [],
                     species = None,
                     calibration_scale = None,
                     public = True,
-                    site = False,
+                    site = True,
                     extra_attributes = {}):
     '''Format attributes
 
@@ -430,6 +430,17 @@ def format_attributes(ds, instruments = [],
     # Format certain key attributes, and determine if they have been set as keywords
     for v in ["species", "calibration_scale", "network"]:
         attrs[v] = lookup_locals_and_attrs(v, locals(), ds.attrs.copy())
+
+    # Append to a site-specific instrument-specific attribute, if present
+    if data_file_path("attributes_site_species_instrument.json", network=network_attrs).exists():
+        with open_data_file("attributes_site_species_instrument.json", network=network_attrs) as f:
+            attributes_site_species_instrument = json.load(f)
+        if attrs["site_code"] in attributes_site_species_instrument:
+            if attrs["species"] in attributes_site_species_instrument[attrs["site_code"]]:
+                if attrs["instrument"] in attributes_site_species_instrument[attrs["site_code"]][attrs["species"]]:
+                    attributes_site_species_instrument = attributes_site_species_instrument[attrs["site_code"]][attrs["species"]][attrs["instrument"]]
+                    for attr in attributes_site_species_instrument:
+                        attrs[attr] += attributes_site_species_instrument[attr]
 
     ds_out = ds.copy(deep=True)
     ds_out.attrs = attrs.copy()
