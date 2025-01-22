@@ -977,7 +977,8 @@ def read_gcwerks_flask(network, species, site, instrument,
                        verbose = True,
                        public = True,
                        dropna=True,
-                       resample = False):
+                       resample = False,
+                       scale = "defaults"):
     '''Read GCWerks flask data
 
     Args:
@@ -989,6 +990,7 @@ def read_gcwerks_flask(network, species, site, instrument,
         public (bool, optional): Whether the dataset is for public release. Default to True.
         dropna (bool, optional): Drop NaN values. Default to True.
         resample (bool, optional): Dummy kwarg, needed for consistency with other functions. Default to False.
+        scale (str, optional): Scale to convert to - currently only accepts "defaults", which will read scale_defaults file.
 
     Returns:
         xr.Dataset: Dataset containing data
@@ -1064,7 +1066,10 @@ def read_gcwerks_flask(network, species, site, instrument,
         ds["mf_std"] = mf_std
 
     # Get cal scale from scale_defaults file
-    scale = calibration_scale_default(network, species)
+    if scale == "defaults":
+        scale = calibration_scale_default(network, species)
+    else:
+        raise ValueError("Flask data must use scale_defaults file")
 
     ds = format_attributes(ds,
                         network = network,
