@@ -349,15 +349,7 @@ def read_baseline(network, species, site, instrument,
     with open_data_file("attributes.json", network=network) as f:
         attributes_default = json.load(f)
 
-    if not instrument.lower() in ["ale", "gage"]:
-
-        ds_out = read_nc(network, species, site, instrument,
-                        verbose=verbose,
-                        baseline = flag_name,
-                        public=public,
-                        dropna=dropna)
-
-    else:
+    if instrument.lower() in ["ale", "gage"]:
 
         if flag_name != "git_pollution_flag":
             raise ValueError("Only git_pollution_flag is available for ALE/GAGE data")
@@ -367,6 +359,27 @@ def read_baseline(network, species, site, instrument,
                            verbose=verbose,
                            public=public,
                            dropna=dropna)
+
+    elif instrument.lower() == "gcms-magnum":
+        
+        if flag_name != "git_pollution_flag":
+            raise ValueError("Only git_pollution_flag is available for ALE/GAGE data")
+
+        ds_out = read_gcms_magnum(network, species,
+                                verbose=verbose,
+                                scale = "defaults",
+                                baseline = True,
+                                public=public,
+                                resample = False,
+                                dropna = dropna)
+
+    else:
+
+        ds_out = read_nc(network, species, site, instrument,
+                        verbose=verbose,
+                        baseline = flag_name,
+                        public=public,
+                        dropna=dropna)
 
     # Add attributes
     ds_out.baseline.attrs = {

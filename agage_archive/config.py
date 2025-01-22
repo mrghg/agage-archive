@@ -125,7 +125,7 @@ class Paths():
                 else:
                     full_path = self.data / network / value
 
-                if not (full_path).exists():
+                if not full_path.exists():
                     raise FileNotFoundError(f"Folder or zip archive {full_path} doesn't exist")
                 if not (full_path.is_dir() or full_path.suffix == ".zip" or full_path.suffix == ".gz"):
                     raise FileNotFoundError(f"{full_path} is not a folder or zip archive")
