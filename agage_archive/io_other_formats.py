@@ -31,7 +31,7 @@ sites_wang = {
     "RPB": "RPB",
 }
 
-def read_wang_file(file):
+def read_wang_file(file, header_lines=6):
     """ Read one file prepared by Ray Wang (see data/ancilliary) and return a dataframe
 
     Args:
@@ -42,15 +42,15 @@ def read_wang_file(file):
     """
 
 
-    # Reading the first 10 lines of the file to understand its structure
-    first_lines = [file.readline().strip() for _ in range(10)]
+    # Reading the first N lines of the file to understand its structure
+    first_lines = [file.readline().strip() for _ in range(header_lines + 1)]
 
     # Go back to beginning of file
     file.seek(0)
 
     # Read the file into a Pandas dataframe with correct headers
-    complete_data = pd.read_csv(file, skiprows=6, delim_whitespace=True,
-                                names=first_lines[5].split(), encoding='ascii')
+    complete_data = pd.read_csv(file, skiprows=header_lines, delim_whitespace=True,
+                                names=first_lines[header_lines-1].split(), encoding='ascii')
 
     complete_data.columns = complete_data.columns.astype(str)
 

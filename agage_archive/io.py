@@ -16,7 +16,8 @@ from agage_archive.data_selection import read_release_schedule, read_data_exclud
     read_data_combination, calibration_scale_default
 from agage_archive.definitions import instrument_type_definition, get_instrument_type, \
     get_instrument_number, instrument_selection_text
-from agage_archive.util import tz_local_to_utc
+from agage_archive.util import tz_local_to_utc, parse_fortran_format
+from agage_archive.io_other_formats import read_wang_file
 
 
 gcwerks_species = {"c2f6": "pfc-116",
@@ -31,6 +32,14 @@ gcwerks_species = {"c2f6": "pfc-116",
                    "c2h2": "ethyne",
                    "c3h6": "c-propane",
                    }
+
+
+magnum_species = {"hfc-134a": "HFC-134a",
+                "hfc-152a": "HFC-152a",
+                "hcfc-142b": "HCFC-142b",
+                "cfc-11": "CFC-11",
+                "cfc-12": "CFC-12"}
+                  
 
 baseline_attrs = {"git_pollution_flag":{
                     "comment": "Baseline flag from the Georgia Tech statistical filtering algorithm.",
@@ -654,6 +663,270 @@ def read_ale_gage(network, species, site, instrument,
         if not utc:
             raise ValueError("Can't exclude data if time is not UTC")
         ds = read_data_exclude(ds, format_species(species), site, instrument)
+
+    # Check against release schedule if for public release. 
+    rs = read_release_schedule(network, 
+                            instrument,
+                            species=format_species(species),
+                            site=site,
+                            public=public)
+    ds = ds.sel(time=slice(None, rs))
+
+    # Remove all time points where mf is NaN
+    if dropna:
+        ds = ds.dropna(dim="time", subset = ["mf"])
+    
+    # Remove pollution flag
+    ds_baseline = ds.baseline.copy(deep=True).to_dataset(name="baseline")
+    ds_baseline.attrs = ds.attrs.copy()
+    ds = ds.drop_vars("baseline")
+
+    # Raise error if baseline dataset is different length to main dataset
+    if len(ds_baseline.time) != len(ds.time):
+        raise ValueError("Baseline dataset is different length to main dataset. " + \
+                         "Check timestamp issues.")
+
+    # Convert scale, if needed
+    ds = scale_convert(ds, scale)
+
+    if baseline:
+        return ds_baseline
+    else:
+        return ds
+
+
+def read_gcms_magnum_file(file, species,
+                        species_name_in_file = None):
+    """Read GCMS Magnum file
+
+    Args:
+        file (file): File object
+        species (str): Species
+
+    Returns:
+        Tuple[pd.DataFrame, str]: Dataframe containing file contents, calibration scale
+    """
+
+    fortran_code_identifier = "You can use the following format in Fortran to read data in different columns,"
+
+    if not species_name_in_file:
+        species_file = species
+    else:
+        species_file = species_name_in_file
+
+    # Get relevant header lines and format code
+    header_li = 0
+    while True:
+        header_li += 1
+        line = file.readline()
+        if fortran_code_identifier in str(line):
+            widths_string = str(line).split(fortran_code_identifier)[1].strip()
+            break
+
+    # Remove any trailing characters from widths_string
+    widths_string = widths_string.split("\\")[0]
+
+    # Return to beginning of file
+    file.seek(0)
+
+    header_line = header_li + 2
+    scales_line = header_li + 1
+
+    # Interpret fortan format code
+    column_specs, column_types = parse_fortran_format(widths_string)
+
+    # Read column names and scales
+    header = pd.read_fwf(file,
+                        colspecs=column_specs,
+                        header=None,
+                        skiprows = header_line,
+                        nrows=1)
+    columns = header.values[0]
+
+    # Return to beginning of file
+    file.seek(0)
+
+    header = pd.read_fwf(file,
+                        colspecs=column_specs,
+                        header=None,
+                        skiprows = scales_line-1,
+                        nrows=1)
+    scales = header.values[0]
+
+    # Return to beginning of file
+    file.seek(0)
+
+    # After two null values in columns, relabel as "missingX" where X is a number
+    for ci in range(1, len(columns)):
+        if not isinstance(columns[ci], str):
+            if not isinstance(columns[ci-1], str):
+                columns[ci] = "missing" + str(ci)
+
+    for ci in range(1, len(columns)):
+        if not isinstance(columns[ci], str):
+            if isinstance(columns[ci-1], str):
+                # rename the column to the previous column name + "_pollution"
+                columns[ci]=columns[ci-1] + "_pollution"
+
+    # Read data
+    df = pd.read_fwf(file,
+                    colspecs=column_specs,
+                    header=None,
+                    skiprows=header_line+1,
+                    names=columns,
+                    column_types=column_types)
+
+    # For data columns (after ABSDA) replace zeros with NaN
+    wh = df.columns.get_loc("ABSDA")
+
+    for ci in range(wh+1, len(df.columns)):
+        df.iloc[:, ci] = df.iloc[:, ci].replace(0, np.nan)
+
+    # Create datetime column and set to index
+    df['datetime'] = pd.to_datetime({
+            'year': df['YYYY'],
+            'month': df['MM'],
+            'day': df['DD'],
+            'hour': df['hh'],
+            'minute': df['min']
+        }, errors='coerce')
+
+    # Drop all rows where datetime is NaT
+    df = df.dropna(subset=['datetime'])
+
+    # Set datetime as index
+    df.set_index('datetime', inplace=True)
+
+    # Drop original date columns
+    drop_cols = ["time", 'YYYY', 'MM', 'DD', 'hh', 'min', "ABSDA"]
+    for col in df.columns:
+        if "missing" in col:
+            drop_cols.append(col)
+    df = df.drop(columns=drop_cols)
+
+    # store only the species column and baseline
+    df["baseline"] = (df[f"{species_file}_pollution"] != "P").astype(np.int8)
+    df["mf"] = df[species_file]
+    df = df[["mf", "baseline"]]
+
+    scale = scales[np.where(columns == species_file)[0][0]]
+
+    return df, scale
+
+
+def read_gcms_magnum(network, species,
+                  verbose = True,
+                  scale = "defaults",
+                  baseline = False,
+                  public = True,
+                  resample = False,
+                  dropna = True):
+    """Read GCMS Magnum data
+
+    Args:
+        network (str): Network
+        species (str): Species
+        verbose (bool, optional): Print verbose output. Defaults to False.
+        scale (str, optional): Calibration scale. Defaults to "defaults".
+        baseline (bool, optional): Return baseline dataset. Defaults to False.
+        public (bool, optional): Whether the dataset is for public release. Default to True.
+        resample (bool, optional): Not used (see run_individual_instrument). Defaults to False.
+        dropna (bool, optional): Drop NaN values. Defaults to True.
+
+    Returns:
+        xarray.Dataset: Dataset
+    """
+
+    # Get data on ALE/GAGE sites
+    with open_data_file("ale_gage_sites.json", network = network, verbose=verbose) as f:
+        site_info = json.load(f)
+
+    # Get species info
+    with open_data_file("gcms-magnum_species.json", network = network, verbose=verbose) as f:
+        species_info = json.load(f)[format_species(species)]
+
+    paths = Paths(network)
+
+    site = "MHD"
+    instrument = "GCMS-Magnum"
+
+    with open_data_file(paths.magnum_path,
+                        network = network,
+                        verbose=verbose) as tar:
+
+        dfs = []
+
+        for member in tar.getmembers():
+
+            # Extract tar file
+            f = tar.extractfile(member)
+            
+            df, scale = read_gcms_magnum_file(f, species,
+                                            species_name_in_file=species_info["species_name_gatech"])
+    
+            dfs.append(df)
+
+    # Concatenate monthly dataframes into single dataframe
+    df_combined = pd.concat(dfs)
+
+    # Sort
+    df_combined.sort_index(inplace=True)
+
+    # Check if there are NaN indices
+    if len(df_combined.index[df_combined.index.isna()]) > 0:
+        raise ValueError("NaN indices found. Check timestamp issues.")
+
+    # Check if there are duplicate indices
+    if len(df_combined.index) != len(df_combined.index.drop_duplicates()):
+        # Find which indices are duplicated
+        duplicated_indices = df_combined.index[df_combined.index.duplicated(keep=False)]
+        raise ValueError(f"Duplicate indices found. Check timestamp issues: {duplicated_indices}")
+    
+    # Store pollution flag
+    da_baseline = df_combined["baseline"]
+
+    repeatability = species_info["repeatability_percent"]/100.
+
+    # Convert to dataset
+    ds = xr.Dataset(data_vars={"mf": ("time", df_combined["mf"].values.copy()),
+                            "mf_repeatability": ("time", df_combined["mf"].values.copy()*repeatability),
+                            "inlet_height": ("time", np.repeat(site_info[site]["inlet_height"], len(df_combined["mf"]))),
+                            "sampling_period": ("time", np.repeat(30, len(df_combined["mf"]))),
+                            },
+                    coords={"time": df_combined.index.values.copy()})
+
+    # Global attributes
+    ds.attrs["comment"] = f"{instrument} {species} data from {site}. " + \
+        "This data was originally processed by Georgia Institute of Technology, " + \
+        "from the original files and has now been reprocessed into netCDF format."
+    ds.attrs["calibration_scale"] = scale
+
+    extra_attrs = site_info[site].copy()
+    extra_attrs["inlet_latitude"] = extra_attrs["latitude"]
+    extra_attrs["inlet_longitude"] = extra_attrs["longitude"]
+    del extra_attrs["latitude"]
+    del extra_attrs["longitude"]
+    del extra_attrs["tz"]
+    extra_attrs["product_type"] = "mole fraction"
+    extra_attrs["instrument_selection"] = "Individual instruments"
+    extra_attrs["frequency"] = "high-frequency"
+    extra_attrs["instrument_type"] = get_instrument_type(get_instrument_number(instrument))
+    extra_attrs["site_code"] = site
+
+    ds = format_attributes(ds,
+                        instruments=[{"instrument": instrument,
+                                    "instrument_comment": "GCMS-Magnum and GCMS-ADS data",
+                                    "instrument_date": ds.time[0].dt.strftime("%Y-%m-%d").values}],
+                        network=network,
+                        species=format_species(species),
+                        site=site,
+                        public=public,
+                        extra_attributes = extra_attrs)
+
+    ds = format_variables(ds, units = species_info["units"])
+
+    # Add pollution flag back in temporarily with dimension time
+    ds["baseline"] = xr.DataArray(da_baseline.values, dims="time")
 
     # Check against release schedule if for public release. 
     rs = read_release_schedule(network, 
