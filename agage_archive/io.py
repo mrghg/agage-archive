@@ -929,7 +929,7 @@ def read_gcms_magnum(network, species,
 
     ds = format_attributes(ds,
                         instruments=[{"instrument": instrument,
-                                    "instrument_comment": "GCMS-Magnum and GCMS-ADS data",
+                                    "instrument_comment": "GCMS-Magnum and early GCMS-ADS HP5973",
                                     "instrument_date": ds.time[0].dt.strftime("%Y-%m-%d").values}],
                         network=network,
                         species=format_species(species),
