@@ -6,11 +6,11 @@
 # x indicates that no part of the record will be processed,
 # General release date: 2024-01-01 00:00,
 Species,MHD
-hfc-134a,
-hfc-152a,
-hcfc-141b,
-hcfc-142b,
-chcl3,
-ch2cl2,
-h-1211,
-ch3br,
+hfc-134a,1998-01-20 00:00
+hfc-152a,1998-01-20 00:00
+hcfc-141b,1998-01-20 00:00
+hcfc-142b,1998-01-20 00:00
+chcl3,1998-01-20 00:00
+ch2cl2,1998-01-20 00:00
+h-1211,1998-01-20 00:00
+ch3br,1998-01-20 00:00
