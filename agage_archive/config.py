@@ -125,9 +125,9 @@ class Paths():
                 else:
                     full_path = self.data / network / value
 
-                if not (full_path).exists():
+                if not full_path.exists():
                     raise FileNotFoundError(f"Folder or zip archive {full_path} doesn't exist")
-                if not (full_path.is_dir() or full_path.suffix == ".zip"):
+                if not (full_path.is_dir() or full_path.suffix == ".zip" or full_path.suffix == ".gz"):
                     raise FileNotFoundError(f"{full_path} is not a folder or zip archive")
 
         # Don't need to do the remaining checks if errors is set to ignore_outputs
@@ -185,6 +185,7 @@ def setup(network = ""):
                     "gcms_flask_path": "data-gcms-flask-nc",
                     "ale_path": "ale",
                     "gage_path": "gage",
+                    "magnum_path": "data-gcms-magnum.tar.gz",
                     "output_path": "output",
                     "output_path_private": "output-private"
                 },
@@ -196,6 +197,7 @@ def setup(network = ""):
                     "gcms_flask_path": "data-gcms-flask-nc",
                     "ale_path": "ale_gage_sio1993/ale",
                     "gage_path": "ale_gage_sio1993/gage",
+                    "magnum_path": "data-gcms-magnum.tar.gz",
                     "output_path": "agage-public-archive.zip",
                     "output_path_private" : "agage-private-archive.zip"
             }

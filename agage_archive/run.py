@@ -10,7 +10,7 @@ from agage_archive.config import Paths, open_data_file, data_file_list, data_fil
     copy_to_archive, output_path
 from agage_archive.data_selection import read_release_schedule, read_data_combination, choose_scale_defaults_file
 from agage_archive.io import combine_datasets, combine_baseline, \
-    read_nc, read_baseline, read_ale_gage, read_gcwerks_flask, \
+    read_nc, read_baseline, read_ale_gage, read_gcwerks_flask, read_gcms_magnum, \
     output_dataset
 from agage_archive.formatting import format_species
 from agage_archive.convert import monthly_baseline
@@ -308,6 +308,10 @@ def run_individual_instrument(network, instrument,
         read_function = read_gcwerks_flask
         read_baseline_function = None
         instrument_out = "gcms-medusa-flask"
+    elif instrument.upper() == "GCMS-MAGNUM":
+        read_function = read_gcms_magnum
+        read_baseline_function = read_baseline
+        instrument_out = "gcms-magnum"
     else:
         read_function = read_nc
         read_baseline_function = read_baseline
@@ -668,14 +672,14 @@ def preprocess():
 
 if __name__ == "__main__":
 
-    #preprocess()
+    preprocess()
 
     start_time = time.time()
 
     print("####################################")
     print("#####Processing public archive######")
     print("####################################")
-    run_all("agage", species = ["cfc-11", "cfc-12", "ccl4"], public=True)
+    run_all("agage", public=True)
 
     # print("####################################")
     # print("#####Processing private archive#####")
