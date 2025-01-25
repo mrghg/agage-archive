@@ -905,7 +905,7 @@ def read_gcms_magnum(network, species,
     ds = xr.Dataset(data_vars={"mf": ("time", df_combined["mf"].values.copy()),
                             "mf_repeatability": ("time", df_combined["mf"].values.copy()*repeatability),
                             "inlet_height": ("time", np.repeat(site_info[site]["inlet_height"], len(df_combined["mf"]))),
-                            "sampling_period": ("time", np.repeat(1, len(df_combined["mf"]))),
+                            "sampling_period": ("time", np.repeat(2400, len(df_combined["mf"]))),
                             },
                     coords={"time": df_combined.index.values.copy()})
 

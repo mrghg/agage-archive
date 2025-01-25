@@ -398,8 +398,11 @@ def test_read_gcms_magnum():
     assert ds.time.dt.hour[0] == 23
     assert ds.time.dt.minute[0] == 54        
 
-    assert ds.time.dt.year[-1] == 2004
+    # Release schedule says that the last year should be 1998
+    assert ds.time.dt.year[-1] == 1998
 
     assert np.isclose(ds.mf.values[0], 9.303)
+
+    assert ds.sampling_period.values[0] == 2400
 
 
