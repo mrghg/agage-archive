@@ -413,8 +413,12 @@ def read_baseline(network, species, site, instrument,
     ds_out.attrs["product_type"] = "baseline flag"
     ds_out.attrs["instrument_selection"] = "Individual instruments"
     ds_out.attrs["frequency"] = "high-frequency"
-    ds_out.attrs["start_date"] = str(ds_out.time[0].dt.strftime("%Y-%m-%d %H:%M:%S").values)
-    ds_out.attrs["end_date"] = str(ds_out.time[-1].dt.strftime("%Y-%m-%d %H:%M:%S").values)
+    if len(ds_out.time) > 0:
+        ds_out.attrs["start_date"] = str(ds_out.time[0].dt.strftime("%Y-%m-%d %H:%M:%S").values)
+        ds_out.attrs["end_date"] = str(ds_out.time[-1].dt.strftime("%Y-%m-%d %H:%M:%S").values)
+    else:
+        ds_out.attrs["start_date"] = ""
+        ds_out.attrs["end_date"] = ""
     if public:
         ds_out.attrs["version"] = attributes_default["version"]
     else:
