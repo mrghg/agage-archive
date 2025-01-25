@@ -629,7 +629,7 @@ def read_ale_gage(network, species, site, instrument,
     ds = xr.Dataset(data_vars={"mf": ("time", df_combined.values.copy()),
                             "mf_repeatability": ("time", df_combined.values.copy()*repeatability),
                             "inlet_height": ("time", np.repeat(site_info[site]["inlet_height"], nt)),
-                            "sampling_period": ("time", np.repeat(30, nt)),
+                            "sampling_period": ("time", np.repeat(1, nt)),
                             },
                     coords={"time": df_combined.index.copy()})
 
@@ -905,7 +905,7 @@ def read_gcms_magnum(network, species,
     ds = xr.Dataset(data_vars={"mf": ("time", df_combined["mf"].values.copy()),
                             "mf_repeatability": ("time", df_combined["mf"].values.copy()*repeatability),
                             "inlet_height": ("time", np.repeat(site_info[site]["inlet_height"], len(df_combined["mf"]))),
-                            "sampling_period": ("time", np.repeat(30, len(df_combined["mf"]))),
+                            "sampling_period": ("time", np.repeat(1, len(df_combined["mf"]))),
                             },
                     coords={"time": df_combined.index.values.copy()})
 
@@ -929,7 +929,7 @@ def read_gcms_magnum(network, species,
 
     ds = format_attributes(ds,
                         instruments=[{"instrument": instrument,
-                                    "instrument_comment": "GCMS-Magnum and early GCMS-ADS HP5973",
+                                    "instrument_comment": "GCMS ADS with Finnigan Magnum Iron Trap",
                                     "instrument_date": ds.time[0].dt.strftime("%Y-%m-%d").values}],
                         network=network,
                         species=format_species(species),
