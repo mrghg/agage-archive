@@ -5,7 +5,8 @@ import json
 
 from agage_archive.config import Paths, open_data_file
 from agage_archive.io import read_ale_gage, read_nc, combine_datasets, read_nc_path, \
-    read_baseline, combine_baseline, output_dataset, read_gcwerks_flask, drop_duplicates
+    read_baseline, combine_baseline, output_dataset, read_gcwerks_flask, drop_duplicates, \
+    read_gcms_magnum_file, read_gcms_magnum
 from agage_archive.convert import scale_convert
 from agage_archive.definitions import nc4_types
 
@@ -330,3 +331,78 @@ def test_drop_duplicates():
     assert ds.instrument_type.values[11] == 1
     assert ds.mf.values[12] == 20
     assert ds.instrument_type.values[12] == 2
+
+
+def test_read_gcms_magnum_file():
+
+    species = "HFC-134a"
+
+    # Test file is in a subset of the tar archive, stored in a folder with the same name
+    sub_path = paths.magnum_path.split(".tar.gz")[0]
+
+    with open_data_file("MHD-ads_1994.dap",
+                        network="agage_test",
+                        sub_path=sub_path) as file:
+        df, scale = read_gcms_magnum_file(file, species)
+
+    assert df.index[0] == pd.Timestamp("1994-10-13 23:54:00")
+    assert df.index[-1] == pd.Timestamp("1994-12-31 19:44:00")
+
+    assert df["mf"].iloc[0] == 9.303
+    assert not np.isfinite(df["mf"].iloc[3])
+    assert df["mf"].iloc[-1] == 1.781
+
+    assert df["baseline"].iloc[0] == 0
+    assert df["baseline"].iloc[16] == 1
+    assert df["baseline"].iloc[-1] == 1
+
+    assert scale == "SIO-05"
+
+    # Test another species
+    species = "HCFC-142b"
+
+    with open_data_file("MHD-ads_1994.dap",
+                        network="agage_test",
+                        sub_path=sub_path) as file:
+        df, scale = read_gcms_magnum_file(file, species)
+
+    assert df.index[0] == pd.Timestamp("1994-10-13 23:54:00")
+    assert df["mf"].iloc[0] == 36.356
+
+    assert scale == "SIO-05"
+
+
+def test_read_gcms_magnum():
+
+    network = "agage"
+    species = "hfc-134a"
+
+    ds = read_gcms_magnum(network, species,
+                        verbose = True,
+                        scale = "defaults",
+                        baseline = False,
+                        public = True,
+                        resample = False,
+                        dropna = True)
+
+    assert ds.attrs["species"] == "hfc-134a"
+    assert ds.attrs["instrument_type"] == "GCMS-Magnum"
+    assert ds.attrs["product_type"] == "mole fraction"
+    assert ds.attrs["frequency"] == "high-frequency"
+    assert ds.attrs["site_code"] == "MHD"    
+
+    assert ds.time.dt.year[0] == 1994
+    assert ds.time.dt.month[0] == 10
+    assert ds.time.dt.day[0] == 13
+    assert ds.time.dt.hour[0] == 23
+    assert ds.time.dt.hour[0] == 23
+    assert ds.time.dt.minute[0] == 54        
+
+    # Release schedule says that the last year should be 1998
+    assert ds.time.dt.year[-1] == 1998
+
+    assert np.isclose(ds.mf.values[0], 9.303)
+
+    assert ds.sampling_period.values[0] == 2400
+
+

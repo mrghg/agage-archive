@@ -2,7 +2,7 @@
 # A blank entry in either the start or end date means that the time is unbounded at that side
 # If there is no entry for a species it is assumed that it is only measured on the GCMS-Medusa
 # Time periods can overlap if you want to keep both instruments
-# An "x" indicates that this instrument should not be included in timeseries for this species
+# An x indicates that this instrument should not be included in timeseries for this species
 # Date format should be YYYY-MM-DD HH:MM
 # NOTE: ENSURE CELLS ARE FORMATTED AS TEXT, NOT DATES. IF PASTING VALUES ENSURE YOU "MATCH DESTINATION FORMATTING" TO PREVENT EXCEL FROM CONVERTING TO DATE AND TIME
 Species,ALE start,ALE end,GAGE start,GAGE end,GCMD start,GCMD end,GCECD start,GCECD end,GCPDD start,GCPDD end,GCMS-ADS start,GCMS-ADS end,GCMS-Medusa start,GCMS-Medusa end,Picarro-1 start,Picarro-1 end,Picarro-2 start,Picarro-2 end
