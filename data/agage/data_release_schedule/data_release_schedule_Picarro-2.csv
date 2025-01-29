@@ -4,10 +4,10 @@
 # Date format YYYY-MM-DD HH:MM
 # All data will be processed until the general release date unless specified in the table
 # x indicates that no part of the record will be processed
-# General release date: 2024-04-01 00:00
-Species,CGO,ZEP
-co2,,x
-ch4,,x
-n2o,x,
-co,x,
-13co2,x,x
+# General release date: 2024-07-01 00:00
+Species,CGO
+co2,x
+ch4,
+n2o,x
+co,x
+13co2,x
