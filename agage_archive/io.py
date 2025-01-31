@@ -1393,7 +1393,9 @@ def output_dataset(ds, network,
     ds_out = ds.copy(deep = True)
 
     # Select time slice
-    ds_out = ds_out.sel(time=slice(None, end_date))
+    if end_date:
+        ds_out = ds_out.sel(time=slice(None, end_date))
+        ds_out.attrs["end_date"] = str(ds_out.time[-1].dt.strftime("%Y-%m-%d %H:%M:%S").values)
 
     if len(ds_out.time) == 0:
         raise ValueError(f"No data retained for {ds_out.attrs['species']} when trying write {filename} after applying release schedule end dates. " + \
