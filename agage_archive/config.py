@@ -180,7 +180,7 @@ def setup(network = ""):
             "agage_test":
                 {
                     "md_path": "data-nc",
-                    "optical_path": "data-optical",
+                    "optical_path": "data-optical-nc",
                     "gcms_path": "data-gcms-nc",
                     "gcms_flask_path": "data-gcms-flask-nc",
                     "ale_path": "ale",

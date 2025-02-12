@@ -69,11 +69,11 @@ to get the latest version of the public archive (file ```data/agage/agage-public
 If you want to update the archive:
 
 1. Download the latest data from GCWerks, and place it at the locations specified in your ```config.yaml``` file.
-2. Modify the data specification files as required, in ```data/agage`` (see section Data Specification Files)`:
+2. Modify the data specification files as required, in ```data/agage``` (see section Data Specification Files)`:
 ```
-data_release_schedule.xlsx
-data_combination.xlsx
-data_exclude.xlsx
+data_release_schedule/
+data_combination/
+data_exclude/
 scale_defaults.csv
 ```
 3. Re-run ```run.py```, or any other processing functions that you'd like to run. 
