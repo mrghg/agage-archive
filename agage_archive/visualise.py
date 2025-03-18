@@ -9,8 +9,31 @@ colour_max = len(colours)
 
 instrument_number, instrument_number_string = instrument_type_definition()
 
+variables = {"mf": "(UNIT)",
+            "mf_repeatability": "repeatability (UNIT)",
+            "mf_variability": "variability (UNIT)",
+            "mf_count": "count",
+            "inlet_height": "inlet height (m)",
+            "sampling_period": "sampling period (s)",
+            "instrument_type": "instrument type"}
+
+
 def plot_add_trace(fig, ds,
-                name="", mode="lines"):
+                name="",
+                variable="mf",
+                mode="lines"):
+    """ Add a trace to a plot
+
+    Args:
+        fig (plotly.graph_objects.Figure): Figure object
+        ds (xarray.Dataset): Dataset containing AGAGE mole fraction data
+        name (str): Name of the trace
+        variable (str): Variable to plot. Defaults to "mf"
+        mode (str) : how to plot the data. Defaults to "line", but can be set to "markers" if desired
+
+    Returns:
+        plotly.graph_objects.Figure: Figure object
+    """
 
     global colour_counter
 
@@ -45,7 +68,8 @@ def plot_add_trace(fig, ds,
                 line=dict(color=colours[colour_counter % colour_max], width=2),
                 name=name + f", {inlet} m",
                 x=ds_plot.time[ind].values,
-                y=ds_plot.mf[ind].values,)
+                y=ds_plot[variable][ind].values,
+                )
             )
 
         colour_counter += 1
@@ -53,7 +77,7 @@ def plot_add_trace(fig, ds,
     return fig
 
 
-def plot_combined(ds, fig, mode="lines"):
+def plot_combined(ds, fig, variable="mf", mode="lines"):
     """ Plot multiple instruments on the same plot
     
     Args:
@@ -83,14 +107,16 @@ def plot_combined(ds, fig, mode="lines"):
 
         # Add trace
         fig = plot_add_trace(fig, ds.isel(time=ind),
-                             name=f"{ds.attrs['site_code']}, {instrument_type_name}", mode=mode)
+                             name=f"{ds.attrs['site_code']}, {instrument_type_name}",
+                             variable=variable,
+                             mode=mode)
 
         colour_counter += 1
         
     return fig
 
 
-def plot_single(ds, fig, mode="lines"):
+def plot_single(ds, fig, variable="mf", mode="lines"):
     """ Plot a single instrument on the same plot
 
     Args:
@@ -106,18 +132,22 @@ def plot_single(ds, fig, mode="lines"):
 
     # Add trace
     fig = plot_add_trace(fig, ds,
-                         name=f"{ds.attrs['site_code']}", mode=mode)
+                         name=f"{ds.attrs['site_code']}",
+                         variable=variable,
+                         mode=mode)
 
     colour_counter += 1
     
     return fig
 
 
-def plot_datasets(datasets, mode="lines"):
+def plot_datasets(datasets, variable="mf", mode="lines"):
     """ Plot datasets
 
     Args:
         datasets (list): List of xarray datasets containing AGAGE mole fraction data
+        variable (str): Variable to plot. Defaults to "mf"
+        mode (str) : how to plot the data. Defaults to "line", but can be set to "markers" if desired
 
     Returns:
         plotly.graph_objects.Figure: Figure object
@@ -129,7 +159,9 @@ def plot_datasets(datasets, mode="lines"):
     fig = go.Figure()
 
     # Set y-axis title to be species and units
-    fig.update_yaxes(title_text=f"{datasets[0].attrs['species']} ({unit})")
+    y_title_suffix = variables[variable].replace("UNIT", unit)
+    y_title = f"{datasets[0].attrs['species']} {y_title_suffix}"
+    fig.update_yaxes(title_text=y_title)
 
     # Make figure less wide
     fig.update_layout(width=600,
@@ -149,11 +181,11 @@ def plot_datasets(datasets, mode="lines"):
         # If instrument_type variable is present, split by instrument_type
         if "instrument_type" in ds.variables:
 
-            fig = plot_combined(ds, fig, mode=mode)
+            fig = plot_combined(ds, fig, variable=variable, mode=mode)
 
         else:
             
-            fig = plot_single(ds, fig, mode=mode)
+            fig = plot_single(ds, fig, variable=variable, mode=mode)
 
     # Make sure legend is visible
     fig.update_layout(showlegend=True)
