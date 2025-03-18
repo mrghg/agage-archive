@@ -5,11 +5,14 @@ from glob import glob
 from pathlib import Path
 
 from agage_archive.config import Paths, data_file_list, open_data_file, is_jupyterlab_session
-from agage_archive.visualise import plot_datasets
+from agage_archive.visualise import plot_datasets, variables
 
 
 # Global dictionary to store filenames associated with instrument/site string displayed in dropdown
 instrument_site_filenames = {}
+
+# Global list to store variable names that can be plotted
+variable_names = list(variables.keys())
 
 
 def file_search_species(network, file_type, species, public = True):
@@ -169,7 +172,7 @@ def load_datasets(network, filenames, public = True):
     return datasets
 
 
-def plot_to_output(sender, network, species, instrument_site, public,
+def plot_to_output(sender, network, species, instrument_site, public, variable,
                    output_widget, mode="lines"):
     """ Plot to output widget
 
@@ -197,9 +200,9 @@ def plot_to_output(sender, network, species, instrument_site, public,
 
     with output_widget:
         clear_output()
-        print(f"Plotting {species} for {instrument_site}... please wait...")
+        print(f"Plotting {species} {variable} for {instrument_site}... please wait...")
         clear_output(True)
-        fig = plot_datasets(datasets, mode=mode)
+        fig = plot_datasets(datasets, variable=variable, mode=mode)
         fig.show(renderer=renderer)
 
 
@@ -296,6 +299,14 @@ def dashboard(network,
         style={'description_width': 'initial'}
     )
 
+    # Selection widget for variable
+    variable_dropdown = widgets.Dropdown(
+        options=variable_names,
+        description='Variable:',
+        disabled=False,
+        default=variable_names[0]
+    )
+
     # Plotting button
     plot_button = widgets.Button(description="Plot")
 
@@ -336,6 +347,7 @@ def dashboard(network,
                                                 species_dropdown.value,
                                                 instrument_site.value,
                                                 public_button.value,
+                                                variable_dropdown.value,
                                                 output,
                                                 mode=mode))
     plot_button.on_click(lambda x: show_netcdf_info(x, network,
@@ -347,6 +359,7 @@ def dashboard(network,
     display(species_dropdown)
     display(file_type_dropdown)
     display(instrument_site)
+    display(variable_dropdown)
     display(plot_button)
     display(output)
     display(output_netcdf)
