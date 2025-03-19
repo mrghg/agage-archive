@@ -403,5 +403,15 @@ def test_monthly_baseline():
     # Check if the baseline flag is added correctly
     assert ds_monthly.attrs["baseline_flag"] == ds_baseline.attrs["baseline_flag"]
 
+    # Test that the sampling_period is correctly set
+    assert ds_monthly.sampling_period.values[0] == 31*24*60*60
+    assert ds_monthly.sampling_period.values[1] == 28*24*60*60
+    assert ds_monthly.sampling_period.values[-2] == 30*24*60*60
+    # For december, sampling period should be 30 days and one minute
+    #  because final period is 1 - 31 Dec (midnight) + the 1 minute sampling period
+    assert ds_monthly.sampling_period.values[-1] == 30*24*60*60 + 60
+
     # Check that a version number is present
     assert "version" in ds_monthly.attrs.keys()
+
+test_monthly_baseline()

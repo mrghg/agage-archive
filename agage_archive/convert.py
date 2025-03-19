@@ -203,12 +203,11 @@ def resampler(df, variable_defaults, last_timestamp, resample_period="3600s"):
         if df_resample["instrument_type"].isnull().any():
             df_resample["instrument_type"].fillna(-1, inplace=True)
 
-    # If last resample period passes the end of the slice,
-    # change the sampling period to the number of seconds between the last time point and the end of the slice
-    if df_resample.index[-1] + pd.Timedelta(df_resample["sampling_period"].iloc[-1], unit="s") > last_timestamp:
-        df_resample.loc[df_resample.index[-1], "sampling_period"] = (last_timestamp - df_resample.index[-1]).seconds
+    # Change the final period to the number of seconds between the last time point and the end of the slice
+    df_resample.loc[df_resample.index[-1], "sampling_period"] = (last_timestamp - df_resample.index[-1]).total_seconds()
 
-    # Overwrite sampling period with the difference between the time points
+    # Overwrite the rest of the sampling periods with the difference between the time points
+    # This is because the resample method doesn't calculate the sampling period correctly for months
     time_diffs = df_resample.index.to_series().diff().dt.total_seconds()
     df_resample.loc[df_resample.index[:-1], "sampling_period"] = time_diffs.iloc[1:].values
     
