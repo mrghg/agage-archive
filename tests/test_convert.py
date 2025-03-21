@@ -377,6 +377,9 @@ def test_monthly_baseline():
 
     # Create a sample baseline dataset
     baseline_data = {"baseline": (["time"], np.random.choice([0, 1], size=len(time)))}
+    # Make sure that the final baseline value is 1 
+    # (otherwise final points are sometimes filtered out, which messes up sampling_period test)
+    baseline_data["baseline"][-1][-1] = 1
     ds_baseline = xr.Dataset(coords={"time": time}, data_vars=baseline_data)
     ds_baseline.attrs["baseline_flag"] = "Baseline Flag"
 
@@ -402,6 +405,14 @@ def test_monthly_baseline():
 
     # Check if the baseline flag is added correctly
     assert ds_monthly.attrs["baseline_flag"] == ds_baseline.attrs["baseline_flag"]
+
+    # Test that the sampling_period is correctly set
+    assert ds_monthly.sampling_period.values[0] == 31*24*60*60
+    assert ds_monthly.sampling_period.values[1] == 28*24*60*60
+    assert ds_monthly.sampling_period.values[-2] == 30*24*60*60
+    # For december, sampling period should be 30 days and one minute
+    #  because final period is 1 - 31 Dec (midnight) + the 1 minute sampling period
+    assert ds_monthly.sampling_period.values[-1].astype(int) == (30*24*60*60 + 60)
 
     # Check that a version number is present
     assert "version" in ds_monthly.attrs.keys()
