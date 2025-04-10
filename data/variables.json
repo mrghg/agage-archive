@@ -102,8 +102,8 @@
             "comment": "Time period over which sample was collected or averaged"
         },
         "encoding": {
-            "dtype": "i2",
-            "_FillValue": -99
+            "dtype": "i4",
+            "_FillValue": -9999
         },
         "optional": "True",
         "resample_method": "",
