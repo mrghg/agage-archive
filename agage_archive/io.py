@@ -1395,6 +1395,11 @@ def output_dataset(ds, network,
     # Select time slice
     if end_date:
         ds_out = ds_out.sel(time=slice(None, end_date))
+
+        if len(ds_out.time) == 0:
+            raise ValueError(f"No data retained for {ds_out.attrs['species']} when trying write {filename} after applying end date. " + \
+                            "Check dates in release schedule or omit this instrument.")
+
         ds_out.attrs["end_date"] = str(ds_out.time[-1].dt.strftime("%Y-%m-%d %H:%M:%S").values)
 
     if len(ds_out.time) == 0:
