@@ -71,7 +71,8 @@ def read_data_combination(network, species, site,
         return default_output
     
     if len(instrument_dates) == 1:
-        raise ValueError(f"Only one instrument found in data_combination.xlsx for {species} at {site.upper()}. Must have at least two instruments.")
+        # Do nothing. This gives us a way of preferring one instrument
+        pass
 
     return instrument_dates
 
