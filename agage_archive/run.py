@@ -225,8 +225,8 @@ def run_individual_site(site, species, network, instrument,
                                     sub_path=paths.output_path,
                                     pattern = f"{format_species(species)}/{network.lower()}_{site.lower()}_{format_species(species)}*.nc",
                                     errors="ignore")[2]:
-                        raise FileExistsError(f"Top-level file already exists for {species} at {site} (now trying to add instrument {instrument_out}). "\
-                                            "Add to data_combination csv to tell me how to combine the data.")
+                        # New behaviour: This is OK, as it provides a way for us to have one recommended instrument
+                        return (site, species, "")
 
                 ds.attrs["instrument_selection"] = instrument_selection_text_str
                 output_dataset(ds, network, instrument=instrument_str,
@@ -523,7 +523,7 @@ def run_all(network,
             baseline = True,
             monthly = True,
             instrument_include = [],
-            instrument_exclude = ["GCPDD"],
+            instrument_exclude = [],
             species = [],
             sites = [],
             public = True,
@@ -621,13 +621,20 @@ def run_all(network,
                                     monthly=monthly, species=species, sites=sites,
                                     public=public, resample=resample, top_level_only=top_level_only)
 
-    # Incorporate README file into output directory or zip file
+    # Incorporate README and CHANGELOG into output directory or zip file
     try:
         readme_file = data_file_path(filename='README.md',
                                     network=network, errors = "ignore_inputs")
         copy_to_archive(readme_file, network, public=public)
     except FileNotFoundError:
         print("No README file found")
+
+    try:
+        changelog_file = data_file_path(filename='CHANGELOG.md',
+                                    network=network, errors = "ignore_inputs")
+        copy_to_archive(changelog_file, network, public=public)
+    except FileNotFoundError:
+        print("No CHANGELOG file found")
 
     # If error log files have been created, warn the user
     if data_file_path("error_log_combined.txt", network=network, errors="ignore").exists():

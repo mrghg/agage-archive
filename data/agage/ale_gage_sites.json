@@ -15,8 +15,8 @@
         "station_long_name": "Kennaook/Cape Grim, Tasmania, Australia",
         "data_owner": "Paul Krummel",
         "data_owner_email": "paul.krummel@csiro.au",
-        "longitude": 144.689,
-        "latitude": -40.683,
+        "longitude": 144.689444,
+        "latitude": -40.683333,
         "tz": "UTC+10",
         "inlet_height": 70,
         "inlet_base_elevation_masl": 94.0
