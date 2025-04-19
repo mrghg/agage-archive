@@ -261,8 +261,14 @@ def format_variables(ds,
 
         else:
             if variables[var]["optional"] == "False":
-                raise ValueError(f"Variable {var_ds} not found in dataset. " + \
-                                "Use variable_translate to map to a different variable name.")
+                if "default" in variables[var]:
+                    # If the variable is optional, but has a default value, use that
+                    vars_out[var] = ("time", np.full(ds.time.shape, variables[var]["default"]))
+                else:
+                    # If the variable is not in the dataset, and is optional, set to NaN
+                    raise ValueError(f"Variable {var_ds} not found in dataset. " + \
+                                    "Use variable_translate to map to a different variable name, " + \
+                                        "or set a default value in variables.json.")
     
     # Create new dataset
     ds = xr.Dataset(vars_out,

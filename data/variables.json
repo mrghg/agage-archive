@@ -57,7 +57,7 @@
     "mf_std": {
         "attrs": {
             "long_name": "Mole fraction standard deviation of % in dry air",
-            "comment": "Standard deviation of replicate samples, if more than two samples are avaialble.",
+            "comment": "Standard deviation of replicate samples, if more than two samples are available.",
             "units": ""
         },
         "encoding": {
@@ -77,7 +77,8 @@
             "dtype": "i4",
             "_FillValue": -99
         },
-        "optional": "True",
+        "optional": "False",
+        "default": 1,
         "resample_method": "sum",
         "remove_flagged": "Zero"
     },
@@ -105,7 +106,7 @@
             "dtype": "i4",
             "_FillValue": -9999
         },
-        "optional": "True",
+        "optional": "False",
         "resample_method": "",
         "remove_flagged": "False"
     },
@@ -118,7 +119,7 @@
             "dtype": "i1",
             "_FillValue": -99
         },
-        "optional": "True",
+        "optional": "",
         "resample_method": "first",
         "remove_flagged": "False"
     }
