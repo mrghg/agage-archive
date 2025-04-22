@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 
 ## [Unreleased]
 
+### Changed
+- Data files now have a more uniform set of variables: mf_count, instrument_type, etc. are included in all files, whether data are present or not
+
+
 ## [20250123] - 2025-01-23
 
 This version represents several major changes in the way that AGAGE data are archived and formatted. Data will now be released in a Climate and Forecasting (CF) convention-compliant netCDF format. The archive contains several sets of files:
