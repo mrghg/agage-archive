@@ -259,7 +259,8 @@ def format_variables(ds,
             if variables[var]["optional"] == "False":
                 if "default" in variables[var]:
                     # If the variable is optional and has a default value, use that
-                    var_temp = np.full(ds.time.shape, variables[var]["default"])
+                    # Setting to a float to avoid issues with NaNs, type conversion happens later
+                    var_temp = np.full(ds.time.shape, float(variables[var]["default"]))
                 else:
                     raise ValueError(f"Variable {var_ds} not found in dataset and has no default value. " + \
                                     "Use variable_translate to map to a different variable name, " + \

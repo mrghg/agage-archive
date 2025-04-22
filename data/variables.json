@@ -50,7 +50,8 @@
             "dtype": "f4",
             "_FillValue": -9999
         },
-        "optional": "True",
+        "optional": "False",
+        "default": 0,
         "resample_method": "",
         "remove_flagged": "True"
     },
