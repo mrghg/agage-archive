@@ -3,7 +3,6 @@ import json
 import pandas as pd
 import numpy as np
 from zipfile import ZipFile
-from io import StringIO
 import json
 
 from agage_archive.config import Paths, open_data_file, data_file_list, \
@@ -17,7 +16,6 @@ from agage_archive.data_selection import read_release_schedule, read_data_exclud
 from agage_archive.definitions import instrument_type_definition, get_instrument_type, \
     get_instrument_number, instrument_selection_text
 from agage_archive.util import tz_local_to_utc, parse_fortran_format
-from agage_archive.io_other_formats import read_wang_file
 
 
 gcwerks_species = {"c2f6": "pfc-116",
@@ -115,6 +113,30 @@ def drop_duplicates(ds):
 
     # Remove the i and drop variables
     ds = ds.drop_vars(["i", "drop"])
+
+    return ds
+
+
+def define_instrument_type(ds, instrument):
+    """Define instrument type for a dataset
+    Args:
+        ds (xarray.Dataset): Dataset
+        instrument (str): Instrument name
+
+    Returns:
+        xarray.Dataset: Dataset with instrument_type defined
+    """
+
+    # Add instrument_type to dataset as variable
+    instrument_type = get_instrument_number(instrument)
+    ds["instrument_type"] = xr.DataArray(np.repeat(instrument_type, len(ds.time)),
+                                    dims="time", coords={"time": ds.time})
+    instrument_number, instrument_type_str = instrument_type_definition()
+
+    ds["instrument_type"].attrs = {
+        "long_name": "ALE/GAGE/AGAGE instrument type",
+        "comment": instrument_type_str,
+        }
 
     return ds
 
@@ -294,6 +316,9 @@ def read_nc(network, species, site, instrument,
         ds = ds.rename({"mf_mean_N": "mf_count"})
     if "mf_mean_stdev" in ds:
         ds = ds.rename({"mf_mean_stdev": "mf_variability"})
+
+    # Add instrument_type to dataset as variable
+    ds = define_instrument_type(ds, instrument)
 
     # Resample dataset, if needed and called
     if resample:
@@ -659,6 +684,9 @@ def read_ale_gage(network, species, site, instrument,
         ds.attrs["instrument_comment"] = "NOTE: Some data points may have been removed from the original dataset " + \
             "because they were not felt to be representative of the baseline air masses (Paul Fraser, pers. comm.). "
 
+    # Add instrument_type to dataset as variable
+    ds = define_instrument_type(ds, instrument)
+
     ds = format_attributes(ds,
                         instruments=[{"instrument": f"{instrument.upper()}_GCMD"}],
                         network=network,
@@ -931,6 +959,10 @@ def read_gcms_magnum(network, species,
     extra_attrs["instrument_type"] = get_instrument_type(get_instrument_number(instrument))
     extra_attrs["site_code"] = site
 
+    # Add instrument_type to dataset as variable
+    ds = define_instrument_type(ds, instrument)
+
+    # Add attributes
     ds = format_attributes(ds,
                         instruments=[{"instrument": instrument,
                                     "instrument_comment": "GCMS ADS with Finnigan Magnum Iron Trap",
@@ -1075,6 +1107,9 @@ def read_gcwerks_flask(network, species, site, instrument,
     else:
         raise ValueError("Flask data must use scale_defaults file")
 
+    # Add instrument_type to dataset as variable
+    ds = define_instrument_type(ds, instrument)
+
     ds = format_attributes(ds,
                         network = network,
                         species = species,
@@ -1179,7 +1214,6 @@ def combine_datasets(network, species, site,
 
         # Store instrument info and make sure the instrument_date is the same as in the filtered file
         instrument_rec.append({key:value for key, value in ds.attrs.items() if "instrument" in key})
-        #instrument_rec[-1]["instrument_date"] = str(dates_rec[-1])
 
         # If variable mf_count is not present, add it (1 measurement per time point)
         if "mf_count" not in ds:
@@ -1193,10 +1227,9 @@ def combine_datasets(network, species, site,
         # Record scale
         scales.append(ds.attrs["calibration_scale"])
 
-        # Add instrument_type to dataset as variable
-        instrument_type = get_instrument_number(instrument)
-        ds["instrument_type"] = xr.DataArray(np.repeat(instrument_type, len(ds.time)),
-                                        dims="time", coords={"time": ds.time})
+        # Check if instrument_type is defined. Error if not
+        if "instrument_type" not in ds.variables:
+            raise ValueError(f"Instrument type {ds.instrument_type} not found in instrument_type_definition.json")
 
         dss.append(ds)
 

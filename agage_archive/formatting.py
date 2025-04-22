@@ -227,6 +227,7 @@ def format_variables(ds,
 
     # Loop through standard variable names
     variables_standardise = [v for v in variables if v != "time"]
+
     for var in variables_standardise:
 
         # Do we need to translate any variable names?
@@ -234,42 +235,47 @@ def format_variables(ds,
             var_ds = variable_translate[var]
         else:
             var_ds = var
-        
-        # Copy and convert variable from dataset
-        if var_ds in ds.variables:
-            # Convert type to that contained in variables.json
-            typ = np.__getattribute__(nc4_types[variables[var]["encoding"]["dtype"]])
 
-            # Error on warnings, in case casting to type causes problems
-            warnings.simplefilter("error")
+        # Convert type to that contained in variables.json
+        typ = np.__getattribute__(nc4_types[variables[var]["encoding"]["dtype"]])
 
-            # Try to convert variable to new type. If there are missing values, choose an appropriate missing value for the type
-            # If the variable is a float, we still want to use NaNs
-            if nc4_types[variables[var]["encoding"]["dtype"]][0] != "f":
-                if "_FillValue" in variables[var]["encoding"]:
-                    missing_value = variables[var]["encoding"]["_FillValue"]
-                else:
-                    missing_value = np.nan
+        # Try to convert variable to new type. If there are missing values, choose an appropriate missing value for the type
+        # If the variable is a float, we still want to use NaNs
+        if nc4_types[variables[var]["encoding"]["dtype"]][0] != "f":
+            if "_FillValue" in variables[var]["encoding"]:
+                missing_value = variables[var]["encoding"]["_FillValue"]
             else:
                 missing_value = np.nan
-            
-            var_temp = ds[var_ds].values.copy()
-            var_temp[np.isnan(var_temp)] = missing_value
-            vars_out[var] = ("time", var_temp.copy().astype(typ))
-
-            warnings.simplefilter("default")
-
         else:
+            missing_value = np.nan
+        
+        # This if statement is here to handle optional variables that are not in the dataset
+        if var_ds in ds.variables:
+            var_temp = ds[var_ds].values.copy()
+        else:
+            # If the variable is not in the dataset, check if it is optional
+            # If it is optional, set it to the default value
+            # If it is not optional, raise an error
             if variables[var]["optional"] == "False":
                 if "default" in variables[var]:
-                    # If the variable is optional, but has a default value, use that
-                    vars_out[var] = ("time", np.full(ds.time.shape, variables[var]["default"]))
+                    # If the variable is optional and has a default value, use that
+                    var_temp = np.full(ds.time.shape, variables[var]["default"])
                 else:
-                    # If the variable is not in the dataset, and is optional, set to NaN
-                    raise ValueError(f"Variable {var_ds} not found in dataset. " + \
+                    raise ValueError(f"Variable {var_ds} not found in dataset and has no default value. " + \
                                     "Use variable_translate to map to a different variable name, " + \
-                                        "or set a default value in variables.json.")
-    
+                                    "or set a default value in variables.json.")
+            else:
+                # This variable is optional and not present, so we can skip it
+                continue
+
+        # Error on warnings, in case casting to type causes problems
+        warnings.simplefilter("error")
+
+        var_temp[np.isnan(var_temp)] = missing_value
+        vars_out[var] = ("time", var_temp.copy().astype(typ))
+
+        warnings.simplefilter("default")
+
     # Create new dataset
     ds = xr.Dataset(vars_out,
                     coords = {"time": ds.time.copy()}, 
