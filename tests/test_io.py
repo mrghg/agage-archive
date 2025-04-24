@@ -6,8 +6,9 @@ import json
 from agage_archive.config import Paths, open_data_file
 from agage_archive.io import read_ale_gage, read_nc, combine_datasets, read_nc_path, \
     read_baseline, combine_baseline, output_dataset, read_gcwerks_flask, drop_duplicates, \
-    read_gcms_magnum_file, read_gcms_magnum
+    read_gcms_magnum_file, read_gcms_magnum, define_instrument_type
 from agage_archive.convert import scale_convert
+from agage_archive.definitions import instrument_type_definition, get_instrument_number
 from agage_archive.definitions import nc4_types
 
 
@@ -406,3 +407,20 @@ def test_read_gcms_magnum():
     assert ds.sampling_period.values[0] == 2400
 
 
+def test_define_instrument_type():
+
+    ds = xr.Dataset(data_vars={"mf": ("time", np.random.rand(10)),
+                                "mf_repeatability": ("time", np.random.rand(10)),
+                                "inlet_height": ("time", np.random.rand(10)),
+                                "sampling_period": ("time", np.random.rand(10))},
+                    coords={"time": pd.date_range("2023-01-01", periods=10, freq="H")})
+
+    instrument = "ALE"
+
+    ds = define_instrument_type(ds, instrument)
+
+    instrument_number, instrument_type_str = instrument_type_definition()
+
+    assert ds["instrument_type"].attrs["long_name"] == "ALE/GAGE/AGAGE instrument type"
+    assert ds["instrument_type"].attrs["comment"] == instrument_type_str
+    assert ds["instrument_type"].values[0] == get_instrument_number(instrument)
