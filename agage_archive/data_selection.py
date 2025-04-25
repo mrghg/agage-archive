@@ -98,7 +98,7 @@ def read_release_schedule(network, instrument,
     with open_data_file(f"data_release_schedule_{instrument}.csv",
                         network = network, sub_path = "data_release_schedule") as f:
         # Read header lines
-        header = [f.readline().decode("utf-8")]
+        header = [f.readline().decode("utf-8-sig")]
         while header[-1][0] == "#":
             pos = f.tell()
             header.append(f.readline().decode("utf-8"))
